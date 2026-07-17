@@ -16,13 +16,16 @@
   canvas { display: block; }
 
   /* HUD */
-  #objective {
+  #hud-top {
     position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    z-index: 20; pointer-events: none; max-width: 80vw;
+  }
+  #objective {
     background: rgba(14, 31, 61, .88); color: #fff; padding: 10px 22px;
     border-radius: 999px; font-size: 15px; font-weight: 600; letter-spacing: .2px;
     border: 1px solid rgba(255,255,255,.15); box-shadow: 0 4px 18px rgba(0,0,0,.35);
-    max-width: 80vw; text-align: center; z-index: 20; pointer-events: none;
-    transition: opacity .3s;
+    text-align: center; transition: opacity .3s;
   }
   #prompt {
     position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
@@ -31,6 +34,15 @@
     box-shadow: 0 4px 14px rgba(0,0,0,.35); display: none; cursor: pointer;
   }
   #prompt.warn { background: rgba(255, 212, 59, .95); color: #4d3800; }
+  #steps { display: none; gap: 7px; }
+  #steps.show { display: flex; }
+  #steps span {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: rgba(255,255,255,.28); border: 1.5px solid rgba(255,255,255,.4);
+    transition: background .3s, border-color .3s, transform .3s;
+  }
+  #steps span.done { background: var(--pp-green); border-color: var(--pp-green); }
+  #steps span.current { border-color: #fff; background: rgba(255,255,255,.15); transform: scale(1.25); }
   #controls-hint {
     position: fixed; bottom: 14px; left: 14px; color: rgba(255,255,255,.75);
     font-size: 12.5px; z-index: 20; background: rgba(14,31,61,.6);
@@ -157,7 +169,8 @@
 
   /* small screens */
   @media (max-width: 640px) {
-    #objective { font-size: 13px; padding: 8px 16px; top: 10px; max-width: 88vw; }
+    #hud-top { top: 10px; max-width: 88vw; }
+    #objective { font-size: 13px; padding: 8px 16px; }
     #prompt { bottom: 140px; font-size: 14px; padding: 9px 16px; max-width: 84vw; text-align: center; }
     .card { padding: 22px 20px; }
     .card h1 { font-size: 21px; }
@@ -172,7 +185,12 @@
 <body>
 <div id="app"></div>
 
-<div id="objective"></div>
+<div id="hud-top">
+  <div id="objective"></div>
+  <div id="steps">
+    <span data-step="0" title="Park"></span><span data-step="1" title="Register"></span><span data-step="2" title="PIN"></span><span data-step="3" title="Dock"></span>
+  </div>
+</div>
 <div id="prompt"></div>
 <div id="controls-hint">
   <kbd>W A S D</kbd> / <kbd>&#8593;&#8595;&#8592;&#8594;</kbd> move &nbsp;·&nbsp; <kbd>&#8679; Shift</kbd> sprint &nbsp;·&nbsp; <kbd>E</kbd> interact
@@ -319,12 +337,54 @@ const DOCK_WALL_Z = -50;      // dock building front
   g.rotation.x = -Math.PI / 2; g.position.y = -0.02; g.receiveShadow = true;
   scene.add(g);
 
+  // asphalt with baked-in speckle so the big surface doesn't read as flat plastic
+  const ac = document.createElement('canvas');
+  ac.width = ac.height = 256;
+  const actx = ac.getContext('2d');
+  actx.fillStyle = '#44474c';
+  actx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 2600; i++) {
+    const v = 46 + Math.floor(Math.random() * 32);
+    actx.fillStyle = `rgba(${v},${v + 2},${v + 5},${0.18 + Math.random() * 0.25})`;
+    const s = Math.random() < 0.92 ? 1 : 2;
+    actx.fillRect(Math.random() * 256, Math.random() * 256, s, s);
+  }
+  const asphaltTex = new THREE.CanvasTexture(ac);
+  asphaltTex.colorSpace = THREE.SRGBColorSpace;
+  asphaltTex.wrapS = asphaltTex.wrapT = THREE.RepeatWrapping;
+  asphaltTex.repeat.set(10, 14);
   const asphalt = new THREE.Mesh(
     new THREE.PlaneGeometry(YARD.maxX - YARD.minX + 6, YARD.maxZ - YARD.minZ + 6),
-    new THREE.MeshStandardMaterial({ color: 0x4a4d52, roughness: 0.95 })
+    new THREE.MeshStandardMaterial({ map: asphaltTex, roughness: 0.95 })
   );
   asphalt.rotation.x = -Math.PI / 2; asphalt.receiveShadow = true;
   scene.add(asphalt);
+
+  // trees outside the fence
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4d33, roughness: 0.9 });
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f7d3a, roughness: 0.85 });
+  for (const [x, z, s] of [[-53, 22, 1], [-54, -12, 1.25], [-52, 48, 0.85], [53, 38, 1.1], [54, 2, 0.9], [52, -30, 1.2], [-30, -72, 1.1], [22, -73, 0.95]]) {
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35 * s, 0.5 * s, 3 * s, 8), trunkMat);
+    trunk.position.set(x, 1.5 * s, z); trunk.castShadow = true;
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(2.4 * s, 10, 8), leafMat);
+    crown.position.set(x, 4.4 * s, z); crown.scale.y = 1.15; crown.castShadow = true;
+    scene.add(trunk, crown);
+  }
+
+  // yard light poles
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x5a6470, metalness: 0.4, roughness: 0.5 });
+  const lampMat = new THREE.MeshStandardMaterial({ color: 0xfff3cf, emissive: 0xffe9a8, emissiveIntensity: 0.9 });
+  for (const [x, z] of [[-42, 58], [42, 58], [-42, -4], [42, -4]]) {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 8.5, 8), poleMat);
+    pole.position.set(x, 4.25, z); pole.castShadow = true;
+    const armDir = Math.sign(-x);
+    const armM = box(1.6, 0.12, 0.12, 0x5a6470, { metalness: 0.4, roughness: 0.5 });
+    armM.position.set(x + armDir * 0.8, 8.4, z);
+    const lamp = box(0.9, 0.22, 0.45, 0xfff3cf, { emissive: 0xffe9a8, emissiveIntensity: 0.9 });
+    lamp.position.set(x + armDir * 1.5, 8.28, z);
+    lamp.material = lampMat;
+    scene.add(pole, armM, lamp);
+  }
 }
 
 // fence
@@ -400,7 +460,17 @@ function makeTractorMesh(color = 0x1f6bff) {
   const wind = box(2.15, 0.85, 0.1, 0x2b3a52, { roughness: 0.2, metalness: 0.6 }); wind.position.set(0, 2.45, 4.9);
   const grille = box(2.3, 0.7, 0.12, 0x1a2434); grille.position.set(0, 1.2, 4.9);
   const plate = box(1.5, 0.12, 1.3, 0x3a3f46, { metalness: 0.5, roughness: 0.4 }); plate.position.set(0, 1.02, 0);
-  addWheels(g, [[-1.2, 4.1], [1.2, 4.1], [-1.2, 0.5], [1.2, 0.5], [-1.2, -0.5], [1.2, -0.5]]);
+  addWheels(g, [[-1.2, 0.5], [1.2, 0.5], [-1.2, -0.5], [1.2, -0.5]]);
+  // front wheels get their own pivots so they can visibly steer
+  g.userData.frontPivots = [-1.2, 1.2].map(x => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, 0.55, 4.1);
+    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.rotation.z = Math.PI / 2; w.castShadow = true;
+    pivot.add(w);
+    g.add(pivot);
+    return pivot;
+  });
   g.add(chassis, cab, wind, grille, plate);
   return g;
 }
@@ -544,6 +614,7 @@ const kiosk = new THREE.Group();
   sctx.fillText('REGISTER', 256, 62);
   sctx.fillText('HERE  ▼', 256, 134);
   const signTex = new THREE.CanvasTexture(signCanvas);
+  signTex.colorSpace = THREE.SRGBColorSpace;
   const signBoard = new THREE.Mesh(
     new THREE.PlaneGeometry(3.6, 1.35),
     new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })
@@ -584,6 +655,23 @@ const barrier = new THREE.Group();
   const post2 = box(0.4, 1.0, 0.4, 0x30405e, { metalness: 0.3 });
   post2.position.set(BARRIER_GAP, 0.5, 0);
   barrier.add(post2);
+  // PIN sign on the barrier post
+  const pc = document.createElement('canvas');
+  pc.width = pc.height = 128;
+  const pctx = pc.getContext('2d');
+  pctx.fillStyle = '#0e1f3d'; pctx.fillRect(0, 0, 128, 128);
+  pctx.strokeStyle = '#ffd43b'; pctx.lineWidth = 6; pctx.strokeRect(6, 6, 116, 116);
+  pctx.fillStyle = '#ffd43b'; pctx.textAlign = 'center'; pctx.textBaseline = 'middle';
+  pctx.font = 'bold 44px sans-serif'; pctx.fillText('PIN', 64, 44);
+  pctx.font = 'bold 30px sans-serif'; pctx.fillText('• • •', 64, 90);
+  const pinTex = new THREE.CanvasTexture(pc);
+  pinTex.colorSpace = THREE.SRGBColorSpace;
+  const pinSign = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.3, 1.3),
+    new THREE.MeshBasicMaterial({ map: pinTex })
+  );
+  pinSign.position.set(-BARRIER_GAP, 2.2, 0.3);
+  barrier.add(pinSign);
   barrier.position.set(0, 0, BARRIER_Z);
   scene.add(barrier);
 }
@@ -614,9 +702,11 @@ const DOCK_SPOT = { x: 0, z: -41, w: 6, d: 17 };
     ctx.fillStyle = '#ffd43b'; ctx.font = 'bold 84px sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(String(i + 1), 64, 70);
+    const dockTex = new THREE.CanvasTexture(canvas);
+    dockTex.colorSpace = THREE.SRGBColorSpace;
     const sign = new THREE.Mesh(
       new THREE.PlaneGeometry(1.6, 1.6),
-      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas) })
+      new THREE.MeshBasicMaterial({ map: dockTex })
     );
     sign.position.set(x, 5.6, DOCK_WALL_Z + 0.25);
     scene.add(sign);
@@ -697,7 +787,18 @@ const pinOverlay = $('pinpad-overlay'), congratsOverlay = $('congrats-overlay');
 const phoneEl = $('phone'), phoneMsg = $('phone-msg'), phoneAnswer = $('phone-answer'), phoneLabel = $('phone-label');
 const btnInteract = $('btn-interact');
 
-function setObjective(text) { objectiveEl.textContent = text; }
+const STEP_OF_STATE = { 'drive-park': 0, 'walk-kiosk': 1, 'kiosk': 1, 'walk-back': 2, 'drive-barrier': 2, 'drive-dock': 3, 'done': 4 };
+function setObjective(text) {
+  objectiveEl.textContent = text;
+  const stepsEl = $('steps');
+  const cur = STEP_OF_STATE[state];
+  if (cur === undefined) { stepsEl.classList.remove('show'); return; }
+  stepsEl.classList.add('show');
+  stepsEl.querySelectorAll('span').forEach((dot, i) => {
+    dot.classList.toggle('done', i < cur);
+    dot.classList.toggle('current', i === cur);
+  });
+}
 function setPrompt(text, warn = false) {
   if (!text) { promptEl.style.display = 'none'; return; }
   if (document.body.classList.contains('touch')) text = text.replace('Press E', 'Tap USE');
@@ -932,9 +1033,14 @@ function driveTruck(dt) {
     if (Math.sign(truckState.speed) !== s) truckState.speed = 0;
   }
 
-  // bicycle model: heading turns with signed speed, so reversing steers mirrored — like a real cab
+  // front wheels visibly track the steering input
+  tractor.userData.frontPivots.forEach(p => { p.rotation.y = truckState.steer; });
+
+  // bicycle model: heading turns with signed speed, so reversing steers mirrored — like a real cab.
+  // steering authority tapers at speed so full throttle doesn't feel twitchy
   if (Math.abs(truckState.speed) > 0.05) {
-    truckState.heading += (truckState.speed / RIG.WB) * Math.tan(truckState.steer) * dt;
+    const taper = 1 - 0.45 * Math.min(1, Math.abs(truckState.speed) / MAX);
+    truckState.heading += (truckState.speed / RIG.WB) * Math.tan(truckState.steer * taper) * dt;
   }
   const dir = new THREE.Vector3(Math.sin(truckState.heading), 0, Math.cos(truckState.heading));
   const next = tractor.position.clone().addScaledVector(dir, truckState.speed * dt);
@@ -978,7 +1084,7 @@ function walkPlayer(dt) {
     if (len > 1) { dx /= len; dz /= len; len = 1; }  // keep analog magnitude, cap at full speed
     player.position.x += dx * SPEED * dt;
     player.position.z += dz * SPEED * dt;
-    player.rotation.y = Math.atan2(dx, dz);
+    player.rotation.y += normAngle(Math.atan2(dx, dz) - player.rotation.y) * Math.min(1, dt * 14);
     player.position.x = THREE.MathUtils.clamp(player.position.x, YARD.minX + 1, YARD.maxX - 1);
     player.position.z = THREE.MathUtils.clamp(player.position.z, BARRIER_Z + 1.2, YARD.maxZ - 1);
     moving = len;
