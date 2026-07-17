@@ -144,8 +144,14 @@
   #btn-interact {
     position: fixed; right: 22px; bottom: 40px; width: 76px; height: 76px;
     border-radius: 50%; border: none; background: var(--pp-green); color: #08331b;
-    font-size: 24px; font-weight: 800; z-index: 25;
-    box-shadow: 0 6px 18px rgba(0,0,0,.4); touch-action: manipulation;
+    font-size: 24px; font-weight: 800; z-index: 25; display: none;
+    box-shadow: 0 6px 18px rgba(0,0,0,.4), 0 0 0 0 rgba(46,204,113,.6);
+    touch-action: manipulation; animation: use-pop .25s ease-out, use-pulse 1.6s .25s infinite;
+  }
+  @keyframes use-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes use-pulse {
+    0%, 100% { box-shadow: 0 6px 18px rgba(0,0,0,.4), 0 0 0 0 rgba(46,204,113,.55); }
+    50% { box-shadow: 0 6px 18px rgba(0,0,0,.4), 0 0 0 14px rgba(46,204,113,0); }
   }
   body.touch #phone { bottom: 130px; right: 14px; width: 190px; }
 
@@ -689,10 +695,12 @@ const objectiveEl = $('objective'), promptEl = $('prompt');
 const introOverlay = $('intro-overlay'), kioskOverlay = $('kiosk-overlay');
 const pinOverlay = $('pinpad-overlay'), congratsOverlay = $('congrats-overlay');
 const phoneEl = $('phone'), phoneMsg = $('phone-msg'), phoneAnswer = $('phone-answer'), phoneLabel = $('phone-label');
+const btnInteract = $('btn-interact');
 
 function setObjective(text) { objectiveEl.textContent = text; }
 function setPrompt(text, warn = false) {
   if (!text) { promptEl.style.display = 'none'; return; }
+  if (document.body.classList.contains('touch')) text = text.replace('Press E', 'Tap USE');
   promptEl.textContent = text;
   promptEl.className = warn ? 'warn' : '';
   promptEl.style.display = 'block';
@@ -987,21 +995,23 @@ function walkPlayer(dt) {
 }
 
 // ---------------------------------------------------------------- prompts per state
+let canUse = false; // an interaction is available right now — drives the USE button
 function updatePrompts() {
-  if (overlayVisible()) { setPrompt(null); return; }
-  switch (state) {
+  canUse = false;
+  if (overlayVisible()) { setPrompt(null); }
+  else switch (state) {
     case 'drive-park':
-      if (rigInZone(PARK_SPOT) && Math.abs(truckState.speed) < 2) setPrompt('Press E to get out of the truck');
+      if (rigInZone(PARK_SPOT) && Math.abs(truckState.speed) < 2) { setPrompt('Press E to get out of the truck'); canUse = true; }
       else if (inZone(tractor.position, PARK_SPOT, 3) && Math.abs(truckState.speed) < 2) setPrompt('Straighten the rig inside the lines', true);
       else setPrompt(null);
       break;
     case 'walk-kiosk':
-      if (dist2d(player.position, KIOSK_POS) < 5) setPrompt('Press E to register at the kiosk');
+      if (dist2d(player.position, KIOSK_POS) < 5) { setPrompt('Press E to register at the kiosk'); canUse = true; }
       else setPrompt(null);
       break;
     case 'walk-back':
       if (dist2d(player.position, tractor.position) < 6) {
-        if (phoneAnswered) setPrompt('Press E to get in the truck');
+        if (phoneAnswered) { setPrompt('Press E to get in the truck'); canUse = true; }
         else setPrompt('📱 Your phone… answer it first (bottom right)', true);
       } else setPrompt(null);
       break;
@@ -1017,6 +1027,7 @@ function updatePrompts() {
       if (rigInZone(DOCK_SPOT) && Math.abs(truckState.speed) < 2) finish();
       break;
   }
+  btnInteract.style.display = canUse ? 'block' : 'none';
 }
 
 // ---------------------------------------------------------------- camera
