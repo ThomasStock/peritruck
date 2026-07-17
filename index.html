@@ -419,7 +419,7 @@ player.visible = false;
 scene.add(player);
 
 // ---------------------------------------------------------------- kiosk
-const KIOSK_POS = new THREE.Vector3(14, 0, 58); // beside the site entrance, next to the office
+const KIOSK_POS = new THREE.Vector3(-15, 0, 8); // on the route between parking and the barrier
 const kiosk = new THREE.Group();
 {
   const base = box(1.2, 0.3, 1.2, 0x2b3646, { metalness: 0.3, roughness: 0.5 });
@@ -434,12 +434,31 @@ const kiosk = new THREE.Group();
   roof.position.y = 3.75;
   kiosk.add(base, pole, body, screen, roof);
   kiosk.position.copy(KIOSK_POS);
-  kiosk.rotation.y = 0; // screen faces north, into the yard
+  kiosk.rotation.y = Math.PI; // screen faces south, toward the parking row
   scene.add(kiosk);
-  const glow = paintLine(KIOSK_POS.x, KIOSK_POS.z - 1.6, 3.4, 2.6, 0x59c2ff, 0.25);
+  const glow = paintLine(KIOSK_POS.x, KIOSK_POS.z + 1.6, 3.4, 2.6, 0x59c2ff, 0.25);
   glow.userData.pulse = true;
 
-  // site office next to the kiosk
+  // "Register here" board above the kiosk
+  const signCanvas = document.createElement('canvas');
+  signCanvas.width = 512; signCanvas.height = 192;
+  const sctx = signCanvas.getContext('2d');
+  sctx.fillStyle = '#1f6bff'; sctx.fillRect(0, 0, 512, 192);
+  sctx.strokeStyle = '#ffffff'; sctx.lineWidth = 8; sctx.strokeRect(8, 8, 496, 176);
+  sctx.fillStyle = '#ffffff'; sctx.textAlign = 'center'; sctx.textBaseline = 'middle';
+  sctx.font = 'bold 64px sans-serif';
+  sctx.fillText('REGISTER', 256, 62);
+  sctx.fillText('HERE  ▼', 256, 134);
+  const signTex = new THREE.CanvasTexture(signCanvas);
+  const signBoard = new THREE.Mesh(
+    new THREE.PlaneGeometry(3.6, 1.35),
+    new THREE.MeshBasicMaterial({ map: signTex, side: THREE.DoubleSide })
+  );
+  signBoard.position.set(0, 4.7, 0);
+  signBoard.rotation.y = Math.PI; // read from the parking side (kiosk group is rotated π)
+  kiosk.add(signBoard);
+
+  // site office by the entrance
   const office = box(7, 3.4, 3.6, 0xe8e4da, { roughness: 0.9 });
   office.position.set(24, 1.7, 60);
   const officeRoof = box(7.5, 0.25, 4.1, 0x1f6bff, { roughness: 0.5 });
@@ -536,6 +555,44 @@ const dockHighlight = paintLine(DOCK_SPOT.x, DOCK_SPOT.z, DOCK_SPOT.w - 0.8, DOC
     cone.position.set(x, 0.45, z); cone.castShadow = true;
     scene.add(cone);
   }
+}
+
+// ---------------------------------------------------------------- objective arrow
+// floats above whoever you're controlling, points at the next objective
+const arrow = new THREE.Group();
+{
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffd43b, emissive: 0xffb020, emissiveIntensity: 0.55, roughness: 0.35 });
+  const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.28, 1.7), mat);
+  shaft.position.z = 0.2;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.75, 1.5, 16), mat);
+  head.rotation.x = Math.PI / 2;
+  head.position.z = 1.75;
+  arrow.add(shaft, head);
+  arrow.visible = false;
+  scene.add(arrow);
+}
+function objectiveTarget() {
+  switch (state) {
+    case 'drive-park': return new THREE.Vector3(PARK_SPOT.x, 0, PARK_SPOT.z);
+    case 'walk-kiosk': return KIOSK_POS;
+    case 'walk-back': return tractor.position;
+    case 'drive-barrier': return new THREE.Vector3(0, 0, BARRIER_Z);
+    case 'drive-dock': return new THREE.Vector3(DOCK_SPOT.x, 0, DOCK_SPOT.z);
+    default: return null;
+  }
+}
+function updateArrow() {
+  const target = objectiveTarget();
+  if (!target) { arrow.visible = false; return; }
+  const walking = state === 'walk-kiosk' || state === 'walk-back';
+  const actor = walking ? player : tractor;
+  if (dist2d(actor.position, target) < 8) { arrow.visible = false; return; } // close enough — highlight/prompt takes over
+  arrow.visible = true;
+  arrow.position.set(
+    actor.position.x,
+    (walking ? 3.8 : 6.0) + 0.3 * Math.sin(pulse * 4),
+    actor.position.z);
+  arrow.rotation.y = Math.atan2(target.x - actor.position.x, target.z - actor.position.z);
 }
 
 // ---------------------------------------------------------------- UI refs
@@ -869,6 +926,7 @@ function update(dt) {
   if (state !== 'drive-park') parkHighlight.material.opacity = Math.min(parkHighlight.material.opacity, 0.12);
 
   updatePrompts();
+  updateArrow();
   updateCamera(dt);
 }
 
