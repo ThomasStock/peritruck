@@ -169,7 +169,7 @@
 <div id="objective"></div>
 <div id="prompt"></div>
 <div id="controls-hint">
-  <kbd>W A S D</kbd> / <kbd>&#8593;&#8595;&#8592;&#8594;</kbd> move &nbsp;·&nbsp; <kbd>E</kbd> interact
+  <kbd>W A S D</kbd> / <kbd>&#8593;&#8595;&#8592;&#8594;</kbd> move &nbsp;·&nbsp; <kbd>&#8679; Shift</kbd> sprint &nbsp;·&nbsp; <kbd>E</kbd> interact
 </div>
 
 <div id="touch-controls">
@@ -649,12 +649,12 @@ const dockHighlight = paintLine(DOCK_SPOT.x, DOCK_SPOT.z, DOCK_SPOT.w - 0.8, DOC
 // floats above whoever you're controlling, points at the next objective
 const arrow = new THREE.Group();
 {
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffd43b, emissive: 0xffb020, emissiveIntensity: 0.55, roughness: 0.35 });
-  const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.28, 1.7), mat);
-  shaft.position.z = 0.2;
-  const head = new THREE.Mesh(new THREE.ConeGeometry(0.75, 1.5, 16), mat);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffd43b, emissive: 0xffb020, emissiveIntensity: 0.3, roughness: 0.35, transparent: true, opacity: 0.8 });
+  const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.14, 0.95), mat);
+  shaft.position.z = 0.1;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.8, 14), mat);
   head.rotation.x = Math.PI / 2;
-  head.position.z = 1.75;
+  head.position.z = 0.95;
   arrow.add(shaft, head);
   arrow.visible = false;
   scene.add(arrow);
@@ -678,7 +678,7 @@ function updateArrow() {
   arrow.visible = true;
   arrow.position.set(
     actor.position.x,
-    (walking ? 3.8 : 6.0) + 0.3 * Math.sin(pulse * 4),
+    (walking ? 3.0 : 5.2) + 0.12 * Math.sin(pulse * 3),
     actor.position.z);
   arrow.rotation.y = Math.atan2(target.x - actor.position.x, target.z - actor.position.z);
 }
@@ -955,7 +955,9 @@ function driveTruck(dt) {
 }
 
 function walkPlayer(dt) {
-  const SPEED = 7;
+  // shift to sprint on keyboard; pushing the stick to its edge sprints on touch
+  const sprint = keys.has('shift') || Math.hypot(joy.x, joy.y) > 0.95;
+  const SPEED = sprint ? 11.5 : 6.5;
   let dx = 0, dz = 0;
   if (keys.has('w') || keys.has('arrowup')) dz -= 1;
   if (keys.has('s') || keys.has('arrowdown')) dz += 1;
@@ -973,10 +975,10 @@ function walkPlayer(dt) {
     player.position.z = THREE.MathUtils.clamp(player.position.z, BARRIER_Z + 1.2, YARD.maxZ - 1);
     moving = len;
   }
-  // limb swing while walking, ease out when stopping
+  // limb swing while walking, ease out when stopping; faster + wider when sprinting
   const u = player.userData;
-  u.cycle += dt * 11 * moving;
-  u.swing = THREE.MathUtils.lerp(u.swing, moving ? 0.55 : 0, Math.min(1, dt * 10));
+  u.cycle += dt * (sprint ? 16 : 11) * moving;
+  u.swing = THREE.MathUtils.lerp(u.swing, moving ? (sprint ? 0.75 : 0.55) : 0, Math.min(1, dt * 10));
   const s = Math.sin(u.cycle) * u.swing;
   limbs.legL.rotation.x = s;
   limbs.legR.rotation.x = -s;
