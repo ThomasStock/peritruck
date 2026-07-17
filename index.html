@@ -332,40 +332,68 @@ for (const z of [14, 23, 32, 41, 50]) {
   paintLine(-27, z, 0.35, 8.3);
 }
 const parkHighlight = paintLine(PARK_SPOT.x, PARK_SPOT.z, PARK_SPOT.w - 1.5, PARK_SPOT.d + 1.2, 0x2ecc71, 0.4);
-// a couple of parked trucks for flavor
-function makeTruck(cabColor = 0x1f6bff, trailerColor = 0xe8e8e8) {
-  const t = new THREE.Group();
-  const trailer = box(2.5, 3.0, 9, trailerColor, { roughness: 0.6 });
-  trailer.position.set(0, 2.0, 2.8);
-  const cab = box(2.4, 2.4, 3.2, cabColor, { roughness: 0.45, metalness: 0.15 });
-  cab.position.set(0, 1.55, -4.0);
-  const wind = box(2.2, 0.9, 0.1, 0x2b3a52, { roughness: 0.2, metalness: 0.6 });
-  wind.position.set(0, 2.1, -5.55);
-  const wheelGeo = new THREE.CylinderGeometry(0.62, 0.62, 0.5, 18);
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x191919, roughness: 0.9 });
-  for (const [x, z] of [[-1.25, -4.6], [1.25, -4.6], [-1.25, -3.2], [1.25, -3.2], [-1.3, 5.4], [1.3, 5.4], [-1.3, 4.0], [1.3, 4.0], [-1.3, 0.5], [1.3, 0.5]]) {
-    const w = new THREE.Mesh(wheelGeo, wheelMat);
-    w.rotation.z = Math.PI / 2; w.position.set(x, 0.62, z);
-    w.castShadow = true;
-    t.add(w);
-  }
-  t.add(trailer, cab, wind);
-  return t;
-}
-for (const [z, c] of [[14, 0xd8452c], [50, 0x38a169]]) {
-  const parked = makeTruck(c, 0xdadfe6);
-  parked.position.set(-35, 0, z);
-  parked.rotation.y = -Math.PI / 2;
-  scene.add(parked);
-}
 
-// ---------------------------------------------------------------- player truck
-const truck = makeTruck(0x1f6bff, 0xf4f6f8);
-// Peripass-blue cab, white trailer
-truck.position.set(0, 0, 58);
-scene.add(truck);
-const truckState = { heading: Math.PI, speed: 0 }; // heading π → forward = (0,0,-1), into the yard
-truck.rotation.y = truckState.heading;
+// ---------------------------------------------------------------- truck rigs
+// tractor origin = rear axle / fifth wheel, forward = +z
+// trailer origin = kingpin (sits on the fifth wheel), body spans z +1.5 … −7.5
+const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.5, 18);
+const wheelMat = new THREE.MeshStandardMaterial({ color: 0x191919, roughness: 0.9 });
+function addWheels(group, pairs) {
+  for (const [x, z] of pairs) {
+    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.rotation.z = Math.PI / 2; w.position.set(x, 0.55, z);
+    w.castShadow = true;
+    group.add(w);
+  }
+}
+function makeTractorMesh(color = 0x1f6bff) {
+  const g = new THREE.Group();
+  const chassis = box(1.1, 0.35, 5.6, 0x2a2f36); chassis.position.set(0, 0.6, 1.4);
+  const cab = box(2.4, 2.3, 2.7, color, { roughness: 0.45, metalness: 0.15 }); cab.position.set(0, 2.0, 3.5);
+  const wind = box(2.15, 0.85, 0.1, 0x2b3a52, { roughness: 0.2, metalness: 0.6 }); wind.position.set(0, 2.45, 4.9);
+  const grille = box(2.3, 0.7, 0.12, 0x1a2434); grille.position.set(0, 1.2, 4.9);
+  const plate = box(1.5, 0.12, 1.3, 0x3a3f46, { metalness: 0.5, roughness: 0.4 }); plate.position.set(0, 1.02, 0);
+  addWheels(g, [[-1.2, 4.1], [1.2, 4.1], [-1.2, 0.5], [1.2, 0.5], [-1.2, -0.5], [1.2, -0.5]]);
+  g.add(chassis, cab, wind, grille, plate);
+  return g;
+}
+function makeTrailerMesh(color = 0xf4f6f8) {
+  const g = new THREE.Group();
+  const bodyM = box(2.5, 2.8, 9, color, { roughness: 0.6 }); bodyM.position.set(0, 2.55, -3);
+  const bumper = box(2.4, 0.3, 0.15, 0x22262c); bumper.position.set(0, 0.75, -7.5);
+  const legs = box(0.9, 0.9, 0.2, 0x565d66); legs.position.set(0, 0.55, -1.2);
+  addWheels(g, [[-1.25, -5.4], [1.25, -5.4], [-1.25, -6.4], [1.25, -6.4]]);
+  g.add(bodyM, bumper, legs);
+  return g;
+}
+function placeStaticRig(x, z, h, cabColor, trailerColor = 0xdadfe6) {
+  const t = makeTractorMesh(cabColor), tr = makeTrailerMesh(trailerColor);
+  t.position.set(x, 0, z); t.rotation.y = h;
+  tr.position.set(x, 0, z); tr.rotation.y = h;
+  scene.add(t, tr);
+}
+// parked flavor rigs, nose out toward the drive lane
+placeStaticRig(-31, 14, Math.PI / 2, 0xd8452c);
+placeStaticRig(-31, 50, Math.PI / 2, 0x38a169);
+
+// ---------------------------------------------------------------- player rig (articulated)
+const tractor = makeTractorMesh(0x1f6bff);
+const trailerM = makeTrailerMesh(0xf4f6f8);
+tractor.position.set(0, 0, 58);
+trailerM.position.set(0, 0, 58);
+scene.add(tractor, trailerM);
+// heading π → forward = (0,0,-1), into the yard
+const truckState = { heading: Math.PI, trailerHeading: Math.PI, speed: 0, steer: 0 };
+tractor.rotation.y = trailerM.rotation.y = Math.PI;
+
+const RIG = { WB: 4.1, LT: 6, MAX_STEER: 0.55, STEER_RATE: 2.4, MAX_JACKKNIFE: 1.35 };
+const normAngle = a => ((a % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
+const tractorFrontPoint = () => new THREE.Vector3(
+  tractor.position.x + Math.sin(truckState.heading) * 5, 0,
+  tractor.position.z + Math.cos(truckState.heading) * 5);
+const trailerRearPoint = () => new THREE.Vector3(
+  tractor.position.x - Math.sin(truckState.trailerHeading) * 7.5, 0,
+  tractor.position.z - Math.cos(truckState.trailerHeading) * 7.5);
 
 // ---------------------------------------------------------------- player (driver)
 const player = new THREE.Group();
@@ -391,7 +419,7 @@ player.visible = false;
 scene.add(player);
 
 // ---------------------------------------------------------------- kiosk
-const KIOSK_POS = new THREE.Vector3(18, 0, 40);
+const KIOSK_POS = new THREE.Vector3(14, 0, 58); // beside the site entrance, next to the office
 const kiosk = new THREE.Group();
 {
   const base = box(1.2, 0.3, 1.2, 0x2b3646, { metalness: 0.3, roughness: 0.5 });
@@ -406,10 +434,21 @@ const kiosk = new THREE.Group();
   roof.position.y = 3.75;
   kiosk.add(base, pole, body, screen, roof);
   kiosk.position.copy(KIOSK_POS);
-  kiosk.rotation.y = Math.PI; // screen faces south, toward parking
+  kiosk.rotation.y = 0; // screen faces north, into the yard
   scene.add(kiosk);
-  const glow = paintLine(KIOSK_POS.x, KIOSK_POS.z + 1.6, 3.4, 2.6, 0x59c2ff, 0.25);
+  const glow = paintLine(KIOSK_POS.x, KIOSK_POS.z - 1.6, 3.4, 2.6, 0x59c2ff, 0.25);
   glow.userData.pulse = true;
+
+  // site office next to the kiosk
+  const office = box(7, 3.4, 3.6, 0xe8e4da, { roughness: 0.9 });
+  office.position.set(24, 1.7, 60);
+  const officeRoof = box(7.5, 0.25, 4.1, 0x1f6bff, { roughness: 0.5 });
+  officeRoof.position.set(24, 3.5, 60);
+  const officeDoor = box(1.1, 2.2, 0.1, 0x33405a);
+  officeDoor.position.set(21.5, 1.1, 58.15);
+  const officeWin = box(3.2, 1.2, 0.1, 0x9fdcff, { emissive: 0x59c2ff, emissiveIntensity: 0.4, roughness: 0.2 });
+  officeWin.position.set(25.2, 2.1, 58.15);
+  scene.add(office, officeRoof, officeDoor, officeWin);
 }
 
 // ---------------------------------------------------------------- barrier
@@ -564,16 +603,18 @@ const overlayVisible = () => [introOverlay, kioskOverlay, pinOverlay, congratsOv
 function inZone(pos, zone, margin = 0) {
   return Math.abs(pos.x - zone.x) < zone.w / 2 + margin && Math.abs(pos.z - zone.z) < zone.d / 2 + margin;
 }
+// whole rig (cab nose + trailer tail) inside the zone → properly parked, not jackknifed across the lines
+const rigInZone = (zone, margin = 1.8) => inZone(tractorFrontPoint(), zone, margin) && inZone(trailerRearPoint(), zone, margin);
 const dist2d = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 // ---------------------------------------------------------------- interactions
 function tryInteract() {
   if (overlayVisible()) return;
-  if (state === 'drive-park' && inZone(truck.position, PARK_SPOT, 1.5) && Math.abs(truckState.speed) < 2) {
+  if (state === 'drive-park' && rigInZone(PARK_SPOT) && Math.abs(truckState.speed) < 2) {
     exitTruck();
   } else if (state === 'walk-kiosk' && dist2d(player.position, KIOSK_POS) < 5) {
     openKiosk();
-  } else if (state === 'walk-back' && dist2d(player.position, truck.position) < 6) {
+  } else if (state === 'walk-back' && dist2d(player.position, tractor.position) < 6) {
     if (!phoneAnswered) {
       setPrompt('📱 Answer your phone first!', true);
       return;
@@ -584,7 +625,11 @@ function tryInteract() {
 
 function exitTruck() {
   truckState.speed = 0;
-  player.position.set(truck.position.x, 0, truck.position.z + 5);
+  // step out beside the cab door
+  const h = truckState.heading;
+  player.position.set(
+    tractor.position.x + Math.cos(h) * 3 + Math.sin(h) * 3, 0,
+    tractor.position.z - Math.sin(h) * 3 + Math.cos(h) * 3);
   player.visible = true;
   state = 'walk-kiosk';
   setObjective('🚶 Walk to the blue Peripass kiosk and register your visit');
@@ -693,9 +738,13 @@ function finish() {
 // ---------------------------------------------------------------- movement
 function driveTruck(dt) {
   const fwd = (keys.has('w') || keys.has('arrowup')) ? 1 : (keys.has('s') || keys.has('arrowdown')) ? -1 : 0;
-  const steer = (keys.has('a') || keys.has('arrowleft')) ? 1 : (keys.has('d') || keys.has('arrowright')) ? -1 : 0;
+  const steerIn = (keys.has('a') || keys.has('arrowleft')) ? 1 : (keys.has('d') || keys.has('arrowright')) ? -1 : 0;
 
-  const ACCEL = 14, MAX = 16, MAX_REV = 7, DRAG = 6;
+  // front wheels turn toward the input, spring back to center when released
+  const steerTarget = steerIn * RIG.MAX_STEER;
+  truckState.steer += THREE.MathUtils.clamp(steerTarget - truckState.steer, -RIG.STEER_RATE * dt, RIG.STEER_RATE * dt);
+
+  const ACCEL = 11, MAX = 13, MAX_REV = 6, DRAG = 7;
   truckState.speed += fwd * ACCEL * dt;
   truckState.speed = THREE.MathUtils.clamp(truckState.speed, -MAX_REV, MAX);
   if (!fwd) {
@@ -703,24 +752,35 @@ function driveTruck(dt) {
     truckState.speed -= s * DRAG * dt;
     if (Math.sign(truckState.speed) !== s) truckState.speed = 0;
   }
-  if (Math.abs(truckState.speed) > 0.2) {
-    truckState.heading += steer * dt * 1.4 * Math.sign(truckState.speed) * Math.min(1, Math.abs(truckState.speed) / 6);
+
+  // bicycle model: heading turns with signed speed, so reversing steers mirrored — like a real cab
+  if (Math.abs(truckState.speed) > 0.05) {
+    truckState.heading += (truckState.speed / RIG.WB) * Math.tan(truckState.steer) * dt;
   }
   const dir = new THREE.Vector3(Math.sin(truckState.heading), 0, Math.cos(truckState.heading));
-  const next = truck.position.clone().addScaledVector(dir, truckState.speed * dt);
+  const next = tractor.position.clone().addScaledVector(dir, truckState.speed * dt);
 
-  // yard bounds (truck is ~13 long; use generous margin)
-  const M = 3;
+  // yard bounds (rig is ~13 long; generous margin)
+  const M = 4;
   next.x = THREE.MathUtils.clamp(next.x, YARD.minX + M, YARD.maxX - M);
-  const minZ = (barrierOpen || truck.position.z < BARRIER_Z) ? DOCK_WALL_Z + 9 : BARRIER_Z + 2.5;
+  const minZ = (barrierOpen || tractor.position.z < BARRIER_Z) ? DOCK_WALL_Z + 9 : BARRIER_Z + 2.5;
   // internal fence: block crossing BARRIER_Z unless inside the gap with barrier open
-  if (truck.position.z > BARRIER_Z && next.z < BARRIER_Z + 2.5) {
+  if (tractor.position.z > BARRIER_Z && next.z < BARRIER_Z + 2.5) {
     const inGap = Math.abs(next.x) < BARRIER_GAP - 1.5;
     if (!barrierOpen || !inGap) { next.z = BARRIER_Z + 2.5; truckState.speed = 0; }
   }
   next.z = THREE.MathUtils.clamp(next.z, minZ, YARD.maxZ - M);
-  truck.position.copy(next);
-  truck.rotation.y = truckState.heading;
+  tractor.position.copy(next);
+  tractor.rotation.y = truckState.heading;
+
+  // trailer chases the kingpin: converges when pulling, diverges when pushing (jackknife)
+  const moved = truckState.speed * dt;
+  truckState.trailerHeading += (moved / RIG.LT) * Math.sin(normAngle(truckState.heading - truckState.trailerHeading));
+  const rel = normAngle(truckState.heading - truckState.trailerHeading);
+  if (rel > RIG.MAX_JACKKNIFE) truckState.trailerHeading = normAngle(truckState.heading - RIG.MAX_JACKKNIFE);
+  else if (rel < -RIG.MAX_JACKKNIFE) truckState.trailerHeading = normAngle(truckState.heading + RIG.MAX_JACKKNIFE);
+  trailerM.position.copy(tractor.position);
+  trailerM.rotation.y = truckState.trailerHeading;
 }
 
 function walkPlayer(dt) {
@@ -745,7 +805,8 @@ function updatePrompts() {
   if (overlayVisible()) { setPrompt(null); return; }
   switch (state) {
     case 'drive-park':
-      if (inZone(truck.position, PARK_SPOT, 1.5) && Math.abs(truckState.speed) < 2) setPrompt('Press E to get out of the truck');
+      if (rigInZone(PARK_SPOT) && Math.abs(truckState.speed) < 2) setPrompt('Press E to get out of the truck');
+      else if (inZone(tractor.position, PARK_SPOT, 3) && Math.abs(truckState.speed) < 2) setPrompt('Straighten the rig inside the lines', true);
       else setPrompt(null);
       break;
     case 'walk-kiosk':
@@ -753,13 +814,13 @@ function updatePrompts() {
       else setPrompt(null);
       break;
     case 'walk-back':
-      if (dist2d(player.position, truck.position) < 6) {
+      if (dist2d(player.position, tractor.position) < 6) {
         if (phoneAnswered) setPrompt('Press E to get in the truck');
         else setPrompt('📱 Your phone… answer it first (bottom right)', true);
       } else setPrompt(null);
       break;
     case 'drive-barrier':
-      if (!pinShown && Math.abs(truck.position.z - BARRIER_Z) < 11 && Math.abs(truck.position.x) < 14) {
+      if (!pinShown && Math.abs(tractor.position.z - BARRIER_Z) < 12 && Math.abs(tractor.position.x) < 16) {
         pinShown = true;
         truckState.speed = 0;
         pinEntry = ''; pinDisplay.innerHTML = '&nbsp;';
@@ -767,7 +828,7 @@ function updatePrompts() {
       }
       break;
     case 'drive-dock':
-      if (inZone(truck.position, DOCK_SPOT, 1.5) && Math.abs(truckState.speed) < 2) finish();
+      if (rigInZone(DOCK_SPOT) && Math.abs(truckState.speed) < 2) finish();
       break;
   }
 }
@@ -775,7 +836,7 @@ function updatePrompts() {
 // ---------------------------------------------------------------- camera
 const camTarget = new THREE.Vector3();
 function updateCamera(dt) {
-  const focus = (state === 'walk-kiosk' || state === 'walk-back' || state === 'kiosk') ? player : truck;
+  const focus = (state === 'walk-kiosk' || state === 'walk-back' || state === 'kiosk') ? player : tractor;
   const offset = focus === player ? new THREE.Vector3(0, 14, 16) : new THREE.Vector3(0, 24, 27);
   const desired = focus.position.clone().add(offset);
   camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
@@ -819,7 +880,7 @@ function tick() {
 tick();
 
 window.__game = {
-  truck, truckState, player, keys,
+  truck: tractor, trailer: trailerM, truckState, player, keys,
   get state() { return state; },
   step(dt, n = 1) { for (let i = 0; i < n; i++) update(dt); renderer.render(scene, camera); },
 };
