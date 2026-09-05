@@ -18,6 +18,8 @@ import {
   overlap,
   step,
   rear,
+  distance,
+  skipToGate,
   slowDown,
   YARD,
   type State,
@@ -288,4 +290,19 @@ test("a paused interaction cannot advance simulation time", () => {
   advance(s, { ...idleInput(), throttle: 1 }, 3);
   assert.equal(s.elapsed, 0);
   assert.equal(s.truck.z, 62);
+});
+
+test("gate skip lands a checked-in rig at the open barrier, able to drive through", () => {
+  const s = createState();
+  assert.ok(skipToGate(s));
+  assert.equal(s.phase, "dock");
+  assert.equal(s.gateOpen, true);
+  assert.equal(s.registered, true);
+  assert.equal(collision(s), undefined);
+  assert.ok(distance(s.truck, YARD.gate) < 6);
+  advance(s, { ...idleInput(), throttle: 1 }, 6);
+  assert.equal(s.contacts, 0);
+  assert.ok(s.truck.z < YARD.gateZ);
+  s.phase = "complete";
+  assert.equal(skipToGate(s), false);
 });
