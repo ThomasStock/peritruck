@@ -169,6 +169,17 @@ function beep(freq = 660) {
   osc.start();
   osc.stop(audio.currentTime + 0.17);
 }
+function enterPlayFullscreen() {
+  if (!matchMedia("(pointer: coarse)").matches) return;
+  if (document.fullscreenElement) return;
+  const root = document.documentElement;
+  if (typeof root.requestFullscreen === "function") {
+    void root.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+    return;
+  }
+  const prefixed = Reflect.get(root, "webkitRequestFullscreen");
+  if (typeof prefixed === "function") prefixed.call(root);
+}
 function start() {
   if (!scene.loaded) return;
   started = true;
@@ -178,6 +189,7 @@ function start() {
   $("mission").classList.remove("hidden");
   $("map-button").classList.remove("hidden");
   $("telemetry").classList.remove("hidden");
+  enterPlayFullscreen();
   scene.renderer.domElement.focus();
 }
 function currentInput(): Input {
@@ -353,6 +365,8 @@ document.addEventListener("visibilitychange", () => {
   last = performance.now();
   accumulator = 0;
 });
+document.addEventListener("fullscreenchange", scene.resize);
+document.addEventListener("webkitfullscreenchange", scene.resize);
 function modal(title: string, body: string, cls = "") {
   modalReturnFocus = document.activeElement as HTMLElement;
   $("modal-root").innerHTML =
