@@ -200,7 +200,9 @@ export class YardScene {
     if (this.lastRoute === s.phase) return;
     this.lastRoute = s.phase;
     while (this.route.children.length) {
-      const c = this.route.children.pop() as THREE.Mesh;
+      const c = this.route.children[0] as THREE.InstancedMesh;
+      this.route.remove(c);
+      c.dispose();
       c.geometry.dispose();
       (c.material as THREE.Material).dispose();
     }
@@ -237,6 +239,11 @@ export class YardScene {
         [0, -24],
         [0, 5],
       ];
+    if (points.length < 2) return;
+    const count = points.slice(1).reduce((total, b, i) => {
+      const a = points[i];
+      return total + Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 1.6);
+    }, 0);
     const geo = new THREE.CircleGeometry(walking(s) ? 0.17 : 0.23, 12),
       mat = new THREE.MeshBasicMaterial({
         color: "#baefe0",
@@ -244,24 +251,28 @@ export class YardScene {
         opacity: 0.65,
         depthWrite: false,
       });
+    const dots = new THREE.InstancedMesh(geo, mat, count);
+    const transform = new THREE.Object3D();
+    transform.rotation.x = -Math.PI / 2;
+    let index = 0;
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1],
         b = points[i],
         n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 1.6);
       for (let j = 0; j < n; j++) {
-        const f = j / n,
-          m = new THREE.Mesh(geo.clone(), mat.clone());
-        m.rotation.x = -Math.PI / 2;
-        m.position.set(
+        const f = j / n;
+        transform.position.set(
           a[0] + (b[0] - a[0]) * f,
           0.12,
           a[1] + (b[1] - a[1]) * f,
         );
-        this.route.add(m);
+        transform.updateMatrix();
+        dots.setMatrixAt(index++, transform.matrix);
       }
     }
-    geo.dispose();
-    mat.dispose();
+    dots.instanceMatrix.needsUpdate = true;
+    dots.computeBoundingSphere();
+    this.route.add(dots);
   }
   render(s: State, input: Input, dt: number, started: boolean) {
     this.tractor.position.set(s.truck.x, 0, s.truck.z);
