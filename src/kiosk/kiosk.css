@@ -1012,7 +1012,7 @@
   align-items: baseline;
   gap: 8px;
 }
-.kiosk-paper__grip,
+.kiosk-paper__tab,
 .kiosk-paper__toggle {
   display: none;
 }
@@ -1118,72 +1118,93 @@
 .kiosk-stage[data-mode="mdp"] .kiosk-frame {
   border-radius: 0;
 }
+/* The delivery note is a drawer on the right, offered only while the reference
+   is typed. A slim tab lives in a gutter beside the screen; nothing is dimmed or
+   blocked, so the driver reads and types at once. */
+.kiosk-stage[data-mode="mdp"] {
+  --paper-w: min(240px, 62vw);
+  --tab-w: 34px;
+}
+.kiosk-stage[data-mode="mdp"][data-step="reference"]:not([data-overlay])
+  .kiosk-device {
+  right: var(--tab-w);
+}
 .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap {
   position: fixed;
-  left: 0;
+  top: 0;
   right: 0;
   bottom: 0;
-  width: auto;
+  width: var(--paper-w);
+  /* The desktop rule centres the note; on a fixed box with both insets that would shrink it. */
+  align-self: stretch;
   z-index: 45;
   padding: 0;
-  transform: translateY(calc(100% - var(--paper-peek, 72px)));
+  transform: translateX(100%);
   transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap.is-open {
-  transform: translateY(0);
+  transform: translateX(0);
 }
 .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap.is-dragging {
   transition: none;
 }
-.kiosk-stage[data-mode="mdp"][data-overlay] .kiosk-paper-wrap:not(.is-open) {
-  transform: translateY(100%);
+.kiosk-stage[data-mode="mdp"]:not([data-step="reference"]) .kiosk-paper-wrap,
+.kiosk-stage[data-mode="mdp"][data-overlay] .kiosk-paper-wrap {
+  display: none;
 }
-.kiosk-stage[data-mode="mdp"]::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 44;
-  background: rgb(0 0 0 / 45%);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s;
-}
-.kiosk-stage[data-mode="mdp"][data-paper="open"]::after {
-  opacity: 1;
-  pointer-events: auto;
-}
-.kiosk-stage[data-mode="mdp"] .kiosk-paper {
-  margin: 0 auto;
-  width: min(360px, 100%);
-  max-height: calc(100dvh - 12px);
-  overflow-y: auto;
-  border-radius: 12px 12px 0 0;
-  padding: 12px 18px calc(16px + env(safe-area-inset-bottom));
-  transform: none;
-  box-shadow: 0 -12px 40px rgb(0 0 0 / 35%);
-  font-size: 12px;
-}
-.kiosk-stage[data-mode="mdp"] .kiosk-paper__handle {
-  cursor: grab;
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--tab-w);
+  height: 150px;
+  padding: 0;
+  border: 0;
+  border-left: 3px solid #00a88c;
+  border-radius: 10px 0 0 10px;
+  background: #fffdf8;
+  color: #163e38;
+  box-shadow: -6px 0 22px rgb(0 0 0 / 20%);
+  cursor: pointer;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
-.kiosk-stage[data-mode="mdp"]
-  .kiosk-paper-wrap.is-dragging
-  .kiosk-paper__handle {
-  cursor: grabbing;
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__tab span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font:
+    700 9.5px "Open Sans",
+    system-ui,
+    sans-serif;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
 }
-.kiosk-stage[data-mode="mdp"] .kiosk-paper__grip {
-  display: block;
-  width: 40px;
-  height: 4px;
-  margin: 0 auto 8px;
-  border-radius: 2px;
-  background: #cfc9bd;
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__tab svg {
+  width: 16px;
+  height: 16px;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper {
+  height: 100%;
+  overflow-y: auto;
+  border-radius: 0;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+  transform: none;
+  box-shadow: -12px 0 40px rgb(0 0 0 / 30%);
+  font-size: 11px;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .kiosk-stage[data-mode="mdp"] .kiosk-paper header {
-  padding: 0 0 10px;
+  align-items: center;
+  padding: 6px 0 8px;
 }
 .kiosk-stage[data-mode="mdp"] .kiosk-paper__title {
   flex-direction: column;
@@ -1193,16 +1214,16 @@
 .kiosk-stage[data-mode="mdp"] .kiosk-paper__toggle {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex: none;
-  height: 30px;
-  padding: 0 10px 0 13px;
+  height: 28px;
+  padding: 0 8px 0 11px;
   border: 0;
-  border-radius: 15px;
+  border-radius: 14px;
   background: #163e38;
   color: #e5f6d6;
   font:
-    700 11.5px "Open Sans",
+    700 11px "Open Sans",
     system-ui,
     sans-serif;
   letter-spacing: 0.3px;
@@ -1212,9 +1233,17 @@
   width: 15px;
   height: 15px;
 }
-/* Keep the kiosk's own content clear of the peeking strip. */
-.kiosk-stage[data-mode="mdp"] .kiosk-scroll-content {
-  padding-bottom: calc(var(--gap) + var(--paper-peek, 72px));
+/* Landscape phones have room to keep the whole screen visible beside the open note. */
+@media (min-width: 720px) {
+  .kiosk-stage[data-mode="mdp"] {
+    --paper-w: 264px;
+  }
+  .kiosk-stage[data-mode="mdp"][data-step="reference"][data-paper="open"]:not(
+      [data-overlay]
+    )
+    .kiosk-device {
+    right: calc(var(--paper-w) + var(--tab-w));
+  }
 }
 /* Compact screens (phone width): single column, inline top bar. */
 @container kiosk (max-width: 600px) {
@@ -1307,8 +1336,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap,
-  .kiosk-stage[data-mode="mdp"]::after {
+  .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap {
     transition: none;
   }
 }

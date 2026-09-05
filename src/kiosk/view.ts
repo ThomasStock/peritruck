@@ -68,103 +68,93 @@ export function mountKiosk(
   const stage = root.firstElementChild as HTMLElement;
   const frame = stage.querySelector<HTMLElement>(".kiosk-frame")!;
   const paperWrap = stage.querySelector<HTMLElement>(".kiosk-paper-wrap")!;
-  const paper = stage.querySelector<HTMLElement>(".kiosk-paper")!;
-  const paperHandle = stage.querySelector<HTMLElement>("[data-paper-handle]")!;
-  const paperToggle = stage.querySelector<HTMLButtonElement>(
-    "[data-paper-toggle]",
-  )!;
+  const paperTab = stage.querySelector<HTMLButtonElement>(".kiosk-paper__tab")!;
+  const paperToggles = [
+    ...stage.querySelectorAll<HTMLButtonElement>("[data-paper-toggle]"),
+  ];
   const mdp = () => stage.dataset.mode === "mdp";
-  // On phones the paperwork is a sheet tucked into the bottom edge. Only its top
-  // strip (grip, title, View) peeks out; the kiosk content pads itself above it.
-  let peek = 0;
-  const measurePeek = () => {
-    peek = paperHandle.offsetTop + paperHandle.offsetHeight;
-    stage.style.setProperty("--paper-peek", `${peek}px`);
-  };
+  // On phones the delivery note is a drawer on the right, offered only while the
+  // reference is typed. It never dims or blocks the kiosk, so the driver can read
+  // and type at the same time.
   const setPaper = (open: boolean) => {
     paperOpen = open;
     stage.dataset.paper = open ? "open" : "closed";
     paperWrap.classList.toggle("is-open", open);
-    paperToggle.setAttribute("aria-expanded", String(open));
-    paperToggle.innerHTML = `<span>${open ? "Hide" : "View"}</span>${open ? icons.chevronDown : icons.chevronUp}`;
-    // A sheet that fits the screen swipes from anywhere; a taller one scrolls and swipes from its header.
-    paper.style.touchAction =
-      paper.scrollHeight > paper.clientHeight + 1 ? "" : "none";
+    for (const b of paperToggles) b.setAttribute("aria-expanded", String(open));
+    paperTab.innerHTML = `${open ? icons.chevronRight : icons.chevronLeft}<span>Delivery note</span>`;
   };
   const applyMode = () => {
     const mode = isMobileDriverPortal() ? "mdp" : "physical";
-    if (stage.dataset.mode !== mode) {
-      stage.dataset.mode = mode;
-      if (mode === "physical") setPaper(false);
-    }
-    measurePeek();
+    if (stage.dataset.mode === mode) return;
+    stage.dataset.mode = mode;
+    if (mode === "physical") setPaper(false);
   };
   applyMode();
   setPaper(false);
-  document.fonts?.ready.then(measurePeek);
   window.addEventListener("resize", applyMode);
-  // Swipe: follow the finger, then settle open or tucked by distance or flick speed.
+  // Swipe: the drawer follows the finger and settles by distance or flick speed.
   let drag: {
-    startY: number;
+    startX: number;
     base: number;
-    lastY: number;
+    lastX: number;
     lastT: number;
     velocity: number;
     moved: boolean;
+    tap: boolean;
   } | null = null;
-  let swallowClick = false;
-  const tuckedOffset = () => paperWrap.offsetHeight - peek;
-  paper.onpointerdown = (e) => {
+  paperWrap.onpointerdown = (e) => {
     if (!mdp() || e.button !== 0) return;
-    if (
-      !paperHandle.contains(e.target as Node) &&
-      paper.scrollHeight > paper.clientHeight + 1
-    )
-      return;
+    // Keep focus (and the phone keyboard) on the kiosk input.
+    e.preventDefault();
     drag = {
-      startY: e.clientY,
-      base: paperOpen ? 0 : tuckedOffset(),
-      lastY: e.clientY,
+      startX: e.clientX,
+      base: paperOpen ? 0 : paperWrap.offsetWidth,
+      lastX: e.clientX,
       lastT: e.timeStamp,
       velocity: 0,
       moved: false,
+      tap: !!(e.target as Element).closest("[data-paper-toggle]"),
     };
     paperWrap.classList.add("is-dragging");
   };
   const onDragMove = (e: PointerEvent) => {
     if (!drag) return;
-    const dy = e.clientY - drag.startY;
-    if (Math.abs(dy) > 4) drag.moved = true;
+    const dx = e.clientX - drag.startX;
+    if (Math.abs(dx) > 6) drag.moved = true;
     const dt = e.timeStamp - drag.lastT;
-    if (dt > 0) drag.velocity = (e.clientY - drag.lastY) / dt;
-    drag.lastY = e.clientY;
+    if (dt > 0) drag.velocity = (e.clientX - drag.lastX) / dt;
+    drag.lastX = e.clientX;
     drag.lastT = e.timeStamp;
-    const offset = Math.min(Math.max(drag.base + dy, 0), tuckedOffset());
-    paperWrap.style.transform = `translateY(${offset}px)`;
+    const width = paperWrap.offsetWidth;
+    const offset = Math.min(Math.max(drag.base + dx, 0), width);
+    paperWrap.style.transform = `translateX(${offset}px)`;
   };
   const onDragEnd = (e: PointerEvent) => {
     if (!drag) return;
-    const { moved, velocity, startY } = drag;
-    const dy = e.clientY - startY;
+    const { moved, velocity, startX, tap } = drag;
+    const dx = e.clientX - startX;
+    const width = paperWrap.offsetWidth;
     drag = null;
     paperWrap.classList.remove("is-dragging");
     paperWrap.style.transform = "";
-    if (!moved) return;
-    swallowClick = true;
-    setTimeout(() => (swallowClick = false), 0);
+    if (!moved) {
+      if (tap && e.type === "pointerup") setPaper(!paperOpen);
+      return;
+    }
     setPaper(
-      paperOpen ? !(dy > 60 || velocity > 0.6) : dy < -40 || velocity < -0.6,
+      paperOpen
+        ? !(dx > width * 0.3 || velocity > 0.6)
+        : dx < -width * 0.25 || velocity < -0.6,
     );
   };
   window.addEventListener("pointermove", onDragMove);
   window.addEventListener("pointerup", onDragEnd);
   window.addEventListener("pointercancel", onDragEnd);
-  paperHandle.onclick = () => {
-    if (swallowClick) return;
-    if (mdp()) setPaper(!paperOpen);
-  };
-  stage.onclick = (e) => {
-    if (e.target === stage && paperOpen) setPaper(false);
+  // Pointer taps are handled on release; only keyboard activation reaches click.
+  paperWrap.onclick = (e) => {
+    if (!(e.target as Element).closest("[data-paper-toggle]")) return;
+    e.preventDefault();
+    if (e.detail === 0 && mdp()) setPaper(!paperOpen);
   };
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape" && paperOpen && mdp()) {
@@ -299,6 +289,8 @@ export function mountKiosk(
     };
     const isLanguage = flow.step === "language";
     stage.toggleAttribute("data-overlay", !!overlay);
+    stage.dataset.step = flow.step;
+    if (overlay || flow.step !== "reference") setPaper(false);
     frame.innerHTML = `<div class="kiosk-page-layout ${isLanguage ? "kiosk-page-layout--language" : ""}" data-step="${flow.step}" lang="${flow.step === "language" ? "en" : flow.language}">${isLanguage ? "" : navButtons("fixed")}<div class="kiosk-page-layout__scroll"><div class="kiosk-scroll-content">${isLanguage ? "" : `<div class="kiosk-mobile-navigation">${navButtons("inline")}</div>`}<div class="kiosk-page">${pages[flow.step]()}</div></div></div>${overlayHtml()}</div>`;
     wire();
   }
@@ -487,5 +479,5 @@ export function mountKiosk(
 function paperHtml(booking: string) {
   const prefix = referencePrefix(booking),
     body = referenceBody(booking);
-  return `<aside class="kiosk-paper-wrap" aria-label="Your paperwork"><article class="kiosk-paper"><div class="kiosk-paper__handle" data-paper-handle><i class="kiosk-paper__grip" aria-hidden="true"></i><header><div class="kiosk-paper__title"><b>DELIVERY NOTE</b><span>CMR · No. 26-09-117</span></div><button type="button" class="kiosk-paper__toggle" data-paper-toggle aria-expanded="false" aria-controls="kiosk-paper-body"><span>View</span>${icons.chevronUp}</button></header></div><div class="kiosk-paper__body" id="kiosk-paper-body"><dl><dt>Carrier</dt><dd>Yard Shift Transport bv</dd><dt>Vehicle</dt><dd>1-YRD-048 · 13.6 m trailer</dd><dt>Consignee</dt><dd>Yard Shift Logistics · Ghent</dd><dt>Goods</dt><dd>General cargo · 12 pallets</dd><dt>Time slot</dt><dd>09:30 – 10:00</dd></dl><div class="kiosk-paper__reference"><span>Peripass reference</span><b>${prefix ? `<em>${esc(prefix)}</em>` : ""}${esc(body)}</b><small>Enter this reference at the driver kiosk</small></div><footer><span>Driver copy</span><span>Keep with vehicle documents</span></footer></div><div class="kiosk-paper__stamp">BOOKED</div></article></aside>`;
+  return `<aside class="kiosk-paper-wrap" aria-label="Your paperwork"><button type="button" class="kiosk-paper__tab" data-paper-toggle aria-expanded="false" aria-controls="kiosk-paper">${icons.chevronLeft}<span>Delivery note</span></button><article class="kiosk-paper" id="kiosk-paper"><header><div class="kiosk-paper__title"><b>DELIVERY NOTE</b><span>CMR · No. 26-09-117</span></div><button type="button" class="kiosk-paper__toggle" data-paper-toggle aria-expanded="false" aria-controls="kiosk-paper"><span>Hide</span>${icons.chevronRight}</button></header><dl><dt>Carrier</dt><dd>Yard Shift Transport bv</dd><dt>Vehicle</dt><dd>1-YRD-048 · 13.6 m trailer</dd><dt>Consignee</dt><dd>Yard Shift Logistics · Ghent</dd><dt>Goods</dt><dd>General cargo · 12 pallets</dd><dt>Time slot</dt><dd>09:30 – 10:00</dd></dl><div class="kiosk-paper__reference"><span>Peripass reference</span><b>${prefix ? `<em>${esc(prefix)}</em>` : ""}${esc(body)}</b><small>Enter this reference at the driver kiosk</small></div><div class="kiosk-paper__stamp">BOOKED</div><footer><span>Driver copy</span><span>Keep with vehicle documents</span></footer></article></aside>`;
 }

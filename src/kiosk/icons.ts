@@ -7,7 +7,6 @@ export const icons = {
   chevronLeft: lucide('<path d="m15 18-6-6 6-6"/>'),
   chevronRight: lucide('<path d="m9 18 6-6-6-6"/>'),
   chevronDown: lucide('<path d="m6 9 6 6 6-6"/>'),
-  chevronUp: lucide('<path d="m18 15-6-6-6 6"/>'),
   circleHelp: lucide(
     '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
   ),
