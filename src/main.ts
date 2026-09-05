@@ -42,6 +42,11 @@ import {
 import { execute } from "./game/commands";
 import { mountKiosk, type KioskController } from "./kiosk/view";
 import { clock, phoneHtml, smsBannerHtml } from "./sms";
+import {
+  browserChromeOpen,
+  nativeFullscreenAvailable,
+  requestNativeFullscreen,
+} from "./play-viewport";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
 <div id="world"></div>
@@ -169,16 +174,78 @@ function beep(freq = 660) {
   osc.start();
   osc.stop(audio.currentTime + 0.17);
 }
+let playViewportBound = false,
+  chromeSwipeY = 0;
+function visualBox() {
+  const vv = window.visualViewport;
+  if (!vv)
+    return {
+      height: window.innerHeight,
+      offsetTop: 0,
+      offsetLeft: 0,
+      width: window.innerWidth,
+    };
+  return {
+    height: vv.height,
+    offsetTop: vv.offsetTop,
+    offsetLeft: vv.offsetLeft,
+    width: vv.width,
+  };
+}
+function syncPlayViewport() {
+  const open =
+    !document.fullscreenElement &&
+    browserChromeOpen(window.innerHeight, visualBox());
+  document.documentElement.classList.toggle("chrome-open", open);
+  document.documentElement.classList.toggle("chrome-collapsed", !open);
+  scene.resize();
+}
+function bindPlayViewport() {
+  if (playViewportBound) return;
+  playViewportBound = true;
+  document.documentElement.classList.add("play-touch");
+  if (!document.getElementById("play-scroll-spacer")) {
+    const spacer = document.createElement("div");
+    spacer.id = "play-scroll-spacer";
+    spacer.setAttribute("aria-hidden", "true");
+    document.body.append(spacer);
+  }
+  const onView = () => syncPlayViewport();
+  window.addEventListener("resize", onView);
+  window.visualViewport?.addEventListener("resize", onView);
+  window.visualViewport?.addEventListener("scroll", onView);
+  $("world").addEventListener(
+    "touchstart",
+    (e) => {
+      chromeSwipeY = e.touches[0]?.clientY ?? 0;
+    },
+    { passive: true },
+  );
+  $("world").addEventListener(
+    "touchmove",
+    (e) => {
+      if (!document.documentElement.classList.contains("chrome-open")) return;
+      const y = e.touches[0]?.clientY ?? chromeSwipeY;
+      const dy = chromeSwipeY - y;
+      chromeSwipeY = y;
+      if (dy > 0) window.scrollBy(0, dy);
+    },
+    { passive: true },
+  );
+}
 function enterPlayFullscreen() {
   if (!matchMedia("(pointer: coarse)").matches) return;
   if (document.fullscreenElement) return;
-  const root = document.documentElement;
-  if (typeof root.requestFullscreen === "function") {
-    void root.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
-    return;
-  }
-  const prefixed = Reflect.get(root, "webkitRequestFullscreen");
-  if (typeof prefixed === "function") prefixed.call(root);
+  bindPlayViewport();
+  syncPlayViewport();
+  window.scrollTo(0, 1);
+  const native = requestNativeFullscreen(document.documentElement);
+  if (native) void native.catch(() => {});
+  if (
+    !nativeFullscreenAvailable(document.documentElement) &&
+    browserChromeOpen(window.innerHeight, visualBox())
+  )
+    note(state, "Swipe up on the yard to hide the browser bar");
 }
 function start() {
   if (!scene.loaded) return;

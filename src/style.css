@@ -1307,3 +1307,27 @@ kbd {
 body:not(.playing) #touch-controls {
   display: none;
 }
+#play-scroll-spacer {
+  display: none;
+  pointer-events: none;
+  width: 1px;
+  height: 130vh;
+}
+html.play-touch.chrome-open {
+  overflow: auto;
+}
+html.play-touch.chrome-open body {
+  overflow: auto;
+  height: auto;
+}
+html.play-touch.chrome-open #play-scroll-spacer {
+  display: block;
+}
+html.play-touch.chrome-open #world canvas {
+  touch-action: pan-y;
+}
+html.play-touch.chrome-collapsed,
+html.play-touch.chrome-collapsed body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
