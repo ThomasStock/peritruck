@@ -95,5 +95,9 @@ function yardBridge(): Plugin {
 }
 export default defineConfig({
   plugins: [yardBridge()],
+  // Tooling may assign a port through PORT; otherwise Vite picks its default.
+  server: process.env.PORT
+    ? { port: Number(process.env.PORT), strictPort: true }
+    : undefined,
   build: { rollupOptions: { output: { manualChunks: { three: ["three"] } } } },
 });
