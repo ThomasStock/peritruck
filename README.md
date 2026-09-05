@@ -36,14 +36,16 @@ Reverse assist is on by default. In reverse, the steering command asks the _trai
 
 The kiosk is a replica of the Peripass kiosk app. On a desktop viewport it renders as a physical kiosk with navigation rails; on phone-sized viewports it renders as the Mobile Driver Portal with the inline top bar. Your delivery note lies next to the kiosk (desktop). On mobile it is a drawer on the right, offered only on the reference step: tap the **Delivery note** tab or swipe it in to read it, and keep it open while you type. Swipe it out, tap the tab or **Hide** to put it away. It carries the reference `PP-2048`.
 
-| Step       | What the driver sees                                                                    |
-| ---------- | --------------------------------------------------------------------------------------- |
-| Language   | Welcome page with English, Dutch, French, German, Polish and Romanian; copy follows it. |
-| Method     | “How would you like to check in?” — enter a reference, or register step by step.        |
-| Visit type | Step by step only: inbound, outbound or contractor.                                     |
-| Reference  | Fixed `PP-` prefix, type the number from the paperwork. A wrong value shows “No match”. |
-| Phone      | Country code and mobile number. Demo: any plausible number is accepted, no SMS is sent. |
-| Endscreen  | Confirmation that the gate PIN arrives by SMS; **Home** returns the driver to the yard. |
+| Step       | What the driver sees                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------- |
+| Language   | Welcome page with English, Dutch, French, German, Polish and Romanian; copy follows it.                       |
+| Method     | “How would you like to check in?” — enter a reference, or register step by step.                              |
+| Visit type | Step by step only: inbound, outbound or contractor.                                                           |
+| Reference  | Fixed `PP-` prefix, type the number from the paperwork, or **Scan document**. A wrong value shows “No match”. |
+| Phone      | Country code and mobile number. Demo: any plausible number is accepted, no SMS is sent.                       |
+| Endscreen  | Confirmation that the gate PIN arrives by SMS; **Home** returns the driver to the yard.                       |
+
+**Scan document** opens the kiosk camera: the screen dims around a clear frame and the delivery note lies half outside it. Drag the note until the green reference box sits inside the frame; the kiosk outlines it, asks you to hold still, captures, shows the real kiosk's “We're scanning your document” page for a second and continues to the phone step with the reference filled in. Arrow keys move the note too. The states, colours and copy follow the production kiosk's Document Capture; the frame itself is the game's teaching aid.
 
 Two seconds after leaving the kiosk the SMS lands on the driver's phone: a lock-screen banner drops over the yard (tap it to dismiss; it leaves by itself). At the gate the same message is open on a rendered handset beside the terminal keypad. Both come from `src/sms.ts`; the delay lives in the simulation as `smsAt`, so CLI sessions and the browser agree on when the PIN is known.
 

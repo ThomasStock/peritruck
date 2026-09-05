@@ -1,6 +1,7 @@
 /** Kiosk copy in the languages offered on the language page.
  * Strings that exist in the production kiosk reuse its translations verbatim;
- * demo-only strings (visit types, phone demo note, endscreen) are written here.
+ * demo-only strings (visit types, scan-frame guidance, phone demo note, endscreen)
+ * are written here.
  */
 export const LANGUAGES = [
   { code: "en", native: "English", english: "English", flag: "GB" },
@@ -222,6 +223,78 @@ export const STRINGS = {
     de: "Ihre Peripass-Referenz beginnt mit {{prefix}} und steht auf dem Lieferschein (CMR), den Sie von Ihrer Disposition erhalten haben.",
     pl: "Twój numer referencyjny Peripass zaczyna się od {{prefix}} i znajduje się na dokumencie dostawy (CMR) otrzymanym od planisty.",
     ro: "Referința ta Peripass începe cu {{prefix}} și se află pe avizul de livrare (CMR) primit de la planificator.",
+  },
+  scanDocument: {
+    en: "Scan document",
+    nl: "Document scannen",
+    fr: "Scanner le document",
+    de: "Dokument scannen",
+    pl: "Zeskanuj dokument",
+    ro: "Scanează documentul",
+  },
+  scanIntroTitle: {
+    en: "Drag your delivery note until the reference sits inside the frame",
+    nl: "Sleep uw leveringsbon tot de referentie in het kader staat",
+    fr: "Faites glisser votre bon de livraison jusqu'à ce que la référence soit dans le cadre",
+    de: "Ziehen Sie Ihren Lieferschein, bis die Referenz im Rahmen liegt",
+    pl: "Przeciągnij dokument dostawy, aż numer referencyjny znajdzie się w ramce",
+    ro: "Trage avizul de livrare până când referința este în cadru",
+  },
+  scanIntroSubtitle: {
+    en: "The photo is taken automatically",
+    nl: "De foto wordt automatisch genomen",
+    fr: "La photo est prise automatiquement",
+    de: "Das Foto wird automatisch aufgenommen",
+    pl: "Zdjęcie jest robione automatycznie",
+    ro: "Fotografia este realizată automat",
+  },
+  scanSearching: {
+    en: "Hold your document in front of the camera",
+    nl: "Houd uw document voor de camera",
+    fr: "Tenez votre document devant la caméra",
+    de: "Halten Sie Ihr Dokument vor die Kamera",
+    pl: "Przytrzymaj dokument przed aparatem",
+    ro: "Țineți documentul în fața camerei",
+  },
+  scanAligning: {
+    en: "Move the reference fully into the frame",
+    nl: "Breng de referentie volledig in het kader",
+    fr: "Placez la référence entièrement dans le cadre",
+    de: "Bewegen Sie die Referenz vollständig in den Rahmen",
+    pl: "Umieść cały numer referencyjny w ramce",
+    ro: "Aduceți referința complet în cadru",
+  },
+  scanHolding: {
+    en: "Hold still…",
+    nl: "Houd stil…",
+    fr: "Ne bougez plus…",
+    de: "Stillhalten…",
+    pl: "Trzymaj nieruchomo…",
+    ro: "Țineți nemișcat…",
+  },
+  scanReady: {
+    en: "Capturing…",
+    nl: "Vastleggen…",
+    fr: "Capture…",
+    de: "Wird erfasst…",
+    pl: "Przechwytywanie…",
+    ro: "Se capturează…",
+  },
+  verifyingTitle: {
+    en: "We're scanning your document",
+    nl: "We zijn uw document aan het scannen",
+    fr: "Nous scannons votre document",
+    de: "Ihr Dokument wird gescannt",
+    pl: "Skanujemy Twój dokument",
+    ro: "Scanăm documentul",
+  },
+  verifyingDescription: {
+    en: "Please wait.",
+    nl: "Even geduld.",
+    fr: "Veuillez patienter.",
+    de: "Bitte warten.",
+    pl: "Proszę czekać.",
+    ro: "Te rugăm să aștepți.",
   },
   phoneTitle: {
     en: "Enter your mobile number",

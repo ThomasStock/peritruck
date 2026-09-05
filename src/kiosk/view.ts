@@ -1,6 +1,9 @@
 /** DOM for the self-service kiosk. Mirrors the production kiosk's page anatomy:
  * navigation rails (or an inline bar on phone-sized screens), page head, option
  * cards, reference and phone forms, message endscreen, in-screen overlays.
+ * The reference step also offers the camera: a viewfinder in which the driver
+ * drags the delivery note into the frame, the kiosk detects the reference and
+ * reads the document before moving on.
  */
 import {
   COUNTRIES,
@@ -11,6 +14,8 @@ import {
   back,
   country,
   createFlow,
+  detectScan,
+  finishScan,
   formatPhone,
   fullReference,
   isValidPhone,
@@ -20,6 +25,7 @@ import {
   selectLanguage,
   selectMethod,
   selectProfile,
+  startScan,
   submitPhone,
   submitReference,
 } from "./flow";
@@ -32,6 +38,45 @@ export type KioskOptions = {
 };
 export type KioskController = { flow: Flow; destroy(): void };
 type Overlay = null | "help" | "leave" | "country";
+/** Guidance states of the viewfinder, named after the production kiosk's Document Capture. */
+type ScanStatus = "searching" | "aligning" | "holding" | "ready";
+type ScanState = {
+  status: ScanStatus;
+  /** Offset of the delivery note from the centre of the camera feed, in px. */
+  x: number;
+  y: number;
+  /** The first layout puts the reference half outside the frame. */
+  placed: boolean;
+  introSeen: boolean;
+  hold?: ReturnType<typeof setTimeout>;
+  ready?: ReturnType<typeof setTimeout>;
+  capture?: ReturnType<typeof setTimeout>;
+};
+/** Outline colours per capture status, as in the production kiosk. */
+const SCAN_COLORS: Record<ScanStatus, string> = {
+  searching: "#4d9be8",
+  aligning: "#e8a33d",
+  holding: "#4d9be8",
+  ready: "#3fbf6f",
+};
+const SCAN_HOLD_MS = 900;
+const SCAN_READY_MS = 450;
+const SCAN_CAPTURE_MS = 380;
+const SCAN_INTRO_MS = 2500;
+const VERIFY_MS = 1000;
+/** Status pictograms of the guidance pill: a white document with a coloured accent. */
+function scanIcon(status: ScanStatus) {
+  const doc =
+    '<rect x="7" y="4" width="12" height="18" rx="1.5" fill="#fff" opacity=".9"/>';
+  const c = SCAN_COLORS[status];
+  const accent = {
+    searching: `<path d="M4 8V4.5h4M18 4.5h4V8M22 18v3.5h-4M8 21.5H4V18" stroke="${c}" stroke-width="1.6"/>`,
+    aligning: `<path d="M5 13H1.5m0 0 2-2m-2 2 2 2M21 13h3.5m0 0-2-2m2 2-2 2" stroke="${c}" stroke-width="1.6"/>`,
+    holding: `<circle cx="7" cy="13" r="2.6" fill="${c}"/><circle cx="19" cy="13" r="2.6" fill="${c}"/>`,
+    ready: `<circle cx="19" cy="19" r="5.5" fill="${c}"/><path d="m16.5 19 1.8 1.8 3.2-3.4" stroke="#fff" stroke-width="1.6"/>`,
+  }[status];
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">${doc}${accent}</svg>`;
+}
 const esc = (s: string) =>
   s.replace(
     /[&<>"']/g,
@@ -63,7 +108,9 @@ export function mountKiosk(
     countrySearch = "",
     phoneError = false,
     locked = false,
-    timer: ReturnType<typeof setTimeout> | undefined;
+    scan: ScanState | null = null,
+    timer: ReturnType<typeof setTimeout> | undefined,
+    verifyTimer: ReturnType<typeof setTimeout> | undefined;
   root.innerHTML = `<div class="kiosk-stage" role="dialog" aria-modal="true" aria-label="Driver check-in kiosk" tabindex="-1"><div class="kiosk-device"><div class="kiosk-frame"></div></div>${paperHtml(opts.booking)}</div>`;
   const stage = root.firstElementChild as HTMLElement;
   const frame = stage.querySelector<HTMLElement>(".kiosk-frame")!;
@@ -242,7 +289,30 @@ export function mountKiosk(
       : "";
   function referencePage() {
     const prefix = referencePrefix(flow.booking);
-    return `${head(esc(t(L(), "referenceTitle")), esc(t(L(), "referenceDescription")))}<form class="kiosk-form" novalidate data-form="reference"><div class="kiosk-field"><div class="kiosk-input-wrap ${flow.reference ? "has-value" : ""}">${prefix ? `<div class="kiosk-prefix" aria-hidden="true">${esc(prefix)}</div>` : ""}<input class="kiosk-input kiosk-input--reference" name="reference" value="${esc(flow.reference)}" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" maxlength="32" aria-label="${esc(t(L(), "referenceTitle"))}"><button type="button" class="kiosk-input-clear" data-action="clear" aria-label="${esc(t(L(), "clear"))}">${icons.circleX}</button></div><button class="kiosk-btn" type="submit" data-submit ${flow.reference.trim() ? "" : "disabled"}><span>${esc(t(L(), "continue"))}</span>${icons.chevronRight}</button></div><div class="kiosk-alert" role="alert" data-alert ${flow.attempted ? "" : "hidden"}>${icons.circleAlert}<div data-alert-body>${noMatchHtml()}</div></div><div class="kiosk-extra-info kiosk-extra-info--divided kiosk-rich"><b>${esc(t(L(), "referenceExtraTitle"))}</b><p>${esc(t(L(), "referenceExtraBody", { prefix: prefix || referenceBody(flow.booking).slice(0, 2) }))}</p></div></form>`;
+    return `${head(esc(t(L(), "referenceTitle")), esc(t(L(), "referenceDescription")))}<form class="kiosk-form" novalidate data-form="reference"><div class="kiosk-field"><div class="kiosk-input-wrap ${flow.reference ? "has-value" : ""}">${prefix ? `<div class="kiosk-prefix" aria-hidden="true">${esc(prefix)}</div>` : ""}<input class="kiosk-input kiosk-input--reference" name="reference" value="${esc(flow.reference)}" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" maxlength="32" aria-label="${esc(t(L(), "referenceTitle"))}"><button type="button" class="kiosk-input-clear" data-action="clear" aria-label="${esc(t(L(), "clear"))}">${icons.circleX}</button></div><button class="kiosk-btn" type="submit" data-submit ${flow.reference.trim() ? "" : "disabled"}><span>${esc(t(L(), "continue"))}</span>${icons.chevronRight}</button><button type="button" class="kiosk-btn kiosk-btn--outline kiosk-btn--scan" data-action="scan">${icons.scan}<span>${esc(t(L(), "scanDocument"))}</span></button></div><div class="kiosk-alert" role="alert" data-alert ${flow.attempted ? "" : "hidden"}>${icons.circleAlert}<div data-alert-body>${noMatchHtml()}</div></div><div class="kiosk-extra-info kiosk-extra-info--divided kiosk-rich"><b>${esc(t(L(), "referenceExtraTitle"))}</b><p>${esc(t(L(), "referenceExtraBody", { prefix: prefix || referenceBody(flow.booking).slice(0, 2) }))}</p></div></form>`;
+  }
+  /** Camera viewfinder: dimmed feed, a clear frame in the middle, the delivery
+   *  note lying half outside it. The driver drags the note until the reference
+   *  box sits inside the frame; the kiosk then asks to hold still and captures. */
+  function scanPage() {
+    const s = scan!;
+    const intro = s.introSeen
+      ? ""
+      : `<div class="kiosk-scan__intro" data-scan-intro><div class="kiosk-scan__intro-card"><svg xmlns="http://www.w3.org/2000/svg" width="72" height="52" viewBox="0 0 72 52" fill="none" aria-hidden="true"><rect x="20" y="4" width="32" height="42" rx="2" fill="#fff" opacity=".95"/><rect x="26" y="12" width="20" height="3" rx="1.5" fill="#8f8b7e"/><rect x="26" y="19" width="16" height="2.5" rx="1.25" fill="#b8b4a8"/><rect x="26" y="25" width="18" height="2.5" rx="1.25" fill="#b8b4a8"/><rect x="26" y="33" width="20" height="8" rx="1.5" fill="#00a88c" opacity=".85"/><path d="M6 26h9m0 0-3-3m3 3-3 3M66 26h-9m0 0 3-3m-3 3 3 3" stroke="#3fbf6f" stroke-width="2" stroke-linecap="round"/></svg><p>${esc(t(L(), "scanIntroTitle"))}</p><small>${esc(t(L(), "scanIntroSubtitle"))}</small></div></div>`;
+    return `<div class="kiosk-scan" data-scan data-status="${s.status}"><div class="kiosk-scan__feed" data-scan-feed tabindex="0" role="application" aria-roledescription="camera" aria-label="${esc(t(L(), "scanIntroTitle"))}"><div class="kiosk-scan__doc" data-scan-doc>${paperArticleHtml(flow.booking, false)}</div><div class="kiosk-scan__quad" data-scan-quad hidden><i></i><i></i><i></i><i></i></div><div class="kiosk-scan__window" data-scan-window aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="kiosk-scan__flash" data-scan-flash></div><div class="kiosk-scan__pill" role="status" data-scan-pill>${scanIcon(s.status)}<span>${esc(t(L(), scanStatusKey(s.status)))}</span></div>${intro}</div></div>`;
+  }
+  const scanStatusKey = (status: ScanStatus): StringKey =>
+    (
+      ({
+        searching: "scanSearching",
+        aligning: "scanAligning",
+        holding: "scanHolding",
+        ready: "scanReady",
+      }) as const
+    )[status];
+  /** The production kiosk's "we're scanning your document" page. */
+  function verifyingPage() {
+    return `${head(esc(t(L(), "verifyingTitle")), esc(t(L(), "verifyingDescription")))}<div class="kiosk-verifying" aria-busy="true"><span class="kiosk-verifying__device">${icons.scanner}</span><span class="kiosk-verifying__spinner">${icons.loader}</span></div>`;
   }
   function phonePage() {
     const c = country(flow.phoneCountry);
@@ -282,12 +352,166 @@ export function mountKiosk(
       return `<div class="kiosk-overlay" data-overlay role="dialog" aria-modal="true" aria-label="${esc(t(L(), "selectCountryCode"))}"><div class="kiosk-overlay__content">${inner}</div></div>`;
     return `<div class="kiosk-overlay" data-overlay><div class="kiosk-overlay__content"><div class="kiosk-card" role="dialog" aria-modal="true">${inner}</div></div></div>`;
   }
+  function resetScan() {
+    if (!scan) return;
+    clearTimeout(scan.hold);
+    clearTimeout(scan.ready);
+    clearTimeout(scan.capture);
+    scan = null;
+  }
+  function wireScan(feed: HTMLElement) {
+    const s = scan!;
+    const root = feed.closest<HTMLElement>("[data-scan]")!;
+    const doc = feed.querySelector<HTMLElement>("[data-scan-doc]")!;
+    const ref = doc.querySelector<HTMLElement>(".kiosk-paper__reference")!;
+    const win = feed.querySelector<HTMLElement>("[data-scan-window]")!;
+    const quad = feed.querySelector<HTMLElement>("[data-scan-quad]")!;
+    const pill = feed.querySelector<HTMLElement>("[data-scan-pill]")!;
+    const intro = feed.querySelector<HTMLElement>("[data-scan-intro]");
+    const place = () => {
+      doc.style.transform = `translate(-50%, -50%) translate(${s.x}px, ${s.y}px) rotate(-4deg) scale(var(--doc-scale, 1))`;
+    };
+    const clamp = () => {
+      // Keep at least a quarter of the note inside the feed so it cannot get lost.
+      const f = feed.getBoundingClientRect(),
+        d = doc.getBoundingClientRect();
+      const mx = f.width / 2 + d.width * 0.25,
+        my = f.height / 2 + d.height * 0.25;
+      s.x = Math.min(Math.max(s.x, -mx), mx);
+      s.y = Math.min(Math.max(s.y, -my), my);
+    };
+    place();
+    if (!s.placed) {
+      // Start with the reference box straddling the frame's lower-right corner.
+      const w = win.getBoundingClientRect(),
+        r = ref.getBoundingClientRect();
+      s.x += w.right - r.width * 0.55 - r.left;
+      s.y += w.bottom - r.height * 0.45 - r.top;
+      s.placed = true;
+      place();
+    }
+    const setStatus = (status: ScanStatus) => {
+      if (s.status === status) return;
+      s.status = status;
+      root.dataset.status = status;
+      pill.innerHTML = `${scanIcon(status)}<span>${esc(t(L(), scanStatusKey(status)))}</span>`;
+    };
+    const stopHold = () => {
+      clearTimeout(s.hold);
+      clearTimeout(s.ready);
+      s.hold = s.ready = undefined;
+    };
+    const capture = () => {
+      stopHold();
+      feed.querySelector("[data-scan-flash]")?.classList.add("is-on");
+      s.capture = setTimeout(() => {
+        resetScan();
+        if (!detectScan(flow)) return;
+        render();
+        verifyTimer = setTimeout(() => {
+          if (finishScan(flow)) render();
+        }, VERIFY_MS);
+      }, SCAN_CAPTURE_MS);
+    };
+    /** Compare the reference box with the frame and drive the guidance state. */
+    const evaluate = (moved: boolean) => {
+      if (s.capture) return;
+      const f = feed.getBoundingClientRect(),
+        w = win.getBoundingClientRect(),
+        r = ref.getBoundingClientRect();
+      const overlaps =
+        r.right > w.left &&
+        r.left < w.right &&
+        r.bottom > w.top &&
+        r.top < w.bottom;
+      const inside =
+        r.left >= w.left - 2 &&
+        r.right <= w.right + 2 &&
+        r.top >= w.top - 2 &&
+        r.bottom <= w.bottom + 2;
+      quad.toggleAttribute("hidden", !overlaps);
+      if (overlaps) {
+        quad.style.left = `${r.left - f.left}px`;
+        quad.style.top = `${r.top - f.top}px`;
+        quad.style.width = `${r.width}px`;
+        quad.style.height = `${r.height}px`;
+      }
+      if (!inside) {
+        stopHold();
+        setStatus(overlaps ? "aligning" : "searching");
+        return;
+      }
+      if (s.status === "ready") return;
+      if (moved || !s.hold) {
+        // Any movement restarts the hold; a steady note is captured after it.
+        stopHold();
+        s.hold = setTimeout(() => {
+          setStatus("ready");
+          s.ready = setTimeout(capture, SCAN_READY_MS);
+        }, SCAN_HOLD_MS);
+      }
+      setStatus("holding");
+    };
+    const dismissIntro = () => {
+      if (s.introSeen) return;
+      s.introSeen = true;
+      intro?.classList.add("is-hidden");
+    };
+    if (intro) setTimeout(dismissIntro, SCAN_INTRO_MS);
+    let pointer: { id: number; x: number; y: number } | null = null;
+    feed.onpointerdown = (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      feed.setPointerCapture(e.pointerId);
+      pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      doc.classList.add("is-lifted");
+      dismissIntro();
+    };
+    feed.onpointermove = (e) => {
+      if (!pointer || e.pointerId !== pointer.id) return;
+      const dx = e.clientX - pointer.x,
+        dy = e.clientY - pointer.y;
+      if (!dx && !dy) return;
+      pointer.x = e.clientX;
+      pointer.y = e.clientY;
+      s.x += dx;
+      s.y += dy;
+      clamp();
+      place();
+      evaluate(Math.abs(dx) + Math.abs(dy) > 1.5);
+    };
+    feed.onpointerup = feed.onpointercancel = (e) => {
+      if (!pointer || e.pointerId !== pointer.id) return;
+      pointer = null;
+      doc.classList.remove("is-lifted");
+      evaluate(false);
+    };
+    feed.onkeydown = (e) => {
+      const step = {
+        ArrowLeft: [-16, 0],
+        ArrowRight: [16, 0],
+        ArrowUp: [0, -16],
+        ArrowDown: [0, 16],
+      }[e.key];
+      if (!step) return;
+      e.preventDefault();
+      dismissIntro();
+      s.x += step[0];
+      s.y += step[1];
+      clamp();
+      place();
+      evaluate(true);
+    };
+    evaluate(false);
+  }
   function render() {
     const pages = {
       language: languagePage,
       method: methodPage,
       profile: profilePage,
       reference: referencePage,
+      scan: scanPage,
+      verifying: verifyingPage,
       phone: phonePage,
       endscreen: endscreenPage,
     };
@@ -295,7 +519,7 @@ export function mountKiosk(
     stage.toggleAttribute("data-overlay", !!overlay);
     stage.dataset.step = flow.step;
     if (overlay || flow.step !== "reference") setPaper(false);
-    frame.innerHTML = `<div class="kiosk-page-layout ${isLanguage ? "kiosk-page-layout--language" : ""}" data-step="${flow.step}" lang="${flow.step === "language" ? "en" : flow.language}">${isLanguage ? "" : navButtons("fixed")}<div class="kiosk-page-layout__scroll"><div class="kiosk-scroll-content">${isLanguage ? "" : `<div class="kiosk-mobile-navigation">${navButtons("inline")}</div>`}<div class="kiosk-page">${pages[flow.step]()}</div></div></div>${overlayHtml()}</div>`;
+    frame.innerHTML = `<div class="kiosk-page-layout ${isLanguage ? "kiosk-page-layout--language" : ""} ${flow.step === "scan" ? "kiosk-page-layout--scan" : ""}" data-step="${flow.step}" lang="${flow.step === "language" ? "en" : flow.language}">${isLanguage ? "" : navButtons("fixed")}<div class="kiosk-page-layout__scroll"><div class="kiosk-scroll-content">${isLanguage ? "" : `<div class="kiosk-mobile-navigation">${navButtons("inline")}</div>`}<div class="kiosk-page">${pages[flow.step]()}</div></div></div>${overlayHtml()}</div>`;
     wire();
   }
   function selectWithLock(button: HTMLButtonElement, apply: () => void) {
@@ -316,9 +540,21 @@ export function mountKiosk(
         e.preventDefault();
         const action = b.dataset.action;
         if (action === "back") {
+          resetScan();
           back(flow);
           phoneError = false;
           render();
+        } else if (action === "scan") {
+          if (startScan(flow)) {
+            scan = {
+              status: "searching",
+              x: 0,
+              y: 0,
+              placed: false,
+              introSeen: false,
+            };
+            render();
+          }
         } else if (action === "home") {
           if (flow.step === "endscreen") finish();
           else if (mdp()) {
@@ -451,6 +687,8 @@ export function mountKiosk(
         }
       };
     }
+    const feed = $("[data-scan-feed]");
+    if (feed && scan) wireScan(feed);
     // Never auto-focus a control on render; park focus on the stage when the
     // previously focused element was replaced so Escape/Tab still work.
     if (!frame.contains(document.activeElement))
@@ -471,6 +709,8 @@ export function mountKiosk(
     flow,
     destroy() {
       clearTimeout(timer);
+      clearTimeout(verifyTimer);
+      resetScan();
       window.removeEventListener("resize", applyMode);
       window.removeEventListener("pointermove", onDragMove);
       window.removeEventListener("pointerup", onDragEnd);
@@ -481,7 +721,11 @@ export function mountKiosk(
   };
 }
 function paperHtml(booking: string) {
+  return `<aside class="kiosk-paper-wrap" aria-label="Your paperwork"><button type="button" class="kiosk-paper__tab" data-paper-toggle aria-expanded="false" aria-controls="kiosk-paper">${icons.chevronLeft}<span>Delivery note</span></button>${paperArticleHtml(booking, true)}</aside>`;
+}
+/** The delivery note itself; the drawer variant carries its Hide button and id. */
+function paperArticleHtml(booking: string, drawer: boolean) {
   const prefix = referencePrefix(booking),
     body = referenceBody(booking);
-  return `<aside class="kiosk-paper-wrap" aria-label="Your paperwork"><button type="button" class="kiosk-paper__tab" data-paper-toggle aria-expanded="false" aria-controls="kiosk-paper">${icons.chevronLeft}<span>Delivery note</span></button><article class="kiosk-paper" id="kiosk-paper"><header><div class="kiosk-paper__title"><b>DELIVERY NOTE</b><span>CMR · No. 26-09-117</span></div><button type="button" class="kiosk-paper__toggle" data-paper-toggle aria-expanded="false" aria-controls="kiosk-paper"><span>Hide</span>${icons.chevronRight}</button></header><dl><dt>Carrier</dt><dd>Yard Shift Transport bv</dd><dt>Vehicle</dt><dd>1-YRD-048 · 13.6 m trailer</dd><dt>Consignee</dt><dd>Yard Shift Logistics · Ghent</dd><dt>Goods</dt><dd>General cargo · 12 pallets</dd><dt>Time slot</dt><dd>09:30 – 10:00</dd></dl><div class="kiosk-paper__reference"><span>Peripass reference</span><b>${prefix ? `<em>${esc(prefix)}</em>` : ""}${esc(body)}</b><small>Enter this reference at the driver kiosk</small></div><div class="kiosk-paper__stamp">BOOKED</div><footer><span>Driver copy</span><span>Keep with vehicle documents</span></footer></article></aside>`;
+  return `<article class="kiosk-paper" ${drawer ? 'id="kiosk-paper"' : 'aria-hidden="true"'}><header><div class="kiosk-paper__title"><b>DELIVERY NOTE</b><span>CMR · No. 26-09-117</span></div>${drawer ? `<button type="button" class="kiosk-paper__toggle" data-paper-toggle aria-expanded="false" aria-controls="kiosk-paper"><span>Hide</span>${icons.chevronRight}</button>` : ""}</header><dl><dt>Carrier</dt><dd>Yard Shift Transport bv</dd><dt>Vehicle</dt><dd>1-YRD-048 · 13.6 m trailer</dd><dt>Consignee</dt><dd>Yard Shift Logistics · Ghent</dd><dt>Goods</dt><dd>General cargo · 12 pallets</dd><dt>Time slot</dt><dd>09:30 – 10:00</dd></dl><div class="kiosk-paper__reference"><span>Peripass reference</span><b>${prefix ? `<em>${esc(prefix)}</em>` : ""}${esc(body)}</b><small>Enter this reference at the driver kiosk</small></div><div class="kiosk-paper__stamp">BOOKED</div><footer><span>Driver copy</span><span>Keep with vehicle documents</span></footer></article>`;
 }
