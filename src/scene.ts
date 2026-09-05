@@ -7,11 +7,11 @@ import {
   objective,
   walking,
   rear,
-  predict,
   staticRigs,
   YARD,
 } from "./game/simulation";
 import { DriverRig } from "./rig";
+import { PredictionPath } from "./prediction";
 export type CameraMode = "follow" | "yard" | "overhead";
 export class YardScene {
   renderer: THREE.WebGLRenderer;
@@ -22,8 +22,9 @@ export class YardScene {
   driver = new THREE.Group();
   gate = new THREE.Group();
   target = new THREE.Group();
+  private predictionPath = new PredictionPath();
   prediction = new THREE.Line(
-    new THREE.BufferGeometry(),
+    this.predictionPath.geometry,
     new THREE.LineBasicMaterial({
       color: "#b8ffe2",
       transparent: true,
@@ -301,13 +302,7 @@ export class YardScene {
     this.scene.getObjectByName("dock-highlight")!.visible = s.phase === "dock";
     this.updateRoute(s);
     this.prediction.visible = started && !walking(s) && s.phase !== "complete";
-    if (this.prediction.visible) {
-      const points = predict(s, input);
-      this.prediction.geometry.dispose();
-      this.prediction.geometry = new THREE.BufferGeometry().setFromPoints(
-        points.map((p) => new THREE.Vector3(p.x, 0.22, p.z)),
-      );
-    }
+    if (this.prediction.visible) this.predictionPath.update(s, input);
     const actor = walking(s) ? s.driver : s.truck;
     let focus = new THREE.Vector3(actor.x, 0, actor.z);
     if (!walking(s)) {

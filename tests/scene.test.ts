@@ -2,7 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 import { YardScene } from "../src/scene";
-import { createState, type State } from "../src/game/simulation";
+import {
+  createState,
+  idleInput,
+  predict,
+  type State,
+  type Truck,
+  type Input,
+} from "../src/game/simulation";
+import { PredictionPath } from "../src/prediction";
 
 // Exercise the route lifecycle without creating a WebGL renderer.
 function routeFixture() {
@@ -134,4 +142,85 @@ test("route phase changes release instance, geometry and material resources and 
   assert.deepEqual(disposed, ["instances", "geometry", "material"]);
   assert.equal(dots.parent, null);
   assert.equal(view.route.children.length, 0);
+});
+
+function assertPrediction(path: PredictionPath, state: State, input: Input) {
+  const expected = new Float32Array(
+    predict(state, input).flatMap((p) => [p.x, 0.22, p.z]),
+  );
+  assert.deepEqual(path.geometry.getAttribute("position").array, expected);
+  assert.ok(path.geometry.boundingSphere);
+}
+
+test("prediction cache preserves exact points, reuses GPU buffers and detects mutations", () => {
+  const path = new PredictionPath(),
+    state = createState(),
+    input = idleInput();
+  assert.equal(path.update(state, input), true);
+  const geometry = path.geometry,
+    position = geometry.getAttribute("position") as THREE.BufferAttribute;
+  assertPrediction(path, state, input);
+  const version = position.version;
+  assert.equal(path.update(state, input), false);
+  assert.equal(position.version, version);
+  for (const key of [
+    "x",
+    "z",
+    "heading",
+    "trailerHeading",
+    "speed",
+    "steer",
+  ] as (keyof Truck)[]) {
+    state.truck[key] += 0.25;
+    assert.equal(path.update(state, input), true, key);
+    assertPrediction(path, state, input);
+    assert.equal(path.geometry, geometry);
+    assert.equal(path.geometry.getAttribute("position"), position);
+    assert.equal(path.update(state, input), false, key);
+  }
+  for (const key of ["throttle", "steer"] as const) {
+    input[key] = -0.5;
+    assert.equal(path.update(state, input), true, key);
+    assertPrediction(path, state, input);
+  }
+  for (const key of ["precision", "brake"] as const) {
+    input[key] = true;
+    assert.equal(path.update(state, input), true, key);
+    assertPrediction(path, state, input);
+  }
+  state.assisted = false;
+  assert.equal(path.update(state, input), true);
+  assertPrediction(path, state, input);
+  // Unrelated state, identity and walking controls cannot alter the tyre track.
+  state.elapsed++;
+  state.phase = "dock";
+  input.walkX = 1;
+  input.walkZ = -1;
+  assert.equal(path.update(structuredClone(state), { ...input }), false);
+  state.truck = { ...state.truck, x: 10, z: 30 };
+  assert.equal(path.update(state, input), true);
+  assertPrediction(path, state, input);
+});
+
+test("cached prediction matches pure prediction across driving modes and steering inputs", () => {
+  const path = new PredictionPath();
+  for (const assisted of [false, true])
+    for (const speed of [-2, 0, 3])
+      for (const throttle of [-1, 0, 1])
+        for (const steer of [-1, 0, 0.7])
+          for (const precision of [false, true]) {
+            const state = createState();
+            state.assisted = assisted;
+            Object.assign(state.truck, {
+              x: 12.4,
+              z: 18.9,
+              heading: 0.2,
+              trailerHeading: -0.1,
+              speed,
+              steer: 0.3,
+            });
+            const input = { ...idleInput(), throttle, steer, precision };
+            path.update(state, input);
+            assertPrediction(path, state, input);
+          }
 });

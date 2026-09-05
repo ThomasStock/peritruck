@@ -48,6 +48,7 @@ const result = {
   sourceHash: createHash("sha256")
     .update(await readFile("src/scene.ts"))
     .update(await readFile("src/game/simulation.ts"))
+    .update(await readFile("src/prediction.ts").catch(() => ""))
     .digest("hex"),
   environment: {
     browser: browser.version(),
@@ -136,6 +137,71 @@ for (const phase of [
       calls: result.scenarios[phase].render.calls,
       dots: result.scenarios[phase].routeDots,
     }),
+  );
+}
+result.predictionScenarios = {};
+for (const moving of [false, true]) {
+  const name = moving ? "moving" : "stationary";
+  result.predictionScenarios[name] = await page.evaluate(async (moving) => {
+    const { view, sim } = window.profile;
+    const state = sim.createState();
+    state.phase = "gate";
+    const input = {
+      ...sim.idleInput(),
+      throttle: moving ? 0.5 : 0,
+      steer: moving ? 0.2 : 0,
+    };
+    const gl = view.renderer.getContext();
+    const draw = () => {
+      // Deterministic changing poses outside the measured render interval.
+      if (moving) sim.integrate(state.truck, input, state.assisted, sim.DT);
+      const t = performance.now();
+      view.render(state, input, sim.DT, true);
+      return performance.now() - t;
+    };
+    for (let n = 0; n < 30; n++) {
+      draw();
+      gl.finish();
+    }
+    const batches = [];
+    let geometryReplacements = 0,
+      attributeRefreshes = 0;
+    let geometry = view.prediction.geometry;
+    let attribute = geometry.getAttribute("position");
+    let version = attribute.version;
+    for (let batch = 0; batch < 5; batch++) {
+      const samples = [];
+      for (let n = 0; n < 30; n++) {
+        samples.push(draw());
+        const nextGeometry = view.prediction.geometry;
+        const nextAttribute = nextGeometry.getAttribute("position");
+        if (nextGeometry !== geometry) geometryReplacements++;
+        if (nextAttribute !== attribute || nextAttribute.version !== version)
+          attributeRefreshes++;
+        geometry = nextGeometry;
+        attribute = nextAttribute;
+        version = attribute.version;
+        gl.finish();
+      }
+      batches.push(samples);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    const sorted = batches.flat().sort((a, b) => a - b);
+    return {
+      batches,
+      batchMedians: batches.map((b) => [...b].sort((a, b) => a - b)[15]),
+      medianMs: sorted[75],
+      p95Ms: sorted[142],
+      geometryReplacements,
+      attributeRefreshes,
+      finalPositions: Array.from(attribute.array),
+      truck: state.truck,
+      input,
+    };
+  }, moving);
+  console.log(
+    "prediction-" + name,
+    JSON.stringify(result.predictionScenarios[name]),
   );
 }
 result.phaseCycles = await page.evaluate(() => {
