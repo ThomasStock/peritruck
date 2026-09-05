@@ -2,7 +2,7 @@
 
 Version 2 of [ThomasStock/peritruck](https://github.com/ThomasStock/peritruck), the game originally served at [truck.placeholder.app](https://truck.placeholder.app/).
 
-A small 3D logistics yard: arrive in your articulated truck, park in holding bay P02, walk to a self-service kiosk, receive gate PIN 2048, enter the site, and reverse into dock 03.
+A small 3D logistics yard: arrive in your articulated truck, park in holding bay P02, check in at a self-service kiosk, receive gate PIN 2048 by SMS, enter the site, and reverse into dock 03.
 
 ## Play locally
 
@@ -31,6 +31,21 @@ Open the exact localhost address printed by Vite. No accounts, remote kiosk serv
 Touch steering and pedals appear on touch devices and small screens. Standard gamepads support left-stick steering, RT/LT pedals, B brake and A interaction. Controls can be remapped; arrow-key alternatives remain available. Gamepad mapping assumes the browser's standard layout and has not been tested with physical hardware.
 
 Reverse assist is on by default. In reverse, the steering command asks the _trailer_ to turn; the controller counter-steers the tractor. Releasing steering stabilizes articulation. Classic steering is available in settings. Neither mode teleports the rig into a bay. There is no countdown or failure screen; pull forward to try again, or recover with R.
+
+## Kiosk check-in
+
+The kiosk is a replica of the Peripass kiosk app. On a desktop viewport it renders as a physical kiosk with navigation rails; on phone-sized viewports it renders as the Mobile Driver Portal with the inline top bar. Your delivery note lies next to the kiosk (desktop) or behind the **Paperwork** button (mobile) and carries the reference `PP-2048`.
+
+| Step       | What the driver sees                                                                    |
+| ---------- | --------------------------------------------------------------------------------------- |
+| Language   | Welcome page with English, Dutch, French, German, Polish and Romanian; copy follows it. |
+| Method     | “How would you like to check in?” — enter a reference, or register step by step.        |
+| Visit type | Step by step only: inbound, outbound or contractor.                                     |
+| Reference  | Fixed `PP-` prefix, type the number from the paperwork. A wrong value shows “No match”. |
+| Phone      | Country code and mobile number. Demo: any plausible number is accepted, no SMS is sent. |
+| Endscreen  | Confirmation that the gate PIN arrives by SMS; **Home** returns the driver to the yard. |
+
+Production strings are reused where the real kiosk has them; demo-only copy (visit types, phone note, endscreen) is written in `src/kiosk/i18n.ts`. The flow itself is a pure step machine in `src/kiosk/flow.ts`, covered by `tests/kiosk.test.ts`. The CLI `register` command still completes the kiosk in one call.
 
 ## Drive from the CLI
 
@@ -96,6 +111,7 @@ npm run models       # Rebuild original GLB assets with installed Blender
 | `src/game/commands.ts`    | Validated CLI/WebMCP commands and feedback driver                                                 |
 | `src/scene.ts`            | Three.js rendering, camera, lights, models, projected path                                        |
 | `src/main.ts`             | Input adapters, accessible overlays, HUD, sound and agent tool registration                       |
+| `src/kiosk/`              | Kiosk replica: step flow, six-language copy, DOM view and stylesheet                              |
 | `vite.config.ts`          | Local-only CLI/browser bridge                                                                     |
 | `scripts/truck.ts`        | JSON command-line client and session persistence                                                  |
 | `scripts/build_models.py` | Reproducible Blender asset authoring                                                              |
@@ -108,7 +124,7 @@ Collision uses oriented rectangles for both tractor and trailer. A closed gate a
 
 All 3D assets were authored in Blender from `scripts/build_models.py`, validated with Blender 5.2.1 LTS, and exported as GLB. A generated cab-over tractor, 13.6 m trailer, driver and yard require about 3.4 MB uncompressed. Assets include bevelled bodywork, mirrors, grille, multi-axle wheels, trailer rails, docking equipment, solar roof panels, fencing, kiosk, footpath, trees and lighting columns. Front wheels animate with steering. Distant scenery is joined by material to keep draw calls down.
 
-The Peripass logo is the official first-party SVG. The house-style starting point is Montserrat and Peripass teal `#00A990`; the game adds dark green and lime feedback accents. Fonts are bundled locally. See [the cited research](docs/research.md) for the real yard process, control rationale, source links and which dimensions are deliberately simplified for play. This is a game, not a truck-driving simulator or an operational safety tool.
+The Peripass logo is the official first-party SVG. The house-style starting point is Montserrat and Peripass teal `#00A990`; the game adds dark green and lime feedback accents. The kiosk uses Open Sans and the kiosk app's tokens (page background `#F4F6F9`, primary teal, 56 px controls). Fonts are bundled locally. See [the cited research](docs/research.md) for the real yard process, control rationale, source links and which dimensions are deliberately simplified for play. This is a game, not a truck-driving simulator or an operational safety tool.
 
 ## Shipping
 

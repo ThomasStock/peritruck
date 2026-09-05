@@ -2,7 +2,13 @@ import "@fontsource/montserrat/400.css";
 import "@fontsource/montserrat/500.css";
 import "@fontsource/montserrat/600.css";
 import "@fontsource/montserrat/700.css";
+import "@fontsource/open-sans/400.css";
+import "@fontsource/open-sans/500.css";
+import "@fontsource/open-sans/600.css";
+import "@fontsource/open-sans/700.css";
+import "@fontsource/open-sans/800.css";
 import "./style.css";
+import "./kiosk/kiosk.css";
 import { YardScene } from "./scene";
 import {
   createState,
@@ -29,6 +35,7 @@ import {
   type Input,
 } from "./game/simulation";
 import { execute } from "./game/commands";
+import { mountKiosk, type KioskController } from "./kiosk/view";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
 <div id="world"></div>
@@ -244,7 +251,8 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(
 }
 let remapping: string | null = null,
   lastDialog = "",
-  modalReturnFocus: HTMLElement | null = null;
+  modalReturnFocus: HTMLElement | null = null,
+  kiosk: KioskController | null = null;
 function closeDialog() {
   settingsOpen = false;
   if (state.phase === "kiosk") state.phase = "walk-kiosk";
@@ -357,6 +365,8 @@ function syncDialog() {
       : "";
   if (kind === lastDialog) return;
   lastDialog = kind;
+  kiosk?.destroy();
+  kiosk = null;
   if (!kind) {
     $("modal-root").replaceChildren();
     modalReturnFocus?.focus();
@@ -428,42 +438,20 @@ function syncDialog() {
       start();
     };
   } else if (kind === "kiosk") {
-    modal(
-      "Driver check-in",
-      `<div class="kiosk-site"><span class="live-dot"></span> SELF-SERVICE REGISTRATION</div><p class="dialog-description">Check in using your booking reference.</p><form id="registration"><label class="field">Language<select id="language"><option>English</option><option>Nederlands</option><option>Français</option><option>Deutsch</option></select></label><label class="field"><span id="booking-label">Booking reference</span><input id="booking" autofocus autocomplete="off" spellcheck="false" placeholder="e.g. PP-2048" value="PP-2048" maxlength="30" required /></label><div class="booking-card"><span>EXPECTED DELIVERY</span><b>PP-2048 · Ghent</b><small>General cargo · 1 trailer</small></div><div id="form-error" class="form-error" role="alert"></div><button id="register-button" class="primary" type="submit">Check in <span>↗</span></button></form><p class="privacy-note">Practice kiosk. No personal details or real registration.</p>`,
-      "kiosk-dialog",
-    );
-    $("language").onchange = () => {
-      const lang = ($("language") as HTMLSelectElement).value;
-      const copy: Record<string, [string, string, string]> = {
-        English: ["Driver check-in", "Booking reference", "Check in"],
-        Nederlands: [
-          "Chauffeursregistratie",
-          "Boekingsreferentie",
-          "Aanmelden",
-        ],
-        Français: [
-          "Enregistrement chauffeur",
-          "Référence de réservation",
-          "S’enregistrer",
-        ],
-        Deutsch: ["Fahrerregistrierung", "Buchungsreferenz", "Anmelden"],
-      };
-      const c = copy[lang];
-      $("dialog-title").textContent = c[0];
-      $("booking-label").textContent = c[1];
-      $("register-button").textContent = c[2];
-    };
-    $("registration").onsubmit = (e) => {
-      e.preventDefault();
-      if (register(state, ($("booking") as HTMLInputElement).value)) {
-        beep();
-        syncDialog();
-      } else {
-        $("form-error").textContent = state.message;
-        ($("booking") as HTMLInputElement).focus();
-      }
-    };
+    // The self-service kiosk: language, check-in method, reference, phone, endscreen.
+    modalReturnFocus = document.activeElement as HTMLElement;
+    keys.clear();
+    touch.clear();
+    kiosk = mountKiosk($("modal-root"), {
+      booking: state.booking,
+      onQuit: closeDialog,
+      onComplete: (reference) => {
+        if (register(state, reference)) {
+          beep();
+          syncDialog();
+        }
+      },
+    });
   } else if (kind === "pin") {
     modal(
       "Automated gate access",

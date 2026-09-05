@@ -3,6 +3,13 @@
   "configurations": [
     {
       "name": "peritruck",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173,
+      "autoPort": true
+    },
+    {
+      "name": "peritruck-static",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "4173"],
       "port": 4173
