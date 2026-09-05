@@ -365,6 +365,15 @@ export function register(s: State, booking: string): boolean {
   note(s, "Message received: gate PIN 2048. Deliver to dock 03.", "registered");
   return true;
 }
+/** Safe stop just inside the barrier once the gate has opened. */
+const insideGate: Truck = {
+  x: 18,
+  z: -2,
+  heading: Math.PI,
+  trailerHeading: Math.PI,
+  speed: 0,
+  steer: 0,
+};
 export function enterPin(s: State, pin: string): boolean {
   if (s.phase !== "pin" || !s.registered) {
     note(s, "Stop at the gate terminal first.");
@@ -377,14 +386,25 @@ export function enterPin(s: State, pin: string): boolean {
   s.gateOpen = true;
   s.phase = "dock";
   note(s, "Access granted. Proceed to dock 03.", "gate-opened");
-  s.checkpoint = {
-    x: 18,
-    z: -2,
+  s.checkpoint = { ...insideGate };
+  return true;
+}
+/** Playtest shortcut: rig at the gate stop line, checked in, barrier open. Silent. */
+export function skipToGate(s: State): boolean {
+  if (s.phase === "complete") return false;
+  s.truck = {
+    x: YARD.gate.x,
+    z: 22,
     heading: Math.PI,
     trailerHeading: Math.PI,
     speed: 0,
     steer: 0,
   };
+  s.registered = true;
+  s.gateOpen = true;
+  s.phase = "dock";
+  s.dockHold = 0;
+  s.checkpoint = { ...insideGate };
   return true;
 }
 export function recover(s: State) {

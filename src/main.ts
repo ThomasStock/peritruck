@@ -20,6 +20,7 @@ import {
   register,
   enterPin,
   recover,
+  skipToGate,
   note,
   snapshot,
   rigRects,
@@ -577,7 +578,8 @@ function drawMap() {
   }
 }
 let uiTick = 0,
-  lastGamepadAction = false;
+  lastGamepadAction = false,
+  skipHeldSince = 0;
 function updateUI() {
   const o = objective(state),
     p = parking(state),
@@ -707,6 +709,18 @@ function frame(now: number) {
     syncDialog();
   }
   lastGamepadAction = pressed;
+  // Holding X for a second jumps to the open gate. Playtest aid, deliberately unlisted.
+  const holdingSkip =
+    started &&
+    !paused &&
+    keys.has("x") &&
+    !Object.values(bindings).includes("x");
+  if (!holdingSkip) skipHeldSince = 0;
+  else if (!skipHeldSince) skipHeldSince = now;
+  else if (now - skipHeldSince >= 1000) {
+    skipHeldSince = Infinity;
+    skipToGate(state);
+  }
   if (started && !paused) {
     accumulator += dt;
     while (accumulator >= DT) {
