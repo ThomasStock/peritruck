@@ -23,6 +23,10 @@ import {
   slowDown,
   YARD,
   type State,
+  smsReceived,
+  SMS_DELAY,
+  objective,
+  snapshot,
 } from "../src/game/simulation";
 import { execute, demo, driveTo, walkTo } from "../src/game/commands";
 
@@ -254,6 +258,27 @@ test("kiosk and gate cannot be skipped, wrong booking/PIN preserve progress", ()
   assert.equal(s.gateOpen, false);
   assert.ok(enterPin(s, "2048"));
   assert.equal(s.phase, "dock");
+});
+
+test("the gate PIN lands on the driver's phone shortly after leaving the kiosk", () => {
+  const s = createState();
+  assert.equal(smsReceived(s), false);
+  s.phase = "kiosk";
+  assert.ok(register(s, "PP-2048"));
+  assert.equal(s.registered, true);
+  assert.equal(smsReceived(s), false);
+  assert.equal(s.message, "");
+  assert.match(objective(s).detail, /on its way by SMS/);
+  advance(s, idleInput(), SMS_DELAY / 2);
+  assert.equal(smsReceived(s), false);
+  advance(s, idleInput(), SMS_DELAY);
+  assert.equal(smsReceived(s), true);
+  assert.match(objective(s).detail, /arrived by SMS/);
+  assert.equal(snapshot(s).smsReceived, true);
+  assert.equal(s.events.at(-1)?.type, "registered");
+  const skipped = createState();
+  skipToGate(skipped);
+  assert.equal(smsReceived(skipped), true);
 });
 
 test("recovery restores the last safe checkpoint without clearing visit progress", () => {

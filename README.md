@@ -45,6 +45,8 @@ The kiosk is a replica of the Peripass kiosk app. On a desktop viewport it rende
 | Phone      | Country code and mobile number. Demo: any plausible number is accepted, no SMS is sent. |
 | Endscreen  | Confirmation that the gate PIN arrives by SMS; **Home** returns the driver to the yard. |
 
+Two seconds after leaving the kiosk the SMS lands on the driver's phone: a lock-screen banner drops over the yard (tap it to dismiss; it leaves by itself). At the gate the same message is open on a rendered handset beside the terminal keypad. Both come from `src/sms.ts`; the delay lives in the simulation as `smsAt`, so CLI sessions and the browser agree on when the PIN is known.
+
 Production strings are reused where the real kiosk has them; demo-only copy (visit types, phone note, endscreen) is written in `src/kiosk/i18n.ts`. The flow itself is a pure step machine in `src/kiosk/flow.ts`, covered by `tests/kiosk.test.ts`. The CLI `register` command still completes the kiosk in one call.
 
 ## Drive from the CLI
@@ -112,6 +114,7 @@ npm run models       # Rebuild original GLB assets with installed Blender
 | `src/scene.ts`            | Three.js rendering, camera, lights, models, projected path                                        |
 | `src/main.ts`             | Input adapters, accessible overlays, HUD, sound and agent tool registration                       |
 | `src/kiosk/`              | Kiosk replica: step flow, six-language copy, DOM view and stylesheet                              |
+| `src/sms.ts`              | The driver's phone: SMS banner and handset with the Messages thread                               |
 | `vite.config.ts`          | Local-only CLI/browser bridge                                                                     |
 | `scripts/truck.ts`        | JSON command-line client and session persistence                                                  |
 | `scripts/build_models.py` | Reproducible Blender asset authoring                                                              |

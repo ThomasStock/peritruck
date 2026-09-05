@@ -34,6 +34,8 @@ export type State = {
   assisted: boolean;
   gateOpen: boolean;
   registered: boolean;
+  /** Simulation time at which the check-in SMS reaches the driver's phone. */
+  smsAt: number;
   pin: string;
   booking: string;
   elapsed: number;
@@ -68,6 +70,8 @@ export const YARD = {
 export const STOP_SPEED = { park: 0.18, gate: 0.3, dock: 0.18 };
 /** Radius (m) around a driving target inside which excess speed warns the driver. */
 export const SLOW_ZONE = 4;
+/** Seconds between leaving the kiosk and the gate PIN landing on the driver's phone. */
+export const SMS_DELAY = 2;
 export const idleInput = (): Input => ({
   throttle: 0,
   steer: 0,
@@ -92,6 +96,9 @@ export const offset = (p: Point, h: number, d: number): Point => ({
 export const rear = (t: Truck) => offset(t, t.trailerHeading, -RIG.rear);
 export const walking = (s: State) =>
   ["walk-kiosk", "walk-truck", "kiosk"].includes(s.phase);
+/** The check-in SMS with the gate PIN has arrived. Sessions saved before the delay existed count as delivered. */
+export const smsReceived = (s: State) =>
+  s.registered && s.elapsed >= (s.smsAt ?? 0);
 export function createState(): State {
   const truck = {
     x: -24,
@@ -109,6 +116,7 @@ export function createState(): State {
     assisted: true,
     gateOpen: false,
     registered: false,
+    smsAt: 0,
     pin: "2048",
     booking: "PP-2048",
     elapsed: 0,
@@ -124,13 +132,15 @@ export function createState(): State {
     events: [],
   };
 }
+/** Record a progression event without showing a toast. */
+export function log(s: State, type: string, detail: string) {
+  s.events.push({ time: Math.round(s.elapsed * 100) / 100, type, detail });
+  s.events = s.events.slice(-100);
+}
 export function note(s: State, detail: string, type = "hint") {
   s.message = detail;
   s.messageUntil = s.elapsed + 4;
-  if (type !== "hint") {
-    s.events.push({ time: Math.round(s.elapsed * 100) / 100, type, detail });
-    s.events = s.events.slice(-100);
-  }
+  if (type !== "hint") log(s, type, detail);
 }
 export type Rect = Point & { w: number; d: number; h: number; name?: string };
 export function rigRects(t: Truck): Rect[] {
@@ -284,7 +294,9 @@ export function objective(s: State): {
     case "walk-truck":
       return {
         title: "Driver instructions",
-        detail: "Your gate PIN is ready. Walk back to the cab.",
+        detail: smsReceived(s)
+          ? "Your gate PIN arrived by SMS. Walk back to the cab."
+          : "Checked in. Your gate PIN is on its way by SMS.",
         target: offset(s.truck, s.truck.heading + Math.PI / 2, 2.5),
         step: 1,
       };
@@ -378,7 +390,9 @@ export function register(s: State, booking: string): boolean {
   }
   s.registered = true;
   s.phase = "walk-truck";
-  note(s, "Message received: gate PIN 2048. Deliver to dock 03.", "registered");
+  // The SMS lands a moment after the driver leaves the kiosk; the UI shows it then.
+  s.smsAt = s.elapsed + SMS_DELAY;
+  log(s, "registered", `Checked in with ${s.booking}. Gate PIN sent by SMS.`);
   return true;
 }
 /** Safe stop just inside the barrier once the gate has opened. */
@@ -417,6 +431,7 @@ export function skipToGate(s: State): boolean {
     steer: 0,
   };
   s.registered = true;
+  s.smsAt = s.elapsed;
   s.gateOpen = true;
   s.phase = "dock";
   s.dockHold = 0;
@@ -569,6 +584,7 @@ export function snapshot(s: State) {
     assisted: s.assisted,
     gateOpen: s.gateOpen,
     registered: s.registered,
+    smsReceived: smsReceived(s),
     objective: objective(s),
     interaction: prompt(s),
     slowDown: slowDown(s),
