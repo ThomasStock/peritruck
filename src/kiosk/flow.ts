@@ -1,10 +1,19 @@
 /** Kiosk registration flow: a small step machine mirroring the production kiosk.
  * Pure data, no DOM, so the browser view and tests share one contract.
  * Steps: language → check-in method → (visit type) → reference → phone → endscreen.
+ * The reference can also be scanned: reference → scan (camera viewfinder) →
+ * verifying (the kiosk reads the document) → phone.
  */
 import { type Lang, isLang } from "./i18n";
 export type Step =
-  "language" | "method" | "profile" | "reference" | "phone" | "endscreen";
+  | "language"
+  | "method"
+  | "profile"
+  | "reference"
+  | "scan"
+  | "verifying"
+  | "phone"
+  | "endscreen";
 export type Method = "reference" | "stepByStep";
 export type Profile = "inbound" | "outbound" | "contractor";
 export type Flow = {
@@ -12,7 +21,7 @@ export type Flow = {
   language: Lang;
   method?: Method;
   profile?: Profile;
-  /** Expected full reference, e.g. PP-2048; the prefix is derived from it. */
+  /** Expected full reference, e.g. PP-K4M7Q2; the prefix is derived from it. */
   booking: string;
   /** What the visitor typed after the fixed prefix. */
   reference: string;
@@ -54,10 +63,10 @@ export function createFlow(booking: string): Flow {
     phoneNumber: "",
   };
 }
-/** "PP-2048" → "PP-". A booking without a dash has no prefix. */
+/** "PP-K4M7Q2" → "PP-". A booking without a dash has no prefix. */
 export const referencePrefix = (booking: string) =>
   booking.slice(0, booking.indexOf("-") + 1);
-/** "PP-2048" → "2048". */
+/** "PP-K4M7Q2" → "K4M7Q2". */
 export const referenceBody = (booking: string) =>
   booking.slice(referencePrefix(booking).length);
 /** Combine the fixed prefix with what was typed; a repeated prefix is forgiven. */
@@ -98,6 +107,27 @@ export function submitReference(f: Flow): boolean {
   f.step = "phone";
   return true;
 }
+/** The driver holds the delivery note up to the kiosk camera instead of typing. */
+export function startScan(f: Flow): boolean {
+  if (f.step !== "reference") return false;
+  f.attempted = undefined;
+  f.step = "scan";
+  return true;
+}
+/** The camera has captured the reference; the kiosk now reads the document. */
+export function detectScan(f: Flow): boolean {
+  if (f.step !== "scan") return false;
+  f.step = "verifying";
+  return true;
+}
+/** The scanned note carries the booked reference, so a scan always matches. */
+export function finishScan(f: Flow): boolean {
+  if (f.step !== "verifying") return false;
+  f.reference = referenceBody(f.booking);
+  f.attempted = undefined;
+  f.step = "phone";
+  return true;
+}
 export const phoneDigits = (number: string) => number.replace(/\D/g, "");
 /** Demo validation: 6–15 digits, any formatting characters allowed. */
 export function isValidPhone(number: string): boolean {
@@ -130,6 +160,8 @@ export function previousStep(f: Flow): Step | null {
       return "method";
     case "reference":
       return f.method === "stepByStep" ? "profile" : "method";
+    case "scan":
+      return "reference";
     case "phone":
       return "reference";
     default:

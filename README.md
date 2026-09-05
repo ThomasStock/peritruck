@@ -2,7 +2,7 @@
 
 Version 2 of [ThomasStock/peritruck](https://github.com/ThomasStock/peritruck), the game originally served at [truck.placeholder.app](https://truck.placeholder.app/).
 
-A small 3D logistics yard: arrive in your articulated truck, park in holding bay P02, check in at a self-service kiosk, receive gate PIN 2048 by SMS, enter the site, and reverse into dock 03.
+A small 3D logistics yard: arrive in your articulated truck, park in holding bay P02, check in at a self-service kiosk, receive a gate PIN by SMS, enter the site, and reverse into dock 03.
 
 ## Play locally
 
@@ -34,16 +34,20 @@ Reverse assist is on by default. In reverse, the steering command asks the _trai
 
 ## Kiosk check-in
 
-The kiosk is a replica of the Peripass kiosk app. On a desktop viewport it renders as a physical kiosk with navigation rails; on phone-sized viewports it renders as the Mobile Driver Portal with the inline top bar. Your delivery note lies next to the kiosk (desktop) or behind the **Paperwork** button (mobile) and carries the reference `PP-2048`.
+The kiosk is a replica of the Peripass kiosk app. On a desktop viewport it renders as a physical kiosk with navigation rails; on phone-sized viewports it renders as the Mobile Driver Portal with the inline top bar. Your delivery note lies next to the kiosk (desktop). On mobile it is a drawer on the right, offered only on the reference step: tap the **Delivery note** tab or swipe it in to read it, and keep it open while you type. Swipe it out, tap the tab or **Hide** to put it away. It carries the reference `PP-K4M7Q2`.
 
-| Step       | What the driver sees                                                                    |
-| ---------- | --------------------------------------------------------------------------------------- |
-| Language   | Welcome page with English, Dutch, French, German, Polish and Romanian; copy follows it. |
-| Method     | “How would you like to check in?” — enter a reference, or register step by step.        |
-| Visit type | Step by step only: inbound, outbound or contractor.                                     |
-| Reference  | Fixed `PP-` prefix, type the number from the paperwork. A wrong value shows “No match”. |
-| Phone      | Country code and mobile number. Demo: any plausible number is accepted, no SMS is sent. |
-| Endscreen  | Confirmation that the gate PIN arrives by SMS; **Home** returns the driver to the yard. |
+| Step       | What the driver sees                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------- |
+| Language   | Welcome page with English, Dutch, French, German, Polish and Romanian; copy follows it.                       |
+| Method     | “How would you like to check in?” — enter a reference, or register step by step.                              |
+| Visit type | Step by step only: inbound, outbound or contractor.                                                           |
+| Reference  | Fixed `PP-` prefix, type the number from the paperwork, or **Scan document**. A wrong value shows “No match”. |
+| Phone      | Country code and mobile number. Demo: any plausible number is accepted, no SMS is sent.                       |
+| Endscreen  | Confirmation that the gate PIN arrives by SMS; **Home** returns the driver to the yard.                       |
+
+**Scan document** opens the kiosk camera: the screen dims around a clear frame and the delivery note lies half outside it. Drag the note until the green reference box sits inside the frame; the kiosk outlines it, asks you to hold still, captures, shows the real kiosk's “We're scanning your document” page for a second and continues to the phone step with the reference filled in. Arrow keys move the note too. The states, colours and copy follow the production kiosk's Document Capture; the frame itself is the game's teaching aid.
+
+Two seconds after leaving the kiosk the SMS lands on the driver's phone: a lock-screen banner drops over the yard (tap it to dismiss; it leaves by itself). At the gate the same message is open on a rendered handset beside the terminal keypad. Both come from `src/sms.ts`; the delay lives in the simulation as `smsAt`, so CLI sessions and the browser agree on when the PIN is known.
 
 Production strings are reused where the real kiosk has them; demo-only copy (visit types, phone note, endscreen) is written in `src/kiosk/i18n.ts`. The flow itself is a pure step machine in `src/kiosk/flow.ts`, covered by `tests/kiosk.test.ts`. The CLI `register` command still completes the kiosk in one call.
 
@@ -62,7 +66,7 @@ npm run truck -- interact
 npm run truck -- walk-to --x -28 --z 29
 npm run truck -- walk-to --x -33.7 --z 28.2
 npm run truck -- interact
-npm run truck -- register --booking PP-2048
+npm run truck -- register --booking PP-K4M7Q2
 ```
 
 `drive-to` is a feedback controller using ordinary pedals and steering. It does not plan around obstacles: provide clear intermediate waypoints. Forward targets track the fifth-wheel position; `--reverse` targets track the trailer rear. A route blocked by an obstacle exits with an error. `walk-to` uses the same walking and collision code as human play.
@@ -113,6 +117,7 @@ npm run models       # Rebuild original GLB assets with installed Blender
 | `src/rig.ts`              | Driver rig: displacement-driven gait, turning, idle motion                                        |
 | `src/main.ts`             | Input adapters, accessible overlays, HUD, sound and agent tool registration                       |
 | `src/kiosk/`              | Kiosk replica: step flow, six-language copy, DOM view and stylesheet                              |
+| `src/sms.ts`              | The driver's phone: SMS banner and handset with the Messages thread                               |
 | `vite.config.ts`          | Local-only CLI/browser bridge                                                                     |
 | `scripts/truck.ts`        | JSON command-line client and session persistence                                                  |
 | `scripts/build_models.py` | Reproducible Blender asset authoring                                                              |

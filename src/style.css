@@ -193,7 +193,7 @@ button:active {
   margin: 19px 0 10px;
 }
 .mission p {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.75;
   margin: 0;
   color: #627c70;
@@ -256,7 +256,7 @@ button:active {
 .controls-hint {
   display: flex;
   gap: 16px;
-  font-size: 10px;
+  font-size: 12px;
   color: #385647;
   align-items: center;
 }
@@ -444,206 +444,8 @@ kbd {
   background: var(--teal);
   color: white;
 }
-@media (min-width: 1500px) {
-  .intro {
-    left: 5vw;
-    width: 380px;
-    padding: 36px;
-  }
-  .intro h1 {
-    font-size: 38px;
-  }
-}
-@media (max-width: 900px) {
-  .site-tag,
-  .edition-note {
-    display: none;
-  }
-  .mission {
-    width: 245px;
-    left: 20px;
-    top: 100px;
-    padding: 20px;
-  }
-  .mission h1 {
-    font-size: 23px;
-  }
-  .intro {
-    left: 25px;
-    width: 305px;
-    padding: 26px;
-  }
-  .intro h1 {
-    font-size: 32px;
-  }
-  .controls-hint {
-    gap: 8px;
-  }
-  .topbar {
-    padding: 20px;
-    height: 78px;
-  }
-  .brand {
-    gap: 12px;
-  }
-  .brand img {
-    width: 111px;
-  }
-  .brand > span:last-child {
-    font-size: 12px;
-  }
-  .brand small {
-    font-size: 8px;
-  }
-  .edition {
-    display: none;
-  }
-}
-@media (max-width: 600px) {
-  .topbar {
-    height: 70px;
-    padding: 16px;
-  }
-  .brand img {
-    width: 102px;
-  }
-  .brand-divider {
-    height: 25px;
-  }
-  .brand > span:last-child {
-    font-size: 10px;
-    letter-spacing: 1.2px;
-  }
-  .brand small {
-    font-size: 7px;
-    letter-spacing: 1.1px;
-  }
-  .icon-button {
-    width: 31px;
-    height: 31px;
-  }
-  .intro {
-    left: 16px;
-    right: 16px;
-    top: auto;
-    bottom: 34px;
-    transform: none;
-    width: auto;
-    border-radius: 20px;
-    padding: 23px;
-  }
-  .intro h1 {
-    font-size: 28px;
-    letter-spacing: -1.5px;
-    margin: 14px 0;
-    line-height: 1.03;
-  }
-  .intro h1 br {
-    display: none;
-  }
-  .intro p {
-    font-size: 12px;
-    margin-bottom: 14px;
-  }
-  .intro p br {
-    display: none;
-  }
-  .intro-steps {
-    margin-bottom: 16px;
-  }
-  .intro-note {
-    margin-top: 12px;
-  }
-  .mission {
-    left: 16px;
-    right: 16px;
-    top: 83px;
-    width: auto;
-    padding: 15px 18px;
-    border-radius: 14px;
-  }
-  .mission h1 {
-    font-size: 20px;
-    margin: 9px 0 5px;
-  }
-  .mission p {
-    font-size: 12px;
-    line-height: 1.5;
-  }
-  .mission-progress {
-    margin: 13px 0 0;
-  }
-  .delivery-note {
-    display: none;
-  }
-  .mission .eyebrow {
-    font-size: 8px;
-  }
-  .bottom-bar {
-    display: none;
-  }
-  .telemetry {
-    right: 16px;
-    bottom: 155px;
-    width: 119px;
-    gap: 10px;
-    padding: 12px;
-  }
-  .gear {
-    padding-right: 12px;
-  }
-  .gear b {
-    font-size: 22px;
-  }
-  .speed b {
-    font-size: 28px;
-  }
-  .assist-tag {
-    font-size: 6px;
-    letter-spacing: 0.1px;
-  }
-  .action-wrap {
-    bottom: 170px;
-    max-width: calc(100vw - 155px);
-    left: 16px;
-    transform: none;
-  }
-  .action {
-    white-space: normal;
-    padding: 10px;
-    gap: 8px;
-    font-size: 11px;
-  }
-  .action kbd {
-    padding: 4px;
-    font-size: 10px;
-  }
-  .target-label {
-    padding: 7px 9px;
-  }
-  .target-label b {
-    font-size: 8px;
-  }
-  .target-number {
-    width: 24px;
-    height: 24px;
-    font-size: 14px;
-  }
-  .toast {
-    top: 210px;
-    max-width: 90vw;
-    width: max-content;
-    font-size: 11px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
-    animation: none !important;
-  }
-}
 .stage-hint {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
   padding-top: 15px;
   color: #58816e;
@@ -746,17 +548,17 @@ kbd {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 10px;
+  font-size: 12px;
   padding: 8px 0;
   border-bottom: 1px solid #dce6d9;
 }
 .dock-measure b {
-  font-size: 12px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 .dock-guide p {
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.7;
   color: #728975;
   margin: 15px 0 0;
@@ -819,6 +621,9 @@ kbd {
   overflow-y: auto;
   box-shadow: 0 24px 90px #12362633;
 }
+.dialog:focus {
+  outline: none;
+}
 .dialog-close {
   position: absolute;
   top: 16px;
@@ -844,7 +649,7 @@ kbd {
   margin: 21px 0 12px;
 }
 .dialog-description {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.8;
   color: #698371;
   margin: 0 0 23px;
@@ -860,7 +665,7 @@ kbd {
 .field {
   display: flex;
   flex-direction: column;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   gap: 8px;
   margin-bottom: 18px;
@@ -875,44 +680,15 @@ kbd {
   width: 100%;
   font-size: 14px;
 }
-.booking-card,
-.message-ticket {
-  padding: 16px;
-  background: #e7efdf;
-  border: 1px solid #d6e2cb;
-  border-radius: 8px;
-  margin: 0 0 17px;
-}
-.booking-card > span,
-.message-ticket > span {
-  font-size: 8px;
-  letter-spacing: 1.2px;
-  color: #708367;
-  display: block;
-  margin-bottom: 8px;
-}
-.booking-card b,
-.message-ticket b {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-}
-.booking-card small,
-.message-ticket small {
-  display: block;
-  font-size: 10px;
-  color: #7b8d73;
-  margin-top: 8px;
-}
 .privacy-note {
-  font-size: 9px;
+  font-size: 11px;
   text-align: center;
   line-height: 1.6;
   color: #809078;
   margin: 17px 0 0;
 }
 .form-error {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: #ad4e38;
   min-height: 16px;
@@ -943,12 +719,6 @@ kbd {
   font-weight: 500;
   padding: 11px;
 }
-.message-ticket strong {
-  margin-left: 26px;
-  font-size: 21px;
-  color: #007e68;
-  font-weight: 600;
-}
 .settings-dialog {
   width: min(520px, 100%);
 }
@@ -961,13 +731,13 @@ kbd {
   border-bottom: 1px solid #dbe5d4;
 }
 .setting-row b {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   display: block;
 }
 .setting-row small {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   color: #768971;
   line-height: 1.5;
   max-width: 300px;
@@ -1003,7 +773,7 @@ kbd {
   justify-content: space-between;
   gap: 5px;
   padding: 5px;
-  font-size: 9px;
+  font-size: 11px;
 }
 .keybind {
   border: 1px solid #c7d7c4;
@@ -1012,10 +782,10 @@ kbd {
   border-radius: 5px;
   padding: 6px;
   min-width: 28px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .settings-tip {
-  font-size: 10px;
+  font-size: 12px;
   color: #7b8d70;
   line-height: 1.8;
   margin: 18px 0;
@@ -1058,6 +828,9 @@ kbd {
   display: grid;
   place-items: center;
   margin: 23px auto;
+}
+.complete-dialog > .text-button {
+  margin-top: 14px;
 }
 #touch-controls {
   display: none;
@@ -1109,15 +882,72 @@ kbd {
 }
 .touch-group button[data-touch="forward"] {
   background: #c6f389ef;
+} /* Responsive layout. Order matters: general tweaks first, phone layouts last so
+   they win over the tablet and short-window blocks. */
+@media (min-width: 1500px) {
+  .intro {
+    left: 5vw;
+    width: 380px;
+    padding: 36px;
+  }
+  .intro h1 {
+    font-size: 38px;
+  }
 }
+/* Tablets and narrow desktop windows. */
+@media (max-width: 900px) {
+  .topbar {
+    padding: 20px;
+    height: 78px;
+  }
+  .brand {
+    gap: 12px;
+  }
+  .brand img {
+    width: 111px;
+  }
+  .intro {
+    left: 25px;
+    width: 305px;
+    padding: 26px;
+  }
+  .intro h1 {
+    font-size: 32px;
+  }
+  .mission {
+    width: 245px;
+    left: 20px;
+    top: 100px;
+    padding: 20px;
+  }
+  .mission h1 {
+    font-size: 23px;
+  }
+  .controls-hint {
+    gap: 8px;
+  }
+  .minimap {
+    left: 20px;
+  }
+  .dock-guide {
+    right: 20px;
+    width: 190px;
+    padding: 16px;
+  }
+}
+/* Short desktop windows. */
 @media (max-height: 760px) and (min-width: 601px) {
   .mission {
     top: 96px;
+    width: 280px;
     padding: 18px 20px;
   }
   .mission h1 {
     font-size: 23px;
     margin-top: 13px;
+  }
+  .mission p {
+    font-size: 13px;
   }
   .mission-progress {
     margin: 15px 0;
@@ -1126,7 +956,11 @@ kbd {
     padding-top: 12px;
   }
   .stage-hint {
+    font-size: 11px;
     padding-top: 10px;
+  }
+  .controls-hint {
+    font-size: 10px;
   }
   .minimap {
     width: 175px;
@@ -1155,11 +989,13 @@ kbd {
     margin-bottom: 13px;
   }
 }
+/* Touch devices: on-screen driving controls replace the keyboard hints. */
 @media (pointer: coarse) {
   #touch-controls {
     display: flex;
   }
-  .bottom-bar .controls-hint {
+  .bottom-bar .controls-hint,
+  .stage-hint {
     display: none;
   }
   .minimap {
@@ -1172,253 +1008,302 @@ kbd {
     bottom: 151px;
   }
 }
-@media (max-width: 900px) {
-  .minimap {
-    left: 20px;
+/* Phones, either orientation: compact cards and a slim HUD. Positions follow below. */
+@media (max-width: 600px), (max-height: 510px) and (orientation: landscape) {
+  .brand img {
+    width: 92px;
   }
-  .dock-guide {
-    right: 20px;
-    width: 190px;
-    padding: 16px;
+  .icon-button {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
   }
-}
-@media (max-width: 600px) {
-  #touch-controls {
-    display: flex;
-    inset: auto 14px 24px;
+  .mission {
+    padding: 12px 14px;
+    border-radius: 14px;
   }
-  .touch-group {
-    gap: 7px;
+  .mission .eyebrow {
+    font-size: 8px;
+    letter-spacing: 1.4px;
   }
-  .touch-group button {
-    width: 48px;
-    height: 54px;
-    border-radius: 13px;
+  .mission h1 {
+    font-size: 17px;
+    letter-spacing: -0.5px;
+    margin: 6px 0 4px;
   }
-  .touch-group.pedals button {
-    width: 47px;
-    height: 70px;
+  .mission p {
+    font-size: 12px;
+    line-height: 1.45;
   }
-  .touch-group.pedals button[data-touch="brake"] {
-    width: 39px;
-    height: 48px;
+  .mission-progress {
+    margin: 10px 0 0;
   }
+  .delivery-note,
+  .stage-hint,
   .minimap {
     display: none !important;
   }
-  .stage-hint {
-    font-size: 10px;
-    padding-top: 8px;
+  .touch-group {
+    gap: 6px;
   }
-  .mission-progress {
-    margin-top: 10px;
+  .touch-group button {
+    width: 50px;
+    height: 54px;
+    border-radius: 13px;
+    font-size: 20px;
+  }
+  .touch-group.pedals button {
+    width: 48px;
+    height: 66px;
+  }
+  .touch-group.pedals button[data-touch="brake"] {
+    width: 40px;
+    height: 46px;
+    font-size: 14px;
   }
   .telemetry {
-    bottom: 115px;
+    width: auto;
+    gap: 6px 10px;
+    padding: 8px 12px;
+    border-radius: 12px;
+  }
+  .gear {
+    padding-right: 10px;
+  }
+  .gear b {
+    font-size: 18px;
+  }
+  .speed b {
+    font-size: 24px;
+    letter-spacing: -1px;
+  }
+  .gear span,
+  .speed span {
+    font-size: 7px;
+    margin-top: 2px;
+  }
+  .assist-tag {
+    display: none;
+  }
+  .articulation {
+    margin-top: 0;
   }
   .dock-guide {
-    top: auto;
-    bottom: 205px;
-    right: 16px;
-    width: 155px;
-    padding: 13px;
+    width: 150px;
+    padding: 10px 12px;
+    border-radius: 12px;
   }
   .dock-guide .eyebrow {
     font-size: 7px;
   }
   .dock-guide > strong {
-    font-size: 13px;
-    margin: 10px 0;
+    font-size: 12px;
+    margin: 6px 0;
   }
   .dock-guide p {
     display: none;
   }
   .dock-measure {
     font-size: 9px;
-    padding: 5px 0;
+    padding: 4px 0;
   }
   .dock-measure b {
+    font-size: 11px;
+  }
+  .dock-meter {
+    height: 6px;
+    margin: 6px 0;
+  }
+  .dock-meter i {
+    height: 10px;
+  }
+  .action {
+    white-space: normal;
+    padding: 10px 14px 10px 10px;
+    gap: 8px;
+    font-size: 11px;
+    border-radius: 10px;
+  }
+  .action kbd {
+    padding: 4px;
     font-size: 10px;
   }
-  .action-wrap {
-    bottom: 120px;
+  .target-label {
+    padding: 7px 9px;
+  }
+  .target-label b {
+    font-size: 8px;
+  }
+  .target-number {
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+  }
+  .toast {
+    width: max-content;
+    font-size: 11px;
+  }
+  .cli-resume {
+    font-size: 8px;
   }
   .modal-scrim {
     padding: 16px;
   }
   .dialog {
-    padding: 25px;
+    padding: 22px;
     max-height: calc(100dvh - 32px);
   }
   .dialog h2 {
-    font-size: 26px;
+    font-size: 24px;
+    margin-top: 12px;
+  }
+  .settings-dialog .setting-row small {
+    font-size: 11px;
+  }
+}
+/* Phones in portrait: mission card under the top bar, guide and telemetry above the touch controls. */
+@media (max-width: 600px) {
+  .topbar {
+    height: 60px;
+    padding: 12px 14px;
+  }
+  .bottom-bar {
+    display: none;
+  }
+  .intro {
+    left: 14px;
+    right: 14px;
+    top: auto;
+    bottom: 28px;
+    transform: none;
+    width: auto;
+    border-radius: 20px;
+    padding: 22px;
+  }
+  .intro h1 {
+    font-size: 28px;
+    letter-spacing: -1.5px;
+    margin: 0 0 12px;
+    line-height: 1.03;
+  }
+  .intro p {
+    font-size: 12px;
+    margin-bottom: 14px;
+  }
+  .mission {
+    left: 14px;
+    right: 14px;
+    top: 62px;
+    width: auto;
+  }
+  #touch-controls {
+    display: flex;
+    inset: auto 12px 14px;
+  }
+  .telemetry {
+    right: 12px;
+    bottom: 90px;
+  }
+  .dock-guide {
+    top: auto;
+    bottom: 90px;
+    left: 12px;
+    right: auto;
+  }
+  .action-wrap {
+    bottom: 90px;
+    left: 12px;
+    transform: none;
+    max-width: calc(100vw - 150px);
+  }
+  .toast {
+    top: 200px;
+    max-width: 90vw;
+  }
+  .cli-resume {
+    top: 17px;
+    right: 92px;
   }
   .keybindings {
     grid-template-columns: repeat(2, 1fr);
   }
-  .cli-resume {
-    top: 70px;
-    right: 16px;
-    font-size: 8px;
-  }
-  .toast {
-    top: 243px;
-  }
-  .completion-route {
-    gap: 8px;
-    font-size: 8px;
-  }
 }
+/* Phones in landscape: mission left, docking guide right, telemetry above the pedals. */
 @media (max-height: 510px) and (orientation: landscape) {
   .topbar {
-    height: 58px;
-    padding: 12px 20px;
-  }
-  .mission {
-    top: 65px;
-    width: 220px;
-    padding: 15px;
-  }
-  .mission h1 {
-    font-size: 20px;
-  }
-  .mission p {
-    font-size: 11px;
-  }
-  .delivery-note,
-  .minimap,
-  .edition-note {
-    display: none !important;
-  }
-  .intro {
-    top: 66px;
-    left: 25px;
-    transform: none;
-    width: 310px;
-    padding: 20px;
-  }
-  .intro h1 {
-    font-size: 32px;
-    margin: 10px 0;
-  }
-  .intro h1 br {
-    display: none;
-  }
-  .intro p {
-    font-size: 11px;
-    margin-bottom: 10px;
-  }
-  .intro-steps {
-    margin-bottom: 12px;
-  }
-  .intro-note {
-    display: none;
+    height: 52px;
+    padding: 10px 14px;
   }
   .bottom-bar {
     padding: 12px 20px;
   }
-  .telemetry {
-    bottom: 65px;
-  }
-  .dock-guide {
-    top: 66px;
-    width: 180px;
-    padding: 13px;
-  }
-  .action-wrap {
-    bottom: 80px;
-  }
-  .stage-hint {
-    font-size: 10px;
-  }
   .controls-hint {
     font-size: 9px;
+  }
+  .intro {
+    top: 56px;
+    right: auto;
+    bottom: auto;
+    left: 14px;
+    transform: none;
+    width: 300px;
+    padding: 18px;
+  }
+  .intro h1 {
+    font-size: 28px;
+    margin: 0 0 10px;
+  }
+  .intro p {
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  .primary {
+    padding: 13px 16px;
+  }
+  .mission {
+    top: 56px;
+    right: auto;
+    left: 14px;
+    width: 215px;
+  }
+  #touch-controls {
+    inset: auto 12px 12px;
+  }
+  .telemetry {
+    right: 12px;
+    bottom: 86px;
+  }
+  .dock-guide {
+    top: 56px;
+    right: 12px;
+    bottom: auto;
+    left: auto;
+    width: 170px;
+  }
+  .action-wrap {
+    bottom: 86px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 300px);
+  }
+  .toast {
+    top: 60px;
+    max-width: max(200px, calc(100vw - 470px));
+  }
+  .cli-resume {
+    top: 10px;
+    right: 92px;
   }
   .dialog {
     max-height: calc(100dvh - 22px);
   }
 }
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
 body:not(.playing) #touch-controls {
   display: none;
-}
-.mission p {
-  font-size: 14px;
-}
-.stage-hint {
-  font-size: 12px;
-}
-.dialog-description {
-  font-size: 14px;
-}
-.field {
-  font-size: 13px;
-}
-.setting-row b {
-  font-size: 14px;
-}
-.setting-row small,
-.settings-tip {
-  font-size: 12px;
-}
-.controls-hint {
-  font-size: 12px;
-}
-.dock-guide p {
-  font-size: 12px;
-}
-.dock-measure {
-  font-size: 12px;
-}
-.dock-measure b {
-  font-size: 14px;
-}
-.keybindings > span {
-  font-size: 11px;
-}
-.keybind {
-  font-size: 12px;
-}
-.privacy-note {
-  font-size: 11px;
-}
-.form-error {
-  font-size: 12px;
-}
-@media (max-width: 600px) {
-  .mission p {
-    font-size: 12px;
-  }
-  .stage-hint {
-    font-size: 11px;
-  }
-  .dock-measure {
-    font-size: 10px;
-  }
-  .dock-measure b {
-    font-size: 12px;
-  }
-  .settings-dialog .setting-row small {
-    font-size: 11px;
-  }
-  .keybindings > span {
-    font-size: 11px;
-  }
-}
-@media (max-height: 760px) and (min-width: 601px) {
-  .mission {
-    width: 280px;
-  }
-  .mission p {
-    font-size: 13px;
-  }
-  .stage-hint {
-    font-size: 11px;
-  }
-  .controls-hint {
-    font-size: 10px;
-  }
-}
-
-.complete-dialog > .text-button {
-  margin-top: 14px;
 }

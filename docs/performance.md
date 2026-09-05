@@ -85,3 +85,5 @@ The commands above profile the current code with fresh labels, preserving the or
 Validation: baseline 23 tests passed; stage 1 25; stage 2 27; stage 3 30. All stages passed TypeScript/Vite production builds and changed-file Prettier checks. The existing Vite warning about a chunk over 500 kB remains. Locked dependency installation reported zero vulnerabilities.
 
 Maintenance: new trajectory physics dependencies must join the prediction key. New dynamic obstacles must participate in shape-cache invalidation. Rendering bounds must refresh whenever trajectory or instance positions change.
+
+PR preparation integrated `main` at `aee2d90`, preserving its newer kiosk, SMS and session behavior. The combined branch passes 34 tests, the production build, formatting and diff checks. The frozen-reference collision/walking benchmark also passes again (`artifacts/performance/pr-validation.json`). The paired measurements above remain the original sequential profiles, before this integration.

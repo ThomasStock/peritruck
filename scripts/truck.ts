@@ -21,8 +21,8 @@ npm run truck -- input --brake --seconds 1
 npm run truck -- drive-to --x -24 --z 39
 npm run truck -- interact
 npm run truck -- walk-to --x -28 --z 29
-npm run truck -- register --booking PP-2048
-npm run truck -- pin --pin 2048
+npm run truck -- register --booking PP-K4M7Q2
+npm run truck -- pin --pin 1234   # the PIN is in status once registered
 npm run truck -- demo
 npm run truck -- recover
 npm run truck -- reset

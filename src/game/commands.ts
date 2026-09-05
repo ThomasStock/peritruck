@@ -99,7 +99,7 @@ export function demo(s: State) {
   walkTo(s, { x: -28, z: 29 });
   walkTo(s, YARD.kiosk);
   interact(s);
-  register(s, "PP-2048");
+  register(s, s.booking);
   walkTo(s, { x: -28, z: 29 });
   walkTo(s, { x: -27, z: 37 });
   interact(s);
@@ -114,7 +114,7 @@ export function demo(s: State) {
   driveTo(s, { x: 18, z: 47 }, false, false, 2);
   driveTo(s, { x: 18, z: 22 });
   interact(s);
-  if (!enterPin(s, "2048")) throw new Error("Demo gate check failed.");
+  if (!enterPin(s, s.pin)) throw new Error("Demo gate check failed.");
   driveTo(s, { x: 18, z: -24 }, false, false, 2);
   driveTo(s, { x: 9, z: -33 }, false, false, 2);
   driveTo(s, { x: 0, z: -24 }, false, false, 2);
