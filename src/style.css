@@ -386,6 +386,10 @@ kbd {
   font-size: 10px;
   margin-top: 4px;
 }
+.target-label.slow small {
+  color: #f3a469;
+  font-weight: 600;
+}
 .action-wrap {
   position: fixed;
   bottom: 100px;

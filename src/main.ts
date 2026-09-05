@@ -11,6 +11,7 @@ import {
   DT,
   objective,
   prompt,
+  slowDown,
   interact,
   walking,
   distance,
@@ -627,8 +628,11 @@ function updateUI() {
           "DOCK 03",
           "DELIVERED",
         ][o.step];
-  $("target-distance").textContent =
-    `${Math.round(distance(isWalking ? state.driver : state.truck, o.target))} m away`;
+  const slow = slowDown(state);
+  $("target-label").classList.toggle("slow", slow);
+  $("target-distance").textContent = slow
+    ? "Slow down"
+    : `${Math.round(distance(isWalking ? state.driver : state.truck, o.target))} m away`;
   $("toast").textContent = state.message;
   $("toast").classList.toggle(
     "hidden",
