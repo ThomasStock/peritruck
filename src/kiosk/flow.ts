@@ -1,10 +1,19 @@
 /** Kiosk registration flow: a small step machine mirroring the production kiosk.
  * Pure data, no DOM, so the browser view and tests share one contract.
  * Steps: language → check-in method → (visit type) → reference → phone → endscreen.
+ * The reference can also be scanned: reference → scan (camera viewfinder) →
+ * verifying (the kiosk reads the document) → phone.
  */
 import { type Lang, isLang } from "./i18n";
 export type Step =
-  "language" | "method" | "profile" | "reference" | "phone" | "endscreen";
+  | "language"
+  | "method"
+  | "profile"
+  | "reference"
+  | "scan"
+  | "verifying"
+  | "phone"
+  | "endscreen";
 export type Method = "reference" | "stepByStep";
 export type Profile = "inbound" | "outbound" | "contractor";
 export type Flow = {
@@ -98,6 +107,27 @@ export function submitReference(f: Flow): boolean {
   f.step = "phone";
   return true;
 }
+/** The driver holds the delivery note up to the kiosk camera instead of typing. */
+export function startScan(f: Flow): boolean {
+  if (f.step !== "reference") return false;
+  f.attempted = undefined;
+  f.step = "scan";
+  return true;
+}
+/** The camera has captured the reference; the kiosk now reads the document. */
+export function detectScan(f: Flow): boolean {
+  if (f.step !== "scan") return false;
+  f.step = "verifying";
+  return true;
+}
+/** The scanned note carries the booked reference, so a scan always matches. */
+export function finishScan(f: Flow): boolean {
+  if (f.step !== "verifying") return false;
+  f.reference = referenceBody(f.booking);
+  f.attempted = undefined;
+  f.step = "phone";
+  return true;
+}
 export const phoneDigits = (number: string) => number.replace(/\D/g, "");
 /** Demo validation: 6–15 digits, any formatting characters allowed. */
 export function isValidPhone(number: string): boolean {
@@ -130,6 +160,8 @@ export function previousStep(f: Flow): Step | null {
       return "method";
     case "reference":
       return f.method === "stepByStep" ? "profile" : "method";
+    case "scan":
+      return "reference";
     case "phone":
       return "reference";
     default:

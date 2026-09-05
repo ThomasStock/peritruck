@@ -4,6 +4,8 @@ import {
   COUNTRIES,
   back,
   createFlow,
+  detectScan,
+  finishScan,
   formatPhone,
   fullReference,
   isValidPhone,
@@ -13,6 +15,7 @@ import {
   selectLanguage,
   selectMethod,
   selectProfile,
+  startScan,
   submitPhone,
   submitReference,
 } from "../src/kiosk/flow";
@@ -120,4 +123,32 @@ test("every kiosk string exists in every offered language and interpolates", () 
     t("en", "referenceExtraBody", { prefix: "PP-" }).includes("PP-"),
     true,
   );
+});
+
+test("scanning the delivery note replaces typing: reference → scan → verifying → phone", () => {
+  const f = createFlow("PP-2048");
+  assert.equal(startScan(f), false);
+  selectLanguage(f, "fr");
+  selectMethod(f, "reference");
+  f.reference = "1234";
+  submitReference(f);
+  assert.equal(f.attempted, "PP-1234");
+  assert.ok(startScan(f));
+  assert.equal(f.step, "scan");
+  assert.equal(f.attempted, undefined);
+  assert.equal(finishScan(f), false);
+  assert.equal(previousStep(f), "reference");
+  assert.ok(back(f));
+  assert.equal(f.step, "reference");
+  assert.ok(startScan(f));
+  assert.ok(detectScan(f));
+  assert.equal(f.step, "verifying");
+  assert.equal(previousStep(f), null);
+  assert.equal(back(f), false);
+  assert.equal(detectScan(f), false);
+  assert.ok(finishScan(f));
+  assert.equal(f.step, "phone");
+  assert.equal(f.reference, "2048");
+  assert.equal(fullReference(f.booking, f.reference), "PP-2048");
+  assert.equal(previousStep(f), "reference");
 });
