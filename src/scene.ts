@@ -13,10 +13,15 @@ import {
 } from "./game/simulation";
 import { DriverRig } from "./rig";
 export type CameraMode = "follow" | "yard" | "overhead";
+export function createYardCamera() {
+  // Cameras stay metres from the actors. A 1 m near plane preserves enough
+  // depth precision to keep the thin yard slabs from shimmering at a distance.
+  return new THREE.PerspectiveCamera(40, 1, 1, 600);
+}
 export class YardScene {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(40, 1, 0.1, 600);
+  camera = createYardCamera();
   tractor = new THREE.Group();
   trailer = new THREE.Group();
   driver = new THREE.Group();
