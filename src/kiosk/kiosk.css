@@ -1384,10 +1384,6 @@
   --scan-wash: rgb(77 155 232 / 12%);
   --doc-scale: 1;
 }
-.kiosk-scan[data-status="aligning"] {
-  --scan-color: #e8a33d;
-  --scan-wash: rgb(232 163 61 / 12%);
-}
 .kiosk-scan[data-status="ready"] {
   --scan-color: #3fbf6f;
   --scan-wash: rgb(63 191 111 / 14%);
@@ -1492,7 +1488,8 @@
 .kiosk-scan[data-status="ready"] .kiosk-scan__window i {
   border-color: var(--scan-color);
 }
-/* Detected-document outline: hairline edge, interior wash, corner brackets in the status colour. */
+/* Detected-document outline, shown once the reference is inside the frame:
+   hairline edge, interior wash, corner brackets in the status colour. */
 .kiosk-scan__quad {
   position: absolute;
   z-index: 2;
@@ -1576,15 +1573,14 @@
 .kiosk-scan__pill svg {
   flex: none;
 }
-/* Intro hint: the lesson before the mistake; melts away on first touch. */
+/* Intro hint: the lesson before the mistake, parked under the frame so the
+   note and the frame stay clear; melts away on first touch. */
 .kiosk-scan__intro {
   position: absolute;
-  inset: 0;
+  inset: auto 16px 16px;
   z-index: 5;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgb(0 0 0 / 55%);
+  display: flex;
+  justify-content: center;
   pointer-events: none;
   transition: opacity 0.25s;
 }
@@ -1592,23 +1588,31 @@
   opacity: 0;
 }
 .kiosk-scan__intro-card {
-  max-width: 300px;
-  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 440px;
+  padding: 12px 16px;
   border: 1px solid rgb(255 255 255 / 15%);
   border-radius: 16px;
   background: rgb(20 24 26 / 95%);
   color: #fff;
-  text-align: center;
+  text-align: left;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 35%);
+}
+.kiosk-scan__intro-card svg {
+  flex: none;
+  width: 52px;
+  height: auto;
 }
 .kiosk-scan__intro-card p {
-  margin-top: 12px;
   font-size: 14px;
   font-weight: 600;
   line-height: 1.35;
 }
 .kiosk-scan__intro-card small {
   display: block;
-  margin-top: 8px;
+  margin-top: 4px;
   font-size: 12px;
   color: rgb(255 255 255 / 60%);
 }

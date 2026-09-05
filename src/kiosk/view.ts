@@ -298,7 +298,7 @@ export function mountKiosk(
     const s = scan!;
     const intro = s.introSeen
       ? ""
-      : `<div class="kiosk-scan__intro" data-scan-intro><div class="kiosk-scan__intro-card"><svg xmlns="http://www.w3.org/2000/svg" width="72" height="52" viewBox="0 0 72 52" fill="none" aria-hidden="true"><rect x="20" y="4" width="32" height="42" rx="2" fill="#fff" opacity=".95"/><rect x="26" y="12" width="20" height="3" rx="1.5" fill="#8f8b7e"/><rect x="26" y="19" width="16" height="2.5" rx="1.25" fill="#b8b4a8"/><rect x="26" y="25" width="18" height="2.5" rx="1.25" fill="#b8b4a8"/><rect x="26" y="33" width="20" height="8" rx="1.5" fill="#00a88c" opacity=".85"/><path d="M6 26h9m0 0-3-3m3 3-3 3M66 26h-9m0 0 3-3m-3 3 3 3" stroke="#3fbf6f" stroke-width="2" stroke-linecap="round"/></svg><p>${esc(t(L(), "scanIntroTitle"))}</p><small>${esc(t(L(), "scanIntroSubtitle"))}</small></div></div>`;
+      : `<div class="kiosk-scan__intro" data-scan-intro><div class="kiosk-scan__intro-card"><svg xmlns="http://www.w3.org/2000/svg" width="72" height="52" viewBox="0 0 72 52" fill="none" aria-hidden="true"><rect x="20" y="4" width="32" height="42" rx="2" fill="#fff" opacity=".95"/><rect x="26" y="12" width="20" height="3" rx="1.5" fill="#8f8b7e"/><rect x="26" y="19" width="16" height="2.5" rx="1.25" fill="#b8b4a8"/><rect x="26" y="25" width="18" height="2.5" rx="1.25" fill="#b8b4a8"/><rect x="26" y="33" width="20" height="8" rx="1.5" fill="#00a88c" opacity=".85"/><path d="M6 26h9m0 0-3-3m3 3-3 3M66 26h-9m0 0 3-3m-3 3 3 3" stroke="#3fbf6f" stroke-width="2" stroke-linecap="round"/></svg><div><p>${esc(t(L(), "scanIntroTitle"))}</p><small>${esc(t(L(), "scanIntroSubtitle"))}</small></div></div></div>`;
     return `<div class="kiosk-scan" data-scan data-status="${s.status}"><div class="kiosk-scan__feed" data-scan-feed tabindex="0" role="application" aria-roledescription="camera" aria-label="${esc(t(L(), "scanIntroTitle"))}"><div class="kiosk-scan__doc" data-scan-doc>${paperArticleHtml(flow.booking, false)}</div><div class="kiosk-scan__quad" data-scan-quad hidden><i></i><i></i><i></i><i></i></div><div class="kiosk-scan__window" data-scan-window aria-hidden="true"><i></i><i></i><i></i><i></i></div><div class="kiosk-scan__flash" data-scan-flash></div><div class="kiosk-scan__pill" role="status" data-scan-pill>${scanIcon(s.status)}<span>${esc(t(L(), scanStatusKey(s.status)))}</span></div>${intro}</div></div>`;
   }
   const scanStatusKey = (status: ScanStatus): StringKey =>
@@ -429,8 +429,10 @@ export function mountKiosk(
         r.right <= w.right + 2 &&
         r.top >= w.top - 2 &&
         r.bottom <= w.bottom + 2;
-      quad.toggleAttribute("hidden", !overlaps);
-      if (overlaps) {
+      // The outline only appears once the reference sits inside the frame;
+      // while it is still being moved the pill alone gives directions.
+      quad.toggleAttribute("hidden", !inside);
+      if (inside) {
         quad.style.left = `${r.left - f.left}px`;
         quad.style.top = `${r.top - f.top}px`;
         quad.style.width = `${r.width}px`;
