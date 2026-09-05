@@ -355,6 +355,7 @@ kbd {
   pointer-events: none;
   box-shadow: 0 4px 18px #133d3222;
   white-space: nowrap;
+  will-change: transform;
 }
 .target-label:after {
   content: "";
