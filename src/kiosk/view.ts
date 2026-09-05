@@ -64,7 +64,7 @@ export function mountKiosk(
     phoneError = false,
     locked = false,
     timer: ReturnType<typeof setTimeout> | undefined;
-  root.innerHTML = `<div class="kiosk-stage" role="dialog" aria-modal="true" aria-label="Driver check-in kiosk"><div class="kiosk-device"><div class="kiosk-frame"></div></div>${paperHtml(opts.booking)}<button class="kiosk-paper-toggle" type="button" aria-expanded="false">${icons.fileText}<span>Paperwork</span></button></div>`;
+  root.innerHTML = `<div class="kiosk-stage" role="dialog" aria-modal="true" aria-label="Driver check-in kiosk" tabindex="-1"><div class="kiosk-device"><div class="kiosk-frame"></div></div>${paperHtml(opts.booking)}<button class="kiosk-paper-toggle" type="button" aria-expanded="false">${icons.fileText}<span>Paperwork</span></button></div>`;
   const stage = root.firstElementChild as HTMLElement;
   const frame = stage.querySelector<HTMLElement>(".kiosk-frame")!;
   const paperWrap = stage.querySelector<HTMLElement>(".kiosk-paper-wrap")!;
@@ -367,8 +367,11 @@ export function mountKiosk(
           input.focus();
         }
       };
-      if (!mdp() && !overlay) input.focus();
-    } else if (!overlay) $("h1")?.focus({ preventScroll: true });
+    }
+    // Never auto-focus a control on render; park focus on the stage when the
+    // previously focused element was replaced so Escape/Tab still work.
+    if (!frame.contains(document.activeElement))
+      stage.focus({ preventScroll: true });
     function wireCountryItems() {
       for (const b of $$<HTMLButtonElement>("[data-select='country']"))
         b.onclick = () => {

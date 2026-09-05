@@ -62,6 +62,9 @@
 .kiosk-stage button:active {
   transform: none;
 }
+.kiosk-stage:focus {
+  outline: none;
+}
 .kiosk-stage button:focus-visible,
 .kiosk-stage a:focus-visible {
   outline: none;
