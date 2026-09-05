@@ -304,11 +304,13 @@ window.addEventListener("keydown", (e) => {
         ),
       ].filter((node) => node.getClientRects().length > 0);
       const first = nodes[0],
-        last = nodes.at(-1);
-      if (e.shiftKey && document.activeElement === first) {
+        last = nodes.at(-1),
+        active = document.activeElement as HTMLElement | null,
+        inside = active ? nodes.includes(active) : false;
+      if (e.shiftKey && (!inside || active === first)) {
         e.preventDefault();
         last?.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
+      } else if (!e.shiftKey && (!inside || active === last)) {
         e.preventDefault();
         first?.focus();
       }
@@ -349,15 +351,15 @@ document.addEventListener("visibilitychange", () => {
 function modal(title: string, body: string, cls = "") {
   modalReturnFocus = document.activeElement as HTMLElement;
   $("modal-root").innerHTML =
-    `<div class="modal-scrim"><section class="dialog ${cls}" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><button class="dialog-close" id="close-dialog" aria-label="Close dialog">×</button><div class="eyebrow">PERIPASS</div><h2 id="dialog-title">${title}</h2>${body}</section></div>`;
+    `<div class="modal-scrim"><section class="dialog ${cls}" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabindex="-1"><button class="dialog-close" id="close-dialog" aria-label="Close dialog">×</button><div class="eyebrow">PERIPASS</div><h2 id="dialog-title">${title}</h2>${body}</section></div>`;
   $("close-dialog").onclick = closeDialog;
   keys.clear();
   touch.clear();
-  requestAnimationFrame(() =>
-    $("modal-root")
-      .querySelector<HTMLElement>("[autofocus],.primary,input,button")
-      ?.focus(),
-  );
+  // Move focus onto the dialog itself, not its first control, so nothing
+  // lights up on open while Escape and the Tab trap keep working.
+  $("modal-root")
+    .querySelector<HTMLElement>(".dialog")
+    ?.focus({ preventScroll: true });
 }
 function syncDialog() {
   const kind = settingsOpen
@@ -457,7 +459,7 @@ function syncDialog() {
   } else if (kind === "pin") {
     modal(
       "Automated gate access",
-      `<p class="dialog-description">Enter the gate PIN from your check-in message.</p><div class="message-ticket"><span>YOUR PERIPASS MESSAGE</span><b>Gate PIN <strong>2 0 4 8</strong></b><small>Proceed to dock 03 after entry.</small></div><form id="pin-form"><label class="field">Gate PIN<input id="pin-input" autofocus inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="Four digit gate PIN" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? "Delete digit" : k}">${k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">Open the gate <span>↗</span></button></form>`,
+      `<p class="dialog-description">Enter the gate PIN from your check-in message.</p><div class="message-ticket"><span>YOUR PERIPASS MESSAGE</span><b>Gate PIN <strong>2 0 4 8</strong></b><small>Proceed to dock 03 after entry.</small></div><form id="pin-form"><label class="field">Gate PIN<input id="pin-input" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="Four digit gate PIN" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? "Delete digit" : k}">${k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">Open the gate <span>↗</span></button></form>`,
       "pin-dialog",
     );
     for (const b of document.querySelectorAll<HTMLButtonElement>("[data-pin]"))

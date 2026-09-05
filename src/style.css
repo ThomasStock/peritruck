@@ -819,6 +819,9 @@ kbd {
   overflow-y: auto;
   box-shadow: 0 24px 90px #12362633;
 }
+.dialog:focus {
+  outline: none;
+}
 .dialog-close {
   position: absolute;
   top: 16px;
