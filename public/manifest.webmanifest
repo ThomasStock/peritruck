@@ -1,0 +1,17 @@
+{
+  "name": "Peripass Yard",
+  "short_name": "Yard",
+  "description": "Explore Peripass yard automation: self-service check-in, automated access and dock instructions.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "background_color": "#123d38",
+  "theme_color": "#123d38",
+  "icons": [
+    {
+      "src": "/brand/peripass.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    }
+  ]
+}
