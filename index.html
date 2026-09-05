@@ -330,11 +330,33 @@ const DOCK_WALL_Z = -50;      // dock building front
 
 // ground
 {
+  const asphaltW = YARD.maxX - YARD.minX + 6;
+  const asphaltD = YARD.maxZ - YARD.minZ + 6;
+  const grassSize = 400;
+  const hx = asphaltW / 2;
+  const hz = asphaltD / 2;
+  const hs = grassSize / 2;
+
+  // grass ring around the yard (hole under the asphalt so the two floors never overlap)
+  const grassShape = new THREE.Shape();
+  grassShape.moveTo(-hs, -hs);
+  grassShape.lineTo(-hs, hs);
+  grassShape.lineTo(hs, hs);
+  grassShape.lineTo(hs, -hs);
+  grassShape.closePath();
+  const yardHole = new THREE.Path();
+  // shape (x, y) → world (x, 0, -y) after rotation.x = -π/2
+  yardHole.moveTo(-hx, hz);
+  yardHole.lineTo(-hx, -hz);
+  yardHole.lineTo(hx, -hz);
+  yardHole.lineTo(hx, hz);
+  yardHole.closePath();
+  grassShape.holes.push(yardHole);
   const g = new THREE.Mesh(
-    new THREE.PlaneGeometry(400, 400),
+    new THREE.ShapeGeometry(grassShape),
     new THREE.MeshStandardMaterial({ color: 0x6d7a3f, roughness: 1 })
   );
-  g.rotation.x = -Math.PI / 2; g.position.y = -0.02; g.receiveShadow = true;
+  g.rotation.x = -Math.PI / 2; g.receiveShadow = true;
   scene.add(g);
 
   // asphalt with baked-in speckle so the big surface doesn't read as flat plastic
@@ -354,7 +376,7 @@ const DOCK_WALL_Z = -50;      // dock building front
   asphaltTex.wrapS = asphaltTex.wrapT = THREE.RepeatWrapping;
   asphaltTex.repeat.set(10, 14);
   const asphalt = new THREE.Mesh(
-    new THREE.PlaneGeometry(YARD.maxX - YARD.minX + 6, YARD.maxZ - YARD.minZ + 6),
+    new THREE.PlaneGeometry(asphaltW, asphaltD),
     new THREE.MeshStandardMaterial({ map: asphaltTex, roughness: 0.95 })
   );
   asphalt.rotation.x = -Math.PI / 2; asphalt.receiveShadow = true;
@@ -427,9 +449,13 @@ const PARK_SPOT = { x: -35, z: 32, w: 17, d: 6 };  // target, truck noses in hea
 function paintLine(x, z, w, d, color = 0xffffff, opacity = 0.9) {
   const m = new THREE.Mesh(
     new THREE.PlaneGeometry(w, d),
-    new THREE.MeshBasicMaterial({ color, transparent: true, opacity })
+    new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4
+    })
   );
   m.rotation.x = -Math.PI / 2; m.position.set(x, 0.02, z);
+  m.renderOrder = 1;
   scene.add(m);
   return m;
 }
