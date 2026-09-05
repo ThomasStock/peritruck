@@ -998,12 +998,23 @@
 }
 .kiosk-paper header {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   padding: 8px 0 8px;
   border-bottom: 1.5px solid #2b2b2b;
   margin-bottom: 8px;
+}
+.kiosk-paper__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.kiosk-paper__tab,
+.kiosk-paper__toggle {
+  display: none;
 }
 .kiosk-paper header b {
   font-size: 13px;
@@ -1084,32 +1095,6 @@
   transform: rotate(-12deg);
   opacity: 0.7;
 }
-.kiosk-paper-toggle {
-  display: none;
-  position: fixed;
-  left: 50%;
-  bottom: max(16px, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  z-index: 46;
-  align-items: center;
-  gap: 8px;
-  height: 44px;
-  padding: 0 18px 0 14px;
-  border: 1px solid #fff9;
-  border-radius: 22px;
-  background: #163e38;
-  color: #e5f6d6;
-  font:
-    600 13px "Open Sans",
-    system-ui,
-    sans-serif;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 30%);
-  cursor: pointer;
-}
-.kiosk-paper-toggle svg {
-  width: 18px;
-  height: 18px;
-}
 /* Mobile Driver Portal: the screen fills the viewport, paperwork slides up. */
 .kiosk-stage[data-mode="mdp"] {
   padding: 0;
@@ -1133,50 +1118,155 @@
 .kiosk-stage[data-mode="mdp"] .kiosk-frame {
   border-radius: 0;
 }
-.kiosk-stage[data-mode="mdp"] .kiosk-paper-toggle {
-  display: flex;
+/* The delivery note is a drawer on the right, offered only while the reference
+   is typed. A slim tab lives in a gutter beside the screen; nothing is dimmed or
+   blocked, so the driver reads and types at once. */
+.kiosk-stage[data-mode="mdp"] {
+  --paper-w: min(240px, 62vw);
+  --tab-w: 34px;
+}
+.kiosk-stage[data-mode="mdp"][data-step="reference"]:not([data-overlay])
+  .kiosk-device {
+  right: var(--tab-w);
 }
 .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap {
   position: fixed;
-  left: 0;
+  top: 0;
   right: 0;
   bottom: 0;
-  width: auto;
+  width: var(--paper-w);
+  /* The desktop rule centres the note; on a fixed box with both insets that would shrink it. */
+  align-self: stretch;
   z-index: 45;
-  transform: translateY(100%);
-  visibility: hidden;
-  transition: none;
   padding: 0;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-/* Only opening animates: a closed sheet must never depend on a transition
-   finishing (timelines pause in hidden tabs). */
 .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap.is-open {
-  transform: translateY(0);
-  visibility: visible;
-  transition: transform 0.25s ease;
+  transform: translateX(0);
 }
-.kiosk-stage[data-mode="mdp"]::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 44;
-  background: rgb(0 0 0 / 45%);
-  opacity: 0;
-  pointer-events: none;
+.kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap.is-dragging {
+  transition: none;
+  animation: none;
 }
-.kiosk-stage[data-mode="mdp"][data-paper="open"]::after {
-  opacity: 1;
-  pointer-events: auto;
-  transition: opacity 0.25s;
+/* Until the note has been opened once, the closed drawer slips a finger's width
+   into view every few seconds so the tab reads as something to pull. */
+.kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap.is-nudging:not(.is-open) {
+  animation: kiosk-paper-nudge 5s cubic-bezier(0.4, 0, 0.2, 1) 0.8s infinite;
+}
+@keyframes kiosk-paper-nudge {
+  0%,
+  22%,
+  100% {
+    transform: translateX(100%);
+  }
+  6%,
+  16% {
+    transform: translateX(calc(100% - 28px));
+  }
+}
+.kiosk-stage[data-mode="mdp"]:not([data-step="reference"]) .kiosk-paper-wrap,
+.kiosk-stage[data-mode="mdp"][data-overlay] .kiosk-paper-wrap {
+  display: none;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--tab-w);
+  height: 150px;
+  padding: 0;
+  border: 0;
+  border-left: 3px solid #00a88c;
+  border-radius: 10px 0 0 10px;
+  background: #fffdf8;
+  color: #163e38;
+  box-shadow: -6px 0 22px rgb(0 0 0 / 20%);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__tab span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font:
+    700 9.5px "Open Sans",
+    system-ui,
+    sans-serif;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__tab svg {
+  width: 16px;
+  height: 16px;
 }
 .kiosk-stage[data-mode="mdp"] .kiosk-paper {
-  margin: 0 auto;
-  width: min(360px, 100%);
-  border-radius: 10px 10px 0 0;
-  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  height: 100%;
+  overflow-y: auto;
+  border-radius: 0;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
   transform: none;
-  box-shadow: 0 -12px 40px rgb(0 0 0 / 35%);
-  font-size: 12px;
+  box-shadow: -12px 0 40px rgb(0 0 0 / 30%);
+  font-size: 11px;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper header {
+  align-items: center;
+  padding: 6px 0 8px;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__title {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  height: 28px;
+  padding: 0 8px 0 11px;
+  border: 1px solid #d9d2c3;
+  border-radius: 14px;
+  background: #f4f0e7;
+  color: #4a4a4a;
+  font:
+    700 11px "Open Sans",
+    system-ui,
+    sans-serif;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__toggle svg {
+  width: 15px;
+  height: 15px;
+}
+/* The drawer is taller than its content: keep the stamp with the footer, not the screen edge. */
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__stamp {
+  position: static;
+  float: right;
+  margin: -26px 6px 0 0;
+}
+/* Landscape phones have room to keep the whole screen visible beside the open note. */
+@media (min-width: 720px) {
+  .kiosk-stage[data-mode="mdp"] {
+    --paper-w: 264px;
+  }
+  .kiosk-stage[data-mode="mdp"][data-step="reference"][data-paper="open"]:not(
+      [data-overlay]
+    )
+    .kiosk-device {
+    right: calc(var(--paper-w) + var(--tab-w));
+  }
 }
 /* Compact screens (phone width): single column, inline top bar. */
 @container kiosk (max-width: 600px) {
@@ -1271,5 +1361,6 @@
 @media (prefers-reduced-motion: reduce) {
   .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap {
     transition: none;
+    animation: none;
   }
 }
