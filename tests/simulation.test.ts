@@ -19,10 +19,15 @@ import {
   step,
   rear,
   distance,
-  skipToGate,
+  skipAhead,
   slowDown,
+  prompt,
   YARD,
   type State,
+  smsReceived,
+  SMS_DELAY,
+  objective,
+  snapshot,
 } from "../src/game/simulation";
 import { execute, demo, driveTo, walkTo } from "../src/game/commands";
 
@@ -256,6 +261,30 @@ test("kiosk and gate cannot be skipped, wrong booking/PIN preserve progress", ()
   assert.equal(s.phase, "dock");
 });
 
+test("the gate PIN lands on the driver's phone shortly after leaving the kiosk", () => {
+  const s = createState();
+  assert.equal(smsReceived(s), false);
+  s.phase = "kiosk";
+  assert.ok(register(s, "PP-2048"));
+  assert.equal(s.registered, true);
+  assert.equal(smsReceived(s), false);
+  assert.equal(s.message, "");
+  assert.match(objective(s).detail, /on its way by SMS/);
+  advance(s, idleInput(), SMS_DELAY / 2);
+  assert.equal(smsReceived(s), false);
+  advance(s, idleInput(), SMS_DELAY);
+  assert.equal(smsReceived(s), true);
+  assert.match(objective(s).detail, /arrived by SMS/);
+  assert.equal(snapshot(s).smsReceived, true);
+  assert.equal(s.events.at(-1)?.type, "registered");
+  const skipped = createState();
+  skipped.phase = "walk-truck";
+  skipped.registered = true;
+  skipped.smsAt = 99;
+  skipAhead(skipped);
+  assert.equal(smsReceived(skipped), true);
+});
+
 test("recovery restores the last safe checkpoint without clearing visit progress", () => {
   const s = createState();
   driveTo(s, { x: -24, z: 39 });
@@ -292,17 +321,43 @@ test("a paused interaction cannot advance simulation time", () => {
   assert.equal(s.truck.z, 62);
 });
 
-test("gate skip lands a checked-in rig at the open barrier, able to drive through", () => {
+test("hold-to-skip advances one act at a time: kiosk, gate line, dock", () => {
   const s = createState();
-  assert.ok(skipToGate(s));
+  assert.ok(skipAhead(s));
+  assert.equal(s.phase, "walk-kiosk");
+  assert.ok(parking(s).ready);
+  assert.equal(prompt(s), "Check in at kiosk");
+  assert.equal(s.registered, false);
+  assert.ok(skipAhead(s));
+  assert.equal(s.phase, "gate");
+  assert.equal(s.registered, true);
+  assert.equal(smsReceived(s), true);
+  assert.equal(s.gateOpen, false);
+  assert.equal(prompt(s), "Enter gate PIN");
+  assert.equal(collision(s), undefined);
+  assert.ok(skipAhead(s));
   assert.equal(s.phase, "dock");
   assert.equal(s.gateOpen, true);
-  assert.equal(s.registered, true);
+  assert.ok(docking(s).ready);
   assert.equal(collision(s), undefined);
+  advance(s, idleInput(), 1);
+  assert.equal(s.phase, "complete");
+  assert.equal(skipAhead(s), false);
+});
+
+test("skipping from the road or on foot snaps to the gate line first", () => {
+  const s = createState();
+  s.phase = "walk-truck";
+  s.registered = true;
+  assert.ok(skipAhead(s));
+  assert.equal(s.phase, "gate");
   assert.ok(distance(s.truck, YARD.gate) < 6);
-  advance(s, { ...idleInput(), throttle: 1 }, 6);
-  assert.equal(s.contacts, 0);
+  s.truck.z = 45;
+  assert.equal(prompt(s), "");
+  assert.ok(skipAhead(s));
+  assert.equal(s.phase, "gate");
+  assert.equal(prompt(s), "Enter gate PIN");
+  assert.ok(skipAhead(s));
+  assert.equal(s.phase, "dock");
   assert.ok(s.truck.z < YARD.gateZ);
-  s.phase = "complete";
-  assert.equal(skipToGate(s), false);
 });
