@@ -419,24 +419,79 @@ export function enterPin(s: State, pin: string): boolean {
   s.checkpoint = { ...insideGate };
   return true;
 }
-/** Playtest shortcut: rig at the gate stop line, checked in, barrier open. Silent. */
-export function skipToGate(s: State): boolean {
-  if (s.phase === "complete") return false;
-  s.truck = {
-    x: YARD.gate.x,
-    z: 22,
-    heading: Math.PI,
-    trailerHeading: Math.PI,
-    speed: 0,
-    steer: 0,
-  };
+/** Truck parked straight in holding bay P02, as after a clean arrival. */
+const parkedInBay: Truck = {
+  x: -24,
+  z: 39.5,
+  heading: Math.PI,
+  trailerHeading: Math.PI,
+  speed: 0,
+  steer: 0,
+};
+/** Stopped at the gate's white line, facing the barrier. */
+const atGateLine: Truck = {
+  x: YARD.gate.x,
+  z: 22,
+  heading: Math.PI,
+  trailerHeading: Math.PI,
+  speed: 0,
+  steer: 0,
+};
+/** Trailer rear squared up 0.45 m from dock 03; docking accepts this at once. */
+const docked: Truck = {
+  x: YARD.dock.x,
+  z: YARD.dock.z + RIG.rear + 0.45,
+  heading: 0,
+  trailerHeading: 0,
+  speed: 0,
+  steer: 0,
+};
+/** A skipped kiosk still hands the driver the PIN; a pending SMS lands now. */
+function deliverPin(s: State) {
+  if (!s.registered || s.smsAt > s.elapsed) s.smsAt = s.elapsed;
   s.registered = true;
-  s.smsAt = s.elapsed;
+}
+function skipToGateLine(s: State) {
+  deliverPin(s);
+  s.truck = { ...atGateLine };
+  s.checkpoint = { ...atGateLine };
+  s.phase = "gate";
+  return true;
+}
+function skipToDock(s: State) {
+  deliverPin(s);
+  s.truck = { ...docked };
   s.gateOpen = true;
   s.phase = "dock";
   s.dockHold = 0;
   s.checkpoint = { ...insideGate };
   return true;
+}
+/** Playtest shortcut (hold X): jump to the next place the driver has to act.
+ * Arriving → parked, standing at the kiosk. Standing at the kiosk, or walking
+ * back → checked in, stopped at the gate line. Stopped at the line, or past the
+ * gate → docked, so the delivery completes on the next hold. Silent: no toast. */
+export function skipAhead(s: State): boolean {
+  switch (s.phase) {
+    case "arrive":
+    case "walk-kiosk":
+      if (s.phase === "walk-kiosk" && prompt(s)) return skipToGateLine(s);
+      s.truck = { ...parkedInBay };
+      s.checkpoint = { ...parkedInBay };
+      s.driver = { x: YARD.kiosk.x, z: YARD.kiosk.z + 0.2 };
+      s.phase = "walk-kiosk";
+      return true;
+    case "kiosk":
+    case "walk-truck":
+      return skipToGateLine(s);
+    case "gate":
+      return prompt(s) ? skipToDock(s) : skipToGateLine(s);
+    case "pin":
+    case "dock":
+      return skipToDock(s);
+    default:
+      return false;
+  }
 }
 export function recover(s: State) {
   if (s.phase === "complete") return;

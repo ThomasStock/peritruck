@@ -28,7 +28,7 @@ import {
   register,
   enterPin,
   recover,
-  skipToGate,
+  skipAhead,
   smsReceived,
   note,
   snapshot,
@@ -613,7 +613,7 @@ function syncSms() {
   if (received && !smsSeen) {
     smsSeen = true;
     smsClock = clock();
-    // The playtest gate skip is silent; only a message received on foot or in the cab drops in.
+    // Only a message received on foot or in the cab drops in; a skip straight to the dock is silent.
     if (["walk-truck", "gate"].includes(state.phase)) showSmsBanner();
   }
   if (smsBannerUntil && state.elapsed > smsBannerUntil) {
@@ -761,7 +761,8 @@ function frame(now: number) {
     syncDialog();
   }
   lastGamepadAction = pressed;
-  // Holding X for a second jumps to the open gate. Playtest aid, deliberately unlisted.
+  // Holding X for a second jumps to the next place to act: kiosk, gate line, dock.
+  // Playtest aid, deliberately unlisted.
   const holdingSkip =
     started &&
     !paused &&
@@ -771,7 +772,7 @@ function frame(now: number) {
   else if (!skipHeldSince) skipHeldSince = now;
   else if (now - skipHeldSince >= 1000) {
     skipHeldSince = Infinity;
-    skipToGate(state);
+    skipAhead(state);
   }
   if (started && !paused) {
     accumulator += dt;
