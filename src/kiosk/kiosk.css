@@ -995,12 +995,23 @@
 }
 .kiosk-paper header {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   padding: 8px 0 8px;
   border-bottom: 1.5px solid #2b2b2b;
   margin-bottom: 8px;
+}
+.kiosk-paper__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.kiosk-paper__grip,
+.kiosk-paper__toggle {
+  display: none;
 }
 .kiosk-paper header b {
   font-size: 13px;
@@ -1081,32 +1092,6 @@
   transform: rotate(-12deg);
   opacity: 0.7;
 }
-.kiosk-paper-toggle {
-  display: none;
-  position: fixed;
-  left: 50%;
-  bottom: max(16px, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  z-index: 46;
-  align-items: center;
-  gap: 8px;
-  height: 44px;
-  padding: 0 18px 0 14px;
-  border: 1px solid #fff9;
-  border-radius: 22px;
-  background: #163e38;
-  color: #e5f6d6;
-  font:
-    600 13px "Open Sans",
-    system-ui,
-    sans-serif;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 30%);
-  cursor: pointer;
-}
-.kiosk-paper-toggle svg {
-  width: 18px;
-  height: 18px;
-}
 /* Mobile Driver Portal: the screen fills the viewport, paperwork slides up. */
 .kiosk-stage[data-mode="mdp"] {
   padding: 0;
@@ -1130,9 +1115,6 @@
 .kiosk-stage[data-mode="mdp"] .kiosk-frame {
   border-radius: 0;
 }
-.kiosk-stage[data-mode="mdp"] .kiosk-paper-toggle {
-  display: flex;
-}
 .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap {
   position: fixed;
   left: 0;
@@ -1140,17 +1122,18 @@
   bottom: 0;
   width: auto;
   z-index: 45;
-  transform: translateY(100%);
-  visibility: hidden;
-  transition: none;
   padding: 0;
+  transform: translateY(calc(100% - var(--paper-peek, 72px)));
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-/* Only opening animates: a closed sheet must never depend on a transition
-   finishing (timelines pause in hidden tabs). */
 .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap.is-open {
   transform: translateY(0);
-  visibility: visible;
-  transition: transform 0.25s ease;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap.is-dragging {
+  transition: none;
+}
+.kiosk-stage[data-mode="mdp"][data-overlay] .kiosk-paper-wrap:not(.is-open) {
+  transform: translateY(100%);
 }
 .kiosk-stage[data-mode="mdp"]::after {
   content: "";
@@ -1160,20 +1143,75 @@
   background: rgb(0 0 0 / 45%);
   opacity: 0;
   pointer-events: none;
+  transition: opacity 0.25s;
 }
 .kiosk-stage[data-mode="mdp"][data-paper="open"]::after {
   opacity: 1;
   pointer-events: auto;
-  transition: opacity 0.25s;
 }
 .kiosk-stage[data-mode="mdp"] .kiosk-paper {
   margin: 0 auto;
   width: min(360px, 100%);
-  border-radius: 10px 10px 0 0;
-  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  max-height: calc(100dvh - 12px);
+  overflow-y: auto;
+  border-radius: 12px 12px 0 0;
+  padding: 12px 18px calc(16px + env(safe-area-inset-bottom));
   transform: none;
   box-shadow: 0 -12px 40px rgb(0 0 0 / 35%);
   font-size: 12px;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.kiosk-stage[data-mode="mdp"]
+  .kiosk-paper-wrap.is-dragging
+  .kiosk-paper__handle {
+  cursor: grabbing;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__grip {
+  display: block;
+  width: 40px;
+  height: 4px;
+  margin: 0 auto 8px;
+  border-radius: 2px;
+  background: #cfc9bd;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper header {
+  padding: 0 0 10px;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__title {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  height: 30px;
+  padding: 0 10px 0 13px;
+  border: 0;
+  border-radius: 15px;
+  background: #163e38;
+  color: #e5f6d6;
+  font:
+    700 11.5px "Open Sans",
+    system-ui,
+    sans-serif;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__toggle svg {
+  width: 15px;
+  height: 15px;
+}
+/* Keep the kiosk's own content clear of the peeking strip. */
+.kiosk-stage[data-mode="mdp"] .kiosk-scroll-content {
+  padding-bottom: calc(var(--gap) + var(--paper-peek, 72px));
 }
 /* Compact screens (phone width): single column, inline top bar. */
 @container kiosk (max-width: 600px) {
@@ -1266,7 +1304,8 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap {
+  .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap,
+  .kiosk-stage[data-mode="mdp"]::after {
     transition: none;
   }
 }

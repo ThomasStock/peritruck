@@ -64,31 +64,117 @@ export function mountKiosk(
     phoneError = false,
     locked = false,
     timer: ReturnType<typeof setTimeout> | undefined;
-  root.innerHTML = `<div class="kiosk-stage" role="dialog" aria-modal="true" aria-label="Driver check-in kiosk"><div class="kiosk-device"><div class="kiosk-frame"></div></div>${paperHtml(opts.booking)}<button class="kiosk-paper-toggle" type="button" aria-expanded="false">${icons.fileText}<span>Paperwork</span></button></div>`;
+  root.innerHTML = `<div class="kiosk-stage" role="dialog" aria-modal="true" aria-label="Driver check-in kiosk"><div class="kiosk-device"><div class="kiosk-frame"></div></div>${paperHtml(opts.booking)}</div>`;
   const stage = root.firstElementChild as HTMLElement;
   const frame = stage.querySelector<HTMLElement>(".kiosk-frame")!;
   const paperWrap = stage.querySelector<HTMLElement>(".kiosk-paper-wrap")!;
+  const paper = stage.querySelector<HTMLElement>(".kiosk-paper")!;
+  const paperHandle = stage.querySelector<HTMLElement>("[data-paper-handle]")!;
   const paperToggle = stage.querySelector<HTMLButtonElement>(
-    ".kiosk-paper-toggle",
+    "[data-paper-toggle]",
   )!;
-  const applyMode = () => {
-    stage.dataset.mode = isMobileDriverPortal() ? "mdp" : "physical";
+  const mdp = () => stage.dataset.mode === "mdp";
+  // On phones the paperwork is a sheet tucked into the bottom edge. Only its top
+  // strip (grip, title, View) peeks out; the kiosk content pads itself above it.
+  let peek = 0;
+  const measurePeek = () => {
+    peek = paperHandle.offsetTop + paperHandle.offsetHeight;
+    stage.style.setProperty("--paper-peek", `${peek}px`);
   };
   const setPaper = (open: boolean) => {
     paperOpen = open;
     stage.dataset.paper = open ? "open" : "closed";
     paperWrap.classList.toggle("is-open", open);
     paperToggle.setAttribute("aria-expanded", String(open));
+    paperToggle.innerHTML = `<span>${open ? "Hide" : "View"}</span>${open ? icons.chevronDown : icons.chevronUp}`;
+    // A sheet that fits the screen swipes from anywhere; a taller one scrolls and swipes from its header.
+    paper.style.touchAction =
+      paper.scrollHeight > paper.clientHeight + 1 ? "" : "none";
+  };
+  const applyMode = () => {
+    const mode = isMobileDriverPortal() ? "mdp" : "physical";
+    if (stage.dataset.mode !== mode) {
+      stage.dataset.mode = mode;
+      if (mode === "physical") setPaper(false);
+    }
+    measurePeek();
   };
   applyMode();
   setPaper(false);
+  document.fonts?.ready.then(measurePeek);
   window.addEventListener("resize", applyMode);
-  paperToggle.onclick = () => setPaper(!paperOpen);
+  // Swipe: follow the finger, then settle open or tucked by distance or flick speed.
+  let drag: {
+    startY: number;
+    base: number;
+    lastY: number;
+    lastT: number;
+    velocity: number;
+    moved: boolean;
+  } | null = null;
+  let swallowClick = false;
+  const tuckedOffset = () => paperWrap.offsetHeight - peek;
+  paper.onpointerdown = (e) => {
+    if (!mdp() || e.button !== 0) return;
+    if (
+      !paperHandle.contains(e.target as Node) &&
+      paper.scrollHeight > paper.clientHeight + 1
+    )
+      return;
+    drag = {
+      startY: e.clientY,
+      base: paperOpen ? 0 : tuckedOffset(),
+      lastY: e.clientY,
+      lastT: e.timeStamp,
+      velocity: 0,
+      moved: false,
+    };
+    paperWrap.classList.add("is-dragging");
+  };
+  const onDragMove = (e: PointerEvent) => {
+    if (!drag) return;
+    const dy = e.clientY - drag.startY;
+    if (Math.abs(dy) > 4) drag.moved = true;
+    const dt = e.timeStamp - drag.lastT;
+    if (dt > 0) drag.velocity = (e.clientY - drag.lastY) / dt;
+    drag.lastY = e.clientY;
+    drag.lastT = e.timeStamp;
+    const offset = Math.min(Math.max(drag.base + dy, 0), tuckedOffset());
+    paperWrap.style.transform = `translateY(${offset}px)`;
+  };
+  const onDragEnd = (e: PointerEvent) => {
+    if (!drag) return;
+    const { moved, velocity, startY } = drag;
+    const dy = e.clientY - startY;
+    drag = null;
+    paperWrap.classList.remove("is-dragging");
+    paperWrap.style.transform = "";
+    if (!moved) return;
+    swallowClick = true;
+    setTimeout(() => (swallowClick = false), 0);
+    setPaper(
+      paperOpen ? !(dy > 60 || velocity > 0.6) : dy < -40 || velocity < -0.6,
+    );
+  };
+  window.addEventListener("pointermove", onDragMove);
+  window.addEventListener("pointerup", onDragEnd);
+  window.addEventListener("pointercancel", onDragEnd);
+  paperHandle.onclick = () => {
+    if (swallowClick) return;
+    if (mdp()) setPaper(!paperOpen);
+  };
   stage.onclick = (e) => {
     if (e.target === stage && paperOpen) setPaper(false);
   };
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape" && paperOpen && mdp()) {
+      e.preventDefault();
+      e.stopPropagation();
+      setPaper(false);
+    }
+  };
+  window.addEventListener("keydown", onKeyDown, true);
   const L = () => flow.language;
-  const mdp = () => stage.dataset.mode === "mdp";
   const $ = <T extends Element = HTMLElement>(sel: string) =>
     frame.querySelector<T>(sel);
   const $$ = <T extends Element = HTMLElement>(sel: string) => [
@@ -212,6 +298,7 @@ export function mountKiosk(
       endscreen: endscreenPage,
     };
     const isLanguage = flow.step === "language";
+    stage.toggleAttribute("data-overlay", !!overlay);
     frame.innerHTML = `<div class="kiosk-page-layout ${isLanguage ? "kiosk-page-layout--language" : ""}" data-step="${flow.step}" lang="${flow.step === "language" ? "en" : flow.language}">${isLanguage ? "" : navButtons("fixed")}<div class="kiosk-page-layout__scroll"><div class="kiosk-scroll-content">${isLanguage ? "" : `<div class="kiosk-mobile-navigation">${navButtons("inline")}</div>`}<div class="kiosk-page">${pages[flow.step]()}</div></div></div>${overlayHtml()}</div>`;
     wire();
   }
@@ -386,6 +473,10 @@ export function mountKiosk(
     destroy() {
       clearTimeout(timer);
       window.removeEventListener("resize", applyMode);
+      window.removeEventListener("pointermove", onDragMove);
+      window.removeEventListener("pointerup", onDragEnd);
+      window.removeEventListener("pointercancel", onDragEnd);
+      window.removeEventListener("keydown", onKeyDown, true);
       root.replaceChildren();
     },
   };
@@ -393,5 +484,5 @@ export function mountKiosk(
 function paperHtml(booking: string) {
   const prefix = referencePrefix(booking),
     body = referenceBody(booking);
-  return `<aside class="kiosk-paper-wrap" aria-label="Your paperwork"><article class="kiosk-paper"><header><b>DELIVERY NOTE</b><span>CMR · No. 26-09-117</span></header><dl><dt>Carrier</dt><dd>Yard Shift Transport bv</dd><dt>Vehicle</dt><dd>1-YRD-048 · 13.6 m trailer</dd><dt>Consignee</dt><dd>Yard Shift Logistics · Ghent</dd><dt>Goods</dt><dd>General cargo · 12 pallets</dd><dt>Time slot</dt><dd>09:30 – 10:00</dd></dl><div class="kiosk-paper__reference"><span>Peripass reference</span><b>${prefix ? `<em>${esc(prefix)}</em>` : ""}${esc(body)}</b><small>Enter this reference at the driver kiosk</small></div><div class="kiosk-paper__stamp">BOOKED</div><footer><span>Driver copy</span><span>Keep with vehicle documents</span></footer></article></aside>`;
+  return `<aside class="kiosk-paper-wrap" aria-label="Your paperwork"><article class="kiosk-paper"><div class="kiosk-paper__handle" data-paper-handle><i class="kiosk-paper__grip" aria-hidden="true"></i><header><div class="kiosk-paper__title"><b>DELIVERY NOTE</b><span>CMR · No. 26-09-117</span></div><button type="button" class="kiosk-paper__toggle" data-paper-toggle aria-expanded="false" aria-controls="kiosk-paper-body"><span>View</span>${icons.chevronUp}</button></header></div><div class="kiosk-paper__body" id="kiosk-paper-body"><dl><dt>Carrier</dt><dd>Yard Shift Transport bv</dd><dt>Vehicle</dt><dd>1-YRD-048 · 13.6 m trailer</dd><dt>Consignee</dt><dd>Yard Shift Logistics · Ghent</dd><dt>Goods</dt><dd>General cargo · 12 pallets</dd><dt>Time slot</dt><dd>09:30 – 10:00</dd></dl><div class="kiosk-paper__reference"><span>Peripass reference</span><b>${prefix ? `<em>${esc(prefix)}</em>` : ""}${esc(body)}</b><small>Enter this reference at the driver kiosk</small></div><footer><span>Driver copy</span><span>Keep with vehicle documents</span></footer></div><div class="kiosk-paper__stamp">BOOKED</div></article></aside>`;
 }

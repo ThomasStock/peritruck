@@ -34,7 +34,7 @@ Reverse assist is on by default. In reverse, the steering command asks the _trai
 
 ## Kiosk check-in
 
-The kiosk is a replica of the Peripass kiosk app. On a desktop viewport it renders as a physical kiosk with navigation rails; on phone-sized viewports it renders as the Mobile Driver Portal with the inline top bar. Your delivery note lies next to the kiosk (desktop) or behind the **Paperwork** button (mobile) and carries the reference `PP-2048`.
+The kiosk is a replica of the Peripass kiosk app. On a desktop viewport it renders as a physical kiosk with navigation rails; on phone-sized viewports it renders as the Mobile Driver Portal with the inline top bar. Your delivery note lies next to the kiosk (desktop) or peeks up from the bottom edge of the screen (mobile): tap **View** or swipe it up to read it, swipe it down, tap **Hide** or tap outside to tuck it away. It carries the reference `PP-2048`.
 
 | Step       | What the driver sees                                                                    |
 | ---------- | --------------------------------------------------------------------------------------- |
