@@ -23,6 +23,9 @@ import {
   slowDown,
   YARD,
   type State,
+  type Rect,
+  obstacles,
+  staticRigs,
 } from "../src/game/simulation";
 import { execute, demo, driveTo, walkTo } from "../src/game/commands";
 
@@ -305,4 +308,188 @@ test("gate skip lands a checked-in rig at the open barrier, able to drive throug
   assert.ok(s.truck.z < YARD.gateZ);
   s.phase = "complete";
   assert.equal(skipToGate(s), false);
+});
+
+// Original SAT arithmetic, kept independent from production corners/overlap helpers.
+function originalOverlap(a: Rect, b: Rect): boolean {
+  const forward = (h: number) => ({ x: Math.sin(h), z: Math.cos(h) });
+  const corners = (r: Rect) => {
+    const f = forward(r.h),
+      side = { x: Math.cos(r.h), z: -Math.sin(r.h) };
+    return [-1, 1].flatMap((a) =>
+      [-1, 1].map((b) => ({
+        x: r.x + (f.x * r.d * a) / 2 + (side.x * r.w * b) / 2,
+        z: r.z + (f.z * r.d * a) / 2 + (side.z * r.w * b) / 2,
+      })),
+    );
+  };
+  const ac = corners(a),
+    bc = corners(b);
+  return [
+    forward(a.h),
+    forward(a.h + Math.PI / 2),
+    forward(b.h),
+    forward(b.h + Math.PI / 2),
+  ].every((axis) => {
+    const ap = ac.map((p) => p.x * axis.x + p.z * axis.z),
+      bp = bc.map((p) => p.x * axis.x + p.z * axis.z);
+    return (
+      Math.max(...ap) > Math.min(...bp) + 0.005 &&
+      Math.max(...bp) > Math.min(...ap) + 0.005
+    );
+  });
+}
+
+function seededRandom() {
+  let seed = 0xa11ce;
+  return () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 2 ** 32;
+  };
+}
+
+test("prepared overlap matches original SAT across random, rotated and grazing rectangles", () => {
+  const random = seededRandom();
+  for (let i = 0; i < 6000; i++) {
+    const a = {
+      x: random() * 100 - 50,
+      z: random() * 130 - 50,
+      w: 0.1 + random() * 12,
+      d: 0.1 + random() * 25,
+      h: random() * Math.PI * 2,
+    };
+    const b = {
+      x: a.x + random() * 30 - 15,
+      z: a.z + random() * 30 - 15,
+      w: 0.1 + random() * 12,
+      d: 0.1 + random() * 25,
+      h: random() * Math.PI * 2,
+    };
+    assert.equal(overlap(a, b), originalOverlap(a, b), `random ${i}`);
+    assert.equal(overlap(b, a), originalOverlap(b, a), `reverse ${i}`);
+  }
+  for (const heading of [0, 1e-12, Math.PI / 4, Math.PI / 2, Math.PI, 2.37]) {
+    for (const depth of [0, 0.004999999, 0.005, 0.005000001, 0.01]) {
+      const a = { x: 0, z: 0, w: 2, d: 5, h: heading };
+      const b = {
+        ...a,
+        x: Math.cos(heading) * (2 - depth),
+        z: -Math.sin(heading) * (2 - depth),
+      };
+      assert.equal(overlap(a, b), originalOverlap(a, b), `${heading}/${depth}`);
+    }
+  }
+  assert.equal(
+    overlap(
+      { x: 0, z: 0, w: 2, d: 2, h: 0 },
+      { x: 1.995, z: 0, w: 2, d: 2, h: 0 },
+    ),
+    false,
+  );
+  assert.equal(
+    overlap(
+      { x: 0, z: 0, w: 2, d: 2, h: 0 },
+      { x: 1.994999, z: 0, w: 2, d: 2, h: 0 },
+    ),
+    true,
+  );
+});
+
+test("cached obstacles preserve first collision and walking outcomes for both gate states", () => {
+  const random = seededRandom();
+  for (let i = 0; i < 3000; i++) {
+    const state = createState();
+    state.gateOpen = i % 2 === 0;
+    state.phase = "walk-kiosk";
+    Object.assign(state.truck, {
+      x: random() * 116 - 58,
+      z: random() * 145 - 60,
+      heading: random() * Math.PI * 2,
+      trailerHeading: random() * Math.PI * 2,
+    });
+    const rects = rigRects(state.truck),
+      blocked = obstacles(state);
+    assert.equal(
+      collision(state),
+      blocked.find((o) => rects.some((r) => originalOverlap(r, o)))?.name,
+    );
+    state.driver = { x: random() * 110 - 55, z: random() * 140 - 57 };
+    const input = {
+      ...idleInput(),
+      walkX: random() * 2 - 1,
+      walkZ: random() * 2 - 1,
+    };
+    const len = Math.max(1, Math.hypot(input.walkX, input.walkZ));
+    const next = {
+      x: state.driver.x + (input.walkX / len) * 3 * DT,
+      z: state.driver.z + (input.walkZ / len) * 3 * DT,
+    };
+    const walker = { ...next, w: 0.55, d: 0.55, h: 0 };
+    const expected = blocked
+      .filter((o) => o.name !== "Protected footpath")
+      .concat(rects)
+      .some((o) => originalOverlap(walker, o))
+      ? { ...state.driver }
+      : next;
+    step(state, input);
+    assert.deepEqual(state.driver, expected, `walking ${i}`);
+  }
+  const state = createState();
+  state.phase = "walk-kiosk";
+  state.driver = { x: -32.5, z: 39 };
+  step(state, { ...idleInput(), walkZ: 1 });
+  assert.ok(state.driver.z > 39, "protected path stays walkable");
+  state.driver = { x: 18, z: 12.5 };
+  step(state, { ...idleInput(), walkZ: -1 });
+  assert.equal(state.driver.z, 12.5, "closed gate blocks walker");
+  state.gateOpen = true;
+  step(state, { ...idleInput(), walkZ: -1 });
+  assert.ok(state.driver.z < 12.5, "opening gate permits walker");
+});
+
+test("obstacle copies cannot poison caches and mutable parked rigs invalidate prepared shapes", () => {
+  const state = createState();
+  state.gateOpen = true;
+  state.truck = {
+    x: 0,
+    z: 0,
+    heading: 0,
+    trailerHeading: 0,
+    speed: 0,
+    steer: 0,
+  };
+  const initial = obstacles(state);
+  const exposed = obstacles(state);
+  exposed[0].x = 10000;
+  exposed[0].name = "changed";
+  exposed.pop();
+  assert.deepEqual(obstacles(state), initial);
+  const original = staticRigs.map((t) => ({ ...t }));
+  try {
+    Object.assign(staticRigs[0], state.truck);
+    assert.equal(collision(state), "Parked truck");
+    for (const key of ["x", "z", "heading", "trailerHeading"] as const) {
+      staticRigs[0][key] += 0.8;
+      const parked = obstacles(state).filter((o) => o.name === "Parked truck");
+      assert.deepEqual(
+        parked.slice(0, 2),
+        rigRects(staticRigs[0]).map((r) => ({ ...r, name: "Parked truck" })),
+      );
+      assert.equal(
+        collision(state),
+        obstacles(state).find((o) =>
+          rigRects(state.truck).some((r) => originalOverlap(r, o)),
+        )?.name,
+      );
+    }
+    staticRigs.splice(0, 1);
+    assert.equal(collision(state), undefined);
+    staticRigs.push({ ...state.truck });
+    assert.equal(collision(state), "Parked truck");
+    staticRigs.pop();
+    assert.equal(collision(state), undefined);
+  } finally {
+    staticRigs.splice(0, staticRigs.length, ...original);
+  }
+  assert.deepEqual(obstacles(state), initial);
 });
