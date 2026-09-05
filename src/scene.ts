@@ -11,6 +11,7 @@ import {
   staticRigs,
   YARD,
 } from "./game/simulation";
+import { DriverRig } from "./rig";
 export type CameraMode = "follow" | "yard" | "overhead";
 export class YardScene {
   renderer: THREE.WebGLRenderer;
@@ -38,6 +39,7 @@ export class YardScene {
   private route = new THREE.Group();
   private lastRoute = "";
   private env: THREE.WebGLRenderTarget;
+  private rig = new DriverRig(this.driver);
   constructor(private container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -165,6 +167,7 @@ export class YardScene {
     this.tractor.add(tractor.scene);
     this.trailer.add(trailer.scene);
     this.driver.add(driver.scene);
+    this.rig.bind();
     this.scene.traverse((o) => {
       if (o instanceof THREE.Mesh) {
         o.castShadow = true;
@@ -269,14 +272,7 @@ export class YardScene {
     }
     this.trailer.position.copy(this.tractor.position);
     this.trailer.rotation.y = s.truck.trailerHeading;
-    this.driver.visible = walking(s);
-    this.driver.position.set(
-      s.driver.x,
-      Math.abs(Math.sin(s.elapsed * 9)) * 0.035,
-      s.driver.z,
-    );
-    if (Math.hypot(input.walkX, input.walkZ) > 0.1)
-      this.driver.rotation.y = Math.atan2(input.walkX, input.walkZ);
+    this.rig.update(s, input, dt, this.reducedMotion);
     this.gateAngle = THREE.MathUtils.damp(
       this.gateAngle,
       s.gateOpen ? Math.PI * 0.48 : 0,

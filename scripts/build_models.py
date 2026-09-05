@@ -252,13 +252,17 @@ for x,z in [(-30,60),(-18,60),(26,19),(10,19),(40,-38)]:
     bpy.context.object.data.materials.append(M['orange'])
     cyl('Cone reflector',(x,.53,z),.155,.12,'white')
 export('yard')
-# Driver: hi-vis figure for walking stage.
-box('Boot L',(-.17,.12,.06),(.25,.23,.42),'dark',.065);box('Boot R',(.17,.12,.06),(.25,.23,.42),'dark',.065)
-for x in [-.16,.16]:box('Trouser leg',(x,.55,0),(.25,.74,.28),'dark',.07)
-box('Torso',(0,1.13,0),(.64,.59,.34),'orange',.08)
-box('Vest stripe',(0,1.07,0),(.66,.07,.36),'white')
-for x in [-.39,.39]:box('Arm',(x,1.03,0),(.18,.58,.23),'teal',.055)
-cyl('Head',(0,1.62,0),.19,.29,'wood')
-cyl('Hard hat',(0,1.80,0),.23,.15,'yellow');cyl('Hat brim',(0,1.74,0),.28,.035,'yellow')
+# Driver: hi-vis figure for walking stage. Limbs hang from named empties (hip,
+# shoulder, neck) so the runtime can swing them; the meshes stay unjoined.
+def pivot(name,p,children):
+    bpy.ops.object.empty_add(location=pos(*p));root=bpy.context.object;root.name=name
+    for child in children:
+        matrix=child.matrix_world.copy();child.parent=root;child.matrix_world=matrix
+    return root
+for side,x in [('left',-.16),('right',.16)]:
+    pivot('leg-'+side,(x,.92,0),[box('Boot',(x*1.06,.12,.06),(.25,.23,.42),'dark',.065),box('Trouser leg',(x,.55,0),(.25,.74,.28),'dark',.07)])
+arms=[pivot('arm-'+side,(x,1.29,0),[box('Arm',(x,1.03,0),(.18,.58,.23),'teal',.055)]) for side,x in [('left',-.39),('right',.39)]]
+head=pivot('head',(0,1.46,0),[cyl('Head',(0,1.62,0),.19,.29,'wood'),cyl('Hard hat',(0,1.80,0),.23,.15,'yellow'),cyl('Hat brim',(0,1.74,0),.28,.035,'yellow'),box('Hat peak',(0,1.735,.3),(.2,.03,.12),'yellow',.01)]+[box('Eye',(x,1.65,.18),(.06,.05,.03),'dark') for x in [-.07,.07]])
+pivot('body',(0,.92,0),[box('Torso',(0,1.13,0),(.64,.59,.34),'orange',.08),box('Vest stripe',(0,1.07,0),(.66,.07,.36),'white')]+arms+[head])
 export('driver')
 print('Yard Shift assets generated in '+OUT)
