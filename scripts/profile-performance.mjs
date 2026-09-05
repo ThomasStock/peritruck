@@ -102,7 +102,10 @@ for (const phase of [
     const sorted = batches.flat().sort((a, b) => a - b);
     // Private TS fields are inspected only here, in the development fixture.
     const dots = [];
-    for (const child of view.route.children) {
+    const routeObjects = view.route.isInstancedMesh
+      ? [view.route]
+      : view.route.children;
+    for (const child of routeObjects) {
       if (child.isInstancedMesh) {
         const arr = child.instanceMatrix.array;
         for (let i = 0; i < child.count; i++)
@@ -122,7 +125,7 @@ for (const phase of [
       p95Ms: sorted[Math.floor(sorted.length * 0.95)],
       render: { ...view.renderer.info.render },
       memory: { ...view.renderer.info.memory },
-      routeObjects: view.route.children.length,
+      routeObjects: routeObjects.length,
       routeDots: dots.length,
       matrices: dots,
     };

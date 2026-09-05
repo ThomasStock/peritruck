@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   type State,
   type Input,
@@ -12,11 +13,39 @@ import {
 } from "./game/simulation";
 import { DriverRig } from "./rig";
 import { PredictionPath } from "./prediction";
+import { RouteDots } from "./route";
 export type CameraMode = "follow" | "yard" | "overhead";
 export function createYardCamera() {
   // Cameras stay metres from the actors. A 1 m near plane preserves enough
   // depth precision to keep the thin yard slabs from shimmering at a distance.
   return new THREE.PerspectiveCamera(40, 1, 1, 600);
+}
+/** Bake every mesh under `root` into one mesh per material, in world space.
+ * For scenery that never moves again: a merged mesh cannot animate its parts,
+ * but it costs one draw call in the colour pass and one in the shadow pass
+ * instead of one per part. Parts whose attributes cannot merge stay separate. */
+export function mergeByMaterial(root: THREE.Object3D): THREE.Mesh[] {
+  root.updateMatrixWorld(true);
+  const groups = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  root.traverse((o) => {
+    if (!(o instanceof THREE.Mesh) || Array.isArray(o.material)) return;
+    const parts = groups.get(o.material) ?? [];
+    parts.push(
+      (o.geometry as THREE.BufferGeometry).clone().applyMatrix4(o.matrixWorld),
+    );
+    groups.set(o.material, parts);
+  });
+  const meshes: THREE.Mesh[] = [];
+  for (const [material, parts] of groups) {
+    const merged = parts.length > 1 ? mergeGeometries(parts) : parts[0];
+    for (const geometry of merged ? [merged] : parts) {
+      geometry.computeBoundingSphere();
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.castShadow = mesh.receiveShadow = true;
+      meshes.push(mesh);
+    }
+  }
+  return meshes;
 }
 export class YardScene {
   renderer: THREE.WebGLRenderer;
@@ -36,21 +65,28 @@ export class YardScene {
       opacity: 0.95,
     }),
   );
+  private routeDots = new RouteDots();
+  route = this.routeDots.mesh;
   mode: CameraMode = "follow";
   loaded = false;
   reducedMotion = false;
   private focus = new THREE.Vector3(-13, 0, 26);
   private look = new THREE.Vector3();
+  private nextFocus = new THREE.Vector3();
+  private tail = new THREE.Vector3();
+  private offset = new THREE.Vector3();
   private gateAngle = 0;
-  private route = new THREE.Group();
-  private lastRoute = "";
   private env: THREE.WebGLRenderTarget;
   private rig = new DriverRig(this.driver);
+  private steering: THREE.Object3D[] = [];
+  private parkingHighlight: THREE.Mesh;
+  private dockHighlight: THREE.Mesh;
   constructor(private container: HTMLElement) {
+    // The drawing buffer is not preserved: keeping it costs a full-screen copy
+    // every frame. Screenshots render synchronously right before reading pixels.
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: false,
-      preserveDrawingBuffer: true,
       powerPreference: "high-performance",
     });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.8));
@@ -104,17 +140,20 @@ export class YardScene {
       this.route,
     );
     this.gate.position.set(12, 1.5, 12);
+    // The arms swing as one piece: two colours, two draw calls.
+    const arms = new THREE.Group();
+    const armColours = ["#db694d", "#e8eee9"].map(
+      (color) => new THREE.MeshStandardMaterial({ color }),
+    );
     for (let i = 0; i < 12; i++) {
       const arm = new THREE.Mesh(
         new THREE.BoxGeometry(0.98, 0.2, 0.18),
-        new THREE.MeshStandardMaterial({
-          color: i % 2 ? "#e8eee9" : "#db694d",
-        }),
+        armColours[i % 2],
       );
       arm.position.x = i + 0.5;
-      arm.castShadow = true;
-      this.gate.add(arm);
+      arms.add(arm);
     }
+    this.gate.add(...mergeByMaterial(arms));
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(1.9, 2.06, 64),
       new THREE.MeshBasicMaterial({
@@ -146,11 +185,13 @@ export class YardScene {
     park.position.set(-24, 0.09, 43.5);
     park.name = "parking-highlight";
     this.scene.add(park);
+    this.parkingHighlight = park;
     const dock = park.clone();
     dock.geometry = new THREE.PlaneGeometry(5.0, 16);
     dock.position.set(0, 0.09, -35.8);
     dock.name = "dock-highlight";
     this.scene.add(dock);
+    this.dockHighlight = dock;
     this.camera.position.set(117, 119, 139);
     this.camera.lookAt(0, 0, 13);
     this.resize();
@@ -174,23 +215,35 @@ export class YardScene {
     this.trailer.add(trailer.scene);
     this.driver.add(driver.scene);
     this.rig.bind();
+    this.steering = ["steering-left", "steering-right"].flatMap((name) => {
+      const wheel = this.tractor.getObjectByName(name);
+      return wheel ? [wheel] : [];
+    });
     this.scene.traverse((o) => {
       if (o instanceof THREE.Mesh) {
         o.castShadow = true;
         o.receiveShadow = true;
       }
     });
+    // Parked rigs never move. Recolour their cabs, then bake all three into one
+    // mesh per material: 13 draw calls instead of 111 in each render pass.
+    const parked = new THREE.Group();
+    const tints = new Map<string, THREE.MeshStandardMaterial>();
     for (const [i, t] of staticRigs.entries()) {
       const cab = tractor.scene.clone(true),
-        box = trailer.scene.clone(true);
+        box = trailer.scene.clone(true),
+        color = i === 1 ? "#e7ac51" : "#486c6d";
       cab.traverse((o) => {
         if (o instanceof THREE.Mesh) {
           const mat = o.material as THREE.MeshStandardMaterial;
           if (mat.name === "Peripass teal") {
-            o.material = mat.clone();
-            (o.material as THREE.MeshStandardMaterial).color.set(
-              i === 1 ? "#e7ac51" : "#486c6d",
-            );
+            let tint = tints.get(color);
+            if (!tint) {
+              tint = mat.clone();
+              tint.color.set(color);
+              tints.set(color, tint);
+            }
+            o.material = tint;
           }
         }
       });
@@ -198,95 +251,24 @@ export class YardScene {
       cab.rotation.y = t.heading;
       box.position.copy(cab.position);
       box.rotation.y = t.trailerHeading;
-      this.scene.add(cab, box);
+      parked.add(cab, box);
+    }
+    this.scene.add(...mergeByMaterial(parked));
+    // Compile every shader before play starts, including the ones for objects
+    // that only appear later, so the first drive and phase changes do not stall.
+    const hidden = [this.prediction, this.route].filter((o) => !o.visible);
+    for (const o of hidden) o.visible = true;
+    try {
+      await this.renderer.compileAsync(this.scene, this.camera);
+    } finally {
+      for (const o of hidden) o.visible = false;
     }
     this.loaded = true;
-  }
-  private updateRoute(s: State) {
-    if (this.lastRoute === s.phase) return;
-    this.lastRoute = s.phase;
-    while (this.route.children.length) {
-      const c = this.route.children[0] as THREE.InstancedMesh;
-      this.route.remove(c);
-      c.dispose();
-      c.geometry.dispose();
-      (c.material as THREE.Material).dispose();
-    }
-    let points: number[][] = [];
-    if (s.phase === "arrive")
-      points = [
-        [-24, 59],
-        [-24, 39],
-      ];
-    if (s.phase === "walk-kiosk" || s.phase === "kiosk")
-      points = [
-        [-28, 37],
-        [-28, 29],
-        [-33.7, 28.2],
-      ];
-    if (s.phase === "gate" || s.phase === "pin")
-      points = [
-        [-24, 39],
-        [-24, 28],
-        [-17, 22],
-        [5, 24],
-        [28, 25],
-        [37, 36],
-        [37, 47],
-        [27, 58],
-        [18, 47],
-        [18, 21.5],
-      ];
-    if (s.phase === "dock")
-      points = [
-        [18, 6],
-        [18, -24],
-        [9, -33],
-        [0, -24],
-        [0, 5],
-      ];
-    if (points.length < 2) return;
-    const count = points.slice(1).reduce((total, b, i) => {
-      const a = points[i];
-      return total + Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 1.6);
-    }, 0);
-    const geo = new THREE.CircleGeometry(walking(s) ? 0.17 : 0.23, 12),
-      mat = new THREE.MeshBasicMaterial({
-        color: "#baefe0",
-        transparent: true,
-        opacity: 0.65,
-        depthWrite: false,
-      });
-    const dots = new THREE.InstancedMesh(geo, mat, count);
-    const transform = new THREE.Object3D();
-    transform.rotation.x = -Math.PI / 2;
-    let index = 0;
-    for (let i = 1; i < points.length; i++) {
-      const a = points[i - 1],
-        b = points[i],
-        n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 1.6);
-      for (let j = 0; j < n; j++) {
-        const f = j / n;
-        transform.position.set(
-          a[0] + (b[0] - a[0]) * f,
-          0.12,
-          a[1] + (b[1] - a[1]) * f,
-        );
-        transform.updateMatrix();
-        dots.setMatrixAt(index++, transform.matrix);
-      }
-    }
-    dots.instanceMatrix.needsUpdate = true;
-    dots.computeBoundingSphere();
-    this.route.add(dots);
   }
   render(s: State, input: Input, dt: number, started: boolean) {
     this.tractor.position.set(s.truck.x, 0, s.truck.z);
     this.tractor.rotation.y = s.truck.heading;
-    for (const name of ["steering-left", "steering-right"]) {
-      const wheel = this.tractor.getObjectByName(name);
-      if (wheel) wheel.rotation.y = s.truck.steer;
-    }
+    for (const wheel of this.steering) wheel.rotation.y = s.truck.steer;
     this.trailer.position.copy(this.tractor.position);
     this.trailer.rotation.y = s.truck.trailerHeading;
     this.rig.update(s, input, dt, this.reducedMotion);
@@ -302,19 +284,18 @@ export class YardScene {
     this.target.visible = s.phase !== "complete";
     const pulse = this.reducedMotion ? 1 : 1 + Math.sin(s.elapsed * 2) * 0.06;
     this.target.scale.setScalar(pulse);
-    this.scene.getObjectByName("parking-highlight")!.visible =
-      s.phase === "arrive";
-    this.scene.getObjectByName("dock-highlight")!.visible = s.phase === "dock";
-    this.updateRoute(s);
+    this.parkingHighlight.visible = s.phase === "arrive";
+    this.dockHighlight.visible = s.phase === "dock";
+    this.routeDots.update(s);
     this.prediction.visible = started && !walking(s) && s.phase !== "complete";
     if (this.prediction.visible) this.predictionPath.update(s, input);
     const actor = walking(s) ? s.driver : s.truck;
-    let focus = new THREE.Vector3(actor.x, 0, actor.z);
+    const focus = this.nextFocus.set(actor.x, 0, actor.z);
     if (!walking(s)) {
       const tail = rear(s.truck);
-      focus.lerp(new THREE.Vector3(tail.x, 0, tail.z), 0.35);
+      focus.lerp(this.tail.set(tail.x, 0, tail.z), 0.35);
     }
-    let offset = new THREE.Vector3(24, 34, 33);
+    const offset = this.offset.set(24, 34, 33);
     if (walking(s)) offset.set(14, 20, 19);
     if (!started || this.mode === "yard" || s.phase === "complete") {
       focus.set(0, 0, 13);

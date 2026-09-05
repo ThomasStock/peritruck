@@ -99,6 +99,28 @@ export const offset = (p: Point, h: number, d: number): Point => ({
   z: p.z + Math.cos(h) * d,
 });
 export const rear = (t: Truck) => offset(t, t.trailerHeading, -RIG.rear);
+export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+/** Interpolate the short way round, so a heading crossing ±π does not spin.
+ * Equal inputs return the input itself, so a rig at rest keeps an exact pose. */
+export const lerpAngle = (a: number, b: number, t: number) => {
+  const turn = angle(b - a);
+  return turn === 0 ? a : angle(a + turn * t);
+};
+export const blendPoint = (a: Point, b: Point, t: number): Point => ({
+  x: lerp(a.x, b.x, t),
+  z: lerp(a.z, b.z, t),
+});
+/** Pose between two consecutive fixed steps. Renderers draw this at the display
+ * rate so motion stays continuous whatever the refresh rate; the simulation
+ * itself never sees blended values. */
+export const blendTruck = (a: Truck, b: Truck, t: number): Truck => ({
+  x: lerp(a.x, b.x, t),
+  z: lerp(a.z, b.z, t),
+  heading: lerpAngle(a.heading, b.heading, t),
+  trailerHeading: lerpAngle(a.trailerHeading, b.trailerHeading, t),
+  speed: lerp(a.speed, b.speed, t),
+  steer: lerp(a.steer, b.steer, t),
+});
 export const walking = (s: State) =>
   ["walk-kiosk", "walk-truck", "kiosk"].includes(s.phase);
 /** The check-in SMS with the gate PIN has arrived. Sessions saved before the delay existed count as delivered. */
@@ -243,6 +265,8 @@ const obstacle = (
   d: number,
   name: string,
 ): Rect => ({ x, z, w, d, h: 0, name });
+/** The kiosk housing. The driver faces its centre while checking in. */
+export const KIOSK: Readonly<Rect> = obstacle(-33.7, 26, 1.1, 0.8, "Kiosk");
 function buildObstacles(gateOpen: boolean): Rect[] {
   return [
     obstacle(-53, 14, 2, 132, "Perimeter fence"),
@@ -263,7 +287,7 @@ function buildObstacles(gateOpen: boolean): Rect[] {
           ),
         ]),
     obstacle(-41, 21, 9, 5, "Reception"),
-    obstacle(-33.7, 26, 1.1, 0.8, "Kiosk"),
+    { ...KIOSK },
     obstacle(-32.5, 39, 2.6, 39, "Protected footpath"),
     ...staticRigs.flatMap((t) =>
       rigRects(t).map((r) => ({ ...r, name: "Parked truck" })),

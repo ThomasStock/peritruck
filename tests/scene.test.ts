@@ -3,28 +3,22 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { YardScene, createYardCamera } from "../src/scene";
+import { createYardCamera, mergeByMaterial } from "../src/scene";
 import {
+  angle,
+  blendPoint,
+  blendTruck,
   createState,
   idleInput,
+  lerpAngle,
   predict,
+  staticRigs,
   type State,
   type Truck,
   type Input,
 } from "../src/game/simulation";
 import { PredictionPath } from "../src/prediction";
-
-// Exercise the route lifecycle without creating a WebGL renderer.
-function routeFixture() {
-  const view = Object.create(YardScene.prototype) as {
-    route: THREE.Group;
-    lastRoute: string;
-    updateRoute(s: State): void;
-  };
-  view.route = new THREE.Group();
-  view.lastRoute = "";
-  return view;
-}
+import { ROUTE_CAPACITY, RouteDots } from "../src/route";
 
 const paths: Partial<Record<State["phase"], number[][]>> = {
   arrive: [
@@ -60,7 +54,8 @@ paths.pin = paths.gate;
 paths.kiosk = paths["walk-kiosk"];
 
 test("instanced routes preserve every original dot transform and appearance in every phase", () => {
-  const view = routeFixture();
+  const route = new RouteDots();
+  const dots = route.mesh;
   const state = createState();
   for (const phase of [
     "arrive",
@@ -73,7 +68,7 @@ test("instanced routes preserve every original dot transform and appearance in e
     "complete",
   ] as const) {
     state.phase = phase;
-    view.updateRoute(state);
+    assert.equal(route.update(state), true);
     const points = paths[phase] ?? [];
     const expected: number[][] = [];
     for (let i = 1; i < points.length; i++) {
@@ -92,14 +87,10 @@ test("instanced routes preserve every original dot transform and appearance in e
         expected.push(Array.from(new Float32Array(original.matrix.elements)));
       }
     }
-    assert.equal(view.route.children.length, expected.length ? 1 : 0);
-    if (!expected.length) continue;
-    const dots = view.route.children[0] as THREE.InstancedMesh<
-      THREE.CircleGeometry,
-      THREE.MeshBasicMaterial
-    >;
-    assert.ok(dots.isInstancedMesh);
     assert.equal(dots.count, expected.length);
+    assert.equal(dots.visible, expected.length > 0);
+    if (!expected.length) continue;
+    assert.ok(dots.isInstancedMesh);
     if (phase === "gate" || phase === "pin") assert.equal(dots.count, 93);
     for (let i = 0; i < dots.count; i++)
       assert.deepEqual(
@@ -121,29 +112,173 @@ test("instanced routes preserve every original dot transform and appearance in e
     assert.equal(dots.castShadow, false);
     assert.equal(dots.receiveShadow, false);
     assert.ok(dots.boundingSphere && dots.boundingSphere.radius > 0);
-    view.updateRoute(state);
-    assert.equal(view.route.children[0], dots);
+    assert.equal(route.update(state), false);
   }
 });
 
-test("route phase changes release instance, geometry and material resources and detach children", () => {
-  const view = routeFixture(),
+test("route phase changes reuse one mesh, two geometries and one material without disposing", () => {
+  const route = new RouteDots(),
     state = createState();
-  state.phase = "gate";
-  view.updateRoute(state);
-  const dots = view.route.children[0] as THREE.InstancedMesh<
-    THREE.CircleGeometry,
-    THREE.MeshBasicMaterial
-  >;
+  const dots = route.mesh,
+    material = dots.material,
+    buffer = dots.instanceMatrix;
+  assert.equal(dots.instanceMatrix.count, ROUTE_CAPACITY);
+  assert.equal(ROUTE_CAPACITY, 93);
+  const geometries = new Set<THREE.BufferGeometry>();
   const disposed: string[] = [];
   dots.addEventListener("dispose", () => disposed.push("instances"));
-  dots.geometry.addEventListener("dispose", () => disposed.push("geometry"));
-  dots.material.addEventListener("dispose", () => disposed.push("material"));
-  state.phase = "complete";
-  view.updateRoute(state);
-  assert.deepEqual(disposed, ["instances", "geometry", "material"]);
-  assert.equal(dots.parent, null);
-  assert.equal(view.route.children.length, 0);
+  material.addEventListener("dispose", () => disposed.push("material"));
+  for (const phase of [
+    "gate",
+    "walk-kiosk",
+    "dock",
+    "complete",
+    "kiosk",
+    "pin",
+    "arrive",
+  ] as const) {
+    state.phase = phase;
+    route.update(state);
+    if (dots.visible) {
+      geometries.add(dots.geometry);
+      dots.geometry.addEventListener("dispose", () =>
+        disposed.push("geometry"),
+      );
+    }
+    assert.equal(route.mesh, dots);
+    assert.equal(dots.material, material);
+    assert.equal(dots.instanceMatrix, buffer);
+    assert.ok(dots.count <= ROUTE_CAPACITY);
+  }
+  assert.equal(geometries.size, 2);
+  assert.deepEqual(disposed, []);
+});
+
+test("pose blending is exact at the ends and takes the short way round", () => {
+  const a: Truck = {
+    x: 0,
+    z: 10,
+    heading: Math.PI - 0.1,
+    trailerHeading: -1,
+    speed: 2,
+    steer: -0.2,
+  };
+  const b: Truck = {
+    x: 1,
+    z: 12,
+    heading: -Math.PI + 0.1,
+    trailerHeading: 1,
+    speed: 4,
+    steer: 0.2,
+  };
+  assert.deepEqual(blendTruck(a, b, 0), a);
+  assert.deepEqual(blendTruck(a, b, 1), {
+    ...b,
+    heading: angle(b.heading),
+    trailerHeading: angle(b.trailerHeading),
+  });
+  const mid = blendTruck(a, b, 0.5);
+  assert.deepEqual(
+    { x: mid.x, z: mid.z, speed: mid.speed, steer: mid.steer },
+    { x: 0.5, z: 11, speed: 3, steer: 0 },
+  );
+  // Crossing ±π: halfway between π−0.1 and −π+0.1 is π, not 0.
+  assert.ok(
+    Math.abs(Math.abs(mid.heading) - Math.PI) < 1e-12,
+    `${mid.heading}`,
+  );
+  assert.equal(mid.trailerHeading, 0);
+  assert.deepEqual(blendPoint({ x: 2, z: 4 }, { x: 4, z: 8 }, 0.25), {
+    x: 2.5,
+    z: 5,
+  });
+  assert.equal(lerpAngle(0.2, 0.2, 0.7), 0.2);
+  assert.ok(Math.abs(lerpAngle(3, -3, 0.5) - Math.PI) < 1e-12);
+  assert.deepEqual(blendTruck(a, a, 0.3), a);
+});
+
+async function loadModel(name: string) {
+  const bytes = await readFile(
+    new URL(`../public/models/${name}.glb`, import.meta.url),
+  );
+  return new GLTFLoader().parseAsync(
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    "",
+  );
+}
+const triangles = (g: THREE.BufferGeometry) =>
+  (g.index ? g.index.count : g.getAttribute("position").count) / 3;
+
+test("parked rigs merge into one mesh per material with geometry and materials intact", async () => {
+  const [tractor, trailer] = await Promise.all([
+    loadModel("tractor"),
+    loadModel("trailer"),
+  ]);
+  const parked = new THREE.Group();
+  const originals: THREE.Mesh[] = [];
+  for (const t of staticRigs) {
+    const cab = tractor.scene.clone(true),
+      box = trailer.scene.clone(true);
+    cab.position.set(t.x, 0, t.z);
+    cab.rotation.y = t.heading;
+    box.position.copy(cab.position);
+    box.rotation.y = t.trailerHeading;
+    parked.add(cab, box);
+  }
+  parked.updateMatrixWorld(true);
+  parked.traverse((o) => {
+    if (o instanceof THREE.Mesh) originals.push(o);
+  });
+  const materials = new Set(originals.map((o) => o.material as THREE.Material));
+  const expectedTriangles = originals.reduce(
+    (sum, o) => sum + triangles(o.geometry),
+    0,
+  );
+  const expectedBounds = new THREE.Box3();
+  for (const o of originals)
+    expectedBounds.union(
+      o.geometry.boundingBox
+        ? o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)
+        : new THREE.Box3().setFromObject(o),
+    );
+  const merged = mergeByMaterial(parked);
+  assert.equal(originals.length, 3 * (29 + 8));
+  assert.equal(merged.length, materials.size);
+  assert.deepEqual(new Set(merged.map((m) => m.material)), materials);
+  assert.equal(
+    merged.reduce((sum, m) => sum + triangles(m.geometry), 0),
+    expectedTriangles,
+  );
+  const bounds = new THREE.Box3();
+  for (const m of merged) {
+    assert.ok(m.castShadow && m.receiveShadow);
+    assert.ok(
+      m.geometry.boundingSphere && m.geometry.boundingSphere.radius > 0,
+    );
+    assert.ok(m.matrixWorld.equals(new THREE.Matrix4()));
+    m.geometry.computeBoundingBox();
+    bounds.union(m.geometry.boundingBox!);
+  }
+  for (const axis of ["x", "y", "z"] as const) {
+    assert.ok(
+      Math.abs(bounds.min[axis] - expectedBounds.min[axis]) < 1e-3,
+      axis,
+    );
+    assert.ok(
+      Math.abs(bounds.max[axis] - expectedBounds.max[axis]) < 1e-3,
+      axis,
+    );
+  }
+  // Every parked rig footprint is covered: sample one point per rig.
+  for (const t of staticRigs) {
+    const inside = merged.some((m) => {
+      m.geometry.computeBoundingBox();
+      return m.geometry.boundingBox!.containsPoint(
+        new THREE.Vector3(t.x, 1.5, t.z),
+      );
+    });
+    assert.ok(inside, `rig at ${t.x},${t.z}`);
+  }
 });
 
 function assertPrediction(path: PredictionPath, state: State, input: Input) {
