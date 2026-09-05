@@ -64,6 +64,10 @@ export const YARD = {
   dock: { x: 0, z: -44 },
   gateZ: 12,
 };
+/** Speeds (m/s) below which a driving step can complete. */
+export const STOP_SPEED = { park: 0.18, gate: 0.3, dock: 0.18 };
+/** Radius (m) around a driving target inside which excess speed warns the driver. */
+export const SLOW_ZONE = 4;
 export const idleInput = (): Input => ({
   throttle: 0,
   steer: 0,
@@ -234,12 +238,8 @@ export function parking(s: State) {
     );
   const straight =
     Math.abs(angle(s.truck.heading - s.truck.trailerHeading)) < 0.16;
-  return {
-    inside,
-    straight,
-    stopped: Math.abs(s.truck.speed) < 0.18,
-    ready: inside && straight && Math.abs(s.truck.speed) < 0.18,
-  };
+  const stopped = Math.abs(s.truck.speed) < STOP_SPEED.park;
+  return { inside, straight, stopped, ready: inside && straight && stopped };
 }
 export function docking(s: State) {
   const tail = rear(s.truck),
@@ -256,7 +256,7 @@ export function docking(s: State) {
       gap > -0.45 &&
       gap < 1.05 &&
       headingError < 0.105 &&
-      Math.abs(s.truck.speed) < 0.18,
+      Math.abs(s.truck.speed) < STOP_SPEED.dock,
   };
 }
 export function objective(s: State): {
@@ -321,10 +321,26 @@ export function prompt(s: State): string {
   if (
     s.phase === "gate" &&
     distance(s.truck, YARD.gate) < 6 &&
-    Math.abs(s.truck.speed) < 0.3
+    Math.abs(s.truck.speed) < STOP_SPEED.gate
   )
     return "Enter gate PIN";
   return "";
+}
+/** Within SLOW_ZONE of the driving target but still too fast for the step to complete. */
+export function slowDown(s: State): boolean {
+  const limit =
+    s.phase === "arrive"
+      ? STOP_SPEED.park
+      : s.phase === "gate"
+        ? STOP_SPEED.gate
+        : s.phase === "dock"
+          ? STOP_SPEED.dock
+          : undefined;
+  return (
+    limit !== undefined &&
+    distance(s.truck, objective(s).target) <= SLOW_ZONE &&
+    Math.abs(s.truck.speed) >= limit
+  );
 }
 export function interact(s: State): boolean {
   if (!prompt(s)) {
@@ -365,6 +381,15 @@ export function register(s: State, booking: string): boolean {
   note(s, "Message received: gate PIN 2048. Deliver to dock 03.", "registered");
   return true;
 }
+/** Safe stop just inside the barrier once the gate has opened. */
+const insideGate: Truck = {
+  x: 18,
+  z: -2,
+  heading: Math.PI,
+  trailerHeading: Math.PI,
+  speed: 0,
+  steer: 0,
+};
 export function enterPin(s: State, pin: string): boolean {
   if (s.phase !== "pin" || !s.registered) {
     note(s, "Stop at the gate terminal first.");
@@ -377,14 +402,25 @@ export function enterPin(s: State, pin: string): boolean {
   s.gateOpen = true;
   s.phase = "dock";
   note(s, "Access granted. Proceed to dock 03.", "gate-opened");
-  s.checkpoint = {
-    x: 18,
-    z: -2,
+  s.checkpoint = { ...insideGate };
+  return true;
+}
+/** Playtest shortcut: rig at the gate stop line, checked in, barrier open. Silent. */
+export function skipToGate(s: State): boolean {
+  if (s.phase === "complete") return false;
+  s.truck = {
+    x: YARD.gate.x,
+    z: 22,
     heading: Math.PI,
     trailerHeading: Math.PI,
     speed: 0,
     steer: 0,
   };
+  s.registered = true;
+  s.gateOpen = true;
+  s.phase = "dock";
+  s.dockHold = 0;
+  s.checkpoint = { ...insideGate };
   return true;
 }
 export function recover(s: State) {
@@ -535,6 +571,7 @@ export function snapshot(s: State) {
     registered: s.registered,
     objective: objective(s),
     interaction: prompt(s),
+    slowDown: slowDown(s),
     parking: parking(s),
     docking: docking(s),
     pin: s.registered ? s.pin : null,
