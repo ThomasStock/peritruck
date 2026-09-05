@@ -268,7 +268,7 @@ export function objective(s: State): {
   switch (s.phase) {
     case "arrive":
       return {
-        title: "Make yourself at home.",
+        title: "Driver parking",
         detail: "Pull into holding bay P02, then come to a stop.",
         target: { x: -24, z: 39 },
         step: 0,
@@ -276,14 +276,14 @@ export function objective(s: State): {
     case "walk-kiosk":
     case "kiosk":
       return {
-        title: "You’re expected.",
+        title: "Self-service check-in",
         detail: "Follow the footpath to the driver check-in kiosk.",
         target: YARD.kiosk,
         step: 1,
       };
     case "walk-truck":
       return {
-        title: "You’re checked in.",
+        title: "Driver instructions",
         detail: "Your gate PIN is ready. Walk back to the cab.",
         target: offset(s.truck, s.truck.heading + Math.PI / 2, 2.5),
         step: 1,
@@ -291,22 +291,22 @@ export function objective(s: State): {
     case "gate":
     case "pin":
       return {
-        title: "Your way in.",
+        title: "Automated access",
         detail: "Stop at the gate’s white line and enter your PIN.",
         target: YARD.gate,
         step: 2,
       };
     case "dock":
       return {
-        title: "Bring it home.",
+        title: "Assigned dock: 03",
         detail: "Turn in the apron. Reverse your trailer into dock 03.",
         target: { x: 0, z: -32.5 },
         step: 3,
       };
     case "complete":
       return {
-        title: "A good day in the yard.",
-        detail: "Dock 03 is ready to unload. Nicely done.",
+        title: "Ready for unloading",
+        detail: "Trailer positioned at dock 03.",
         target: YARD.dock,
         step: 4,
       };
@@ -331,7 +331,7 @@ export function interact(s: State): boolean {
     note(
       s,
       walking(s)
-        ? "Move a little closer to the highlighted destination."
+        ? "Move closer to the marked destination."
         : "Stop in the marked area first.",
     );
     return false;
@@ -376,7 +376,7 @@ export function enterPin(s: State, pin: string): boolean {
   }
   s.gateOpen = true;
   s.phase = "dock";
-  note(s, "Access granted. Dock 03 is yours.", "gate-opened");
+  note(s, "Access granted. Proceed to dock 03.", "gate-opened");
   s.checkpoint = {
     x: 18,
     z: -2,
@@ -397,7 +397,7 @@ export function recover(s: State) {
     if (s.phase === "kiosk") s.phase = "walk-kiosk";
   }
   if (s.phase === "pin") s.phase = "gate";
-  note(s, "Back at your last safe stop. Take your time.", "recovered");
+  note(s, "Returned to the last safe stop.", "recovered");
 }
 /** Truck physics used by both live simulation and projected tyre tracks. */
 export function integrate(

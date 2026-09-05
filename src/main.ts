@@ -32,15 +32,15 @@ import { execute } from "./game/commands";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
 <div id="world"></div>
-<header class="topbar"><a class="brand" href="/" aria-label="Yard Shift home"><img src="/brand/peripass.svg" alt="Peripass"/><span class="brand-divider"></span><span>YARD SHIFT<small>THE DRIVER’S SEAT</small></span></a><div class="site-tag"><span class="live-dot"></span> GHENT · TERMINAL 01</div><div class="top-actions"><button id="camera" class="icon-button" aria-label="Change camera view" title="Camera · C">◩</button><button id="help" class="icon-button" aria-label="Controls and settings" title="Controls · Escape">?</button><span class="edition">VOL. 02</span></div></header>
-<section id="intro" class="intro panel"><div class="eyebrow"><span class="live-dot"></span> YOUR FIRST SHIFT</div><h1>Your yard.<br>Your move.</h1><p>One truck. One delivery.<br>Make every move feel right.</p><div class="intro-steps"><span>01 Park</span><span>02 Check in</span><span>03 Enter</span><span>04 Dock</span></div><button id="start" class="primary" disabled>Preparing your truck… <span>↗</span></button><small class="intro-note">A little precision. A lot of satisfaction.</small></section>
+<header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><button id="camera" class="icon-button" aria-label="Change camera view" title="Camera · C">◩</button><button id="help" class="icon-button" aria-label="Controls and settings" title="Controls · Escape">?</button></div></header>
+<section id="intro" class="intro panel"><h1>Automate your yard.</h1><p>Self-service check-in. Automated access. Clear driver instructions.</p><button id="start" class="primary" disabled>Loading… <span>↗</span></button></section>
 <aside id="mission" class="mission panel hidden"><div class="eyebrow" id="step-label">01 / 04 · ARRIVAL</div><h1 id="objective-title"></h1><p id="objective-detail"></p><div class="mission-progress"><i></i><i></i><i></i><i></i></div><div class="delivery-note"><span id="note-label">YOUR DELIVERY</span><b id="delivery-reference">PP-2048 <span>→</span> Ghent</b><small id="note-detail">Registration reference</small></div><div id="stage-hint" class="stage-hint"></div></aside>
 <button id="map-button" class="minimap panel hidden" aria-label="Show whole yard map"><div><span>YARD MAP</span><span>↗</span></div><canvas id="map" width="340" height="270" aria-label="Yard map showing the truck, destination, gate and docks"></canvas><span class="map-key"><i></i> You <b>◎</b> Destination <span>N ↑</span></span></button>
 <div id="target-label" class="target-label hidden"><span id="target-symbol" class="target-number">P</span><div><b id="target-name">HOLDING BAY P02</b><small id="target-distance"></small></div></div>
 <div id="action-wrap" class="action-wrap hidden"><button id="interact" class="action"><kbd id="interact-key">E</kbd><span id="action-text"></span><span>↗</span></button></div>
 <div id="toast" role="status" aria-live="polite" class="toast hidden"></div>
-<button id="cli-resume" class="cli-resume hidden">CLI has the wheel · Resume driving ↗</button>
-<footer class="bottom-bar"><div class="controls-hint" id="controls-hint"></div><div class="edition-note">A SMALL WORLD. A SMOOTH OPERATION.</div></footer>
+<button id="cli-resume" class="cli-resume hidden">CLI control · Resume ↗</button>
+<footer class="bottom-bar"><div class="controls-hint" id="controls-hint"></div></footer>
 <div id="dock-guide" class="dock-guide panel hidden"><div class="eyebrow">03 · DOCKING GUIDE</div><strong id="dock-coach">Trailer first.</strong><div class="dock-measure"><span>Side offset</span><b id="dock-offset"></b></div><div class="dock-meter"><i id="dock-needle"></i><span></span></div><div class="dock-measure"><span>Trailer angle</span><b id="dock-angle"></b></div><div class="dock-measure"><span>To bumper</span><b id="dock-gap"></b></div><p id="dock-tip"></p></div>
 <div id="telemetry" class="telemetry panel hidden"><div class="gear"><b id="gear">N</b><span>AUTO</span></div><div class="speed"><b id="speed">00</b><span>KM/H</span></div><div id="assist-tag" class="assist-tag"><span class="live-dot"></span> REVERSE ASSIST</div><div class="articulation"><span>TRAILER</span><div><i id="articulation-bar"></i></div><b id="articulation-value">0°</b></div></div>
 <div id="touch-controls" aria-label="Touch driving controls"><div class="touch-group"><button data-touch="left" aria-label="Steer left">←</button><button data-touch="right" aria-label="Steer right">→</button></div><div class="touch-group pedals"><button data-touch="reverse" aria-label="Brake then reverse">↓<small>REVERSE</small></button><button data-touch="forward" aria-label="Drive forward">↑<small>DRIVE</small></button><button data-touch="brake" aria-label="Brake">■</button></div></div>
@@ -290,9 +290,9 @@ window.addEventListener("keydown", (e) => {
     if (e.key === "Tab") {
       const nodes = [
         ...$("modal-root").querySelectorAll<HTMLElement>(
-          'button:not([disabled]),input,select,[tabindex="0"]',
+          'a[href],button:not([disabled]),input,select,[tabindex="0"]',
         ),
-      ];
+      ].filter((node) => node.getClientRects().length > 0);
       const first = nodes[0],
         last = nodes.at(-1);
       if (e.shiftKey && document.activeElement === first) {
@@ -339,7 +339,7 @@ document.addEventListener("visibilitychange", () => {
 function modal(title: string, body: string, cls = "") {
   modalReturnFocus = document.activeElement as HTMLElement;
   $("modal-root").innerHTML =
-    `<div class="modal-scrim"><section class="dialog ${cls}" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><button class="dialog-close" id="close-dialog" aria-label="Close dialog">×</button><div class="eyebrow">PERIPASS · YARD SHIFT</div><h2 id="dialog-title">${title}</h2>${body}</section></div>`;
+    `<div class="modal-scrim"><section class="dialog ${cls}" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><button class="dialog-close" id="close-dialog" aria-label="Close dialog">×</button><div class="eyebrow">PERIPASS</div><h2 id="dialog-title">${title}</h2>${body}</section></div>`;
   $("close-dialog").onclick = closeDialog;
   keys.clear();
   touch.clear();
@@ -364,14 +364,14 @@ function syncDialog() {
   }
   if (kind === "settings") {
     modal(
-      "Make it feel right.",
-      `<p class="dialog-description">Your shift is paused. Find your comfortable driving setup.</p>
+      "Controls",
+      `<p class="dialog-description">Driving is paused.</p>
       <label class="setting-row"><span><b>Trailer reverse assist</b><small>Steer where you want the trailer to go. Release to straighten.</small></span><input id="assist-setting" type="checkbox" ${state.assisted ? "checked" : ""}/></label>
       <label class="setting-row"><span><b>Sound</b><small>Engine hum and gentle reversing cues.</small></span><input id="sound-setting" type="checkbox" ${soundEnabled ? "checked" : ""}/></label>
       <label class="setting-row"><span><b>Reduced motion</b><small>Instant camera changes; no pulsing markers.</small></span><input id="motion-setting" type="checkbox" ${reducedMotion ? "checked" : ""}/></label>
       <div class="controls-title">YOUR CONTROLS <span>Click a key to change it</span></div><div class="keybindings" id="keybindings"></div>
       <p class="settings-tip">Hold S to brake, then reverse. A / D steer the cab forward and aim the trailer in reverse. Shift keeps things slow. Space stops the truck. Arrow keys also work.</p>
-      <div class="dialog-buttons"><button id="resume" class="primary">Back to the yard <span>↗</span></button><button id="recover" class="secondary">Recover to safe stop</button><button id="restart" class="text-button">Start a new shift</button></div>`,
+      <div class="dialog-buttons"><button id="resume" class="primary">Resume <span>↗</span></button><button id="recover" class="secondary">Recover to safe stop</button><button id="restart" class="text-button">Restart demo</button></div>`,
       "settings-dialog",
     );
     for (const [action, key] of Object.entries(bindings)) {
@@ -429,21 +429,25 @@ function syncDialog() {
     };
   } else if (kind === "kiosk") {
     modal(
-      "Welcome, driver.",
-      `<div class="kiosk-site"><span class="live-dot"></span> GHENT · DRIVER SELF CHECK-IN</div><p class="dialog-description">Let’s get your delivery moving. Your booking reference is on the delivery note.</p><form id="registration"><label class="field">Language<select id="language"><option>English</option><option>Nederlands</option><option>Français</option><option>Deutsch</option></select></label><label class="field"><span id="booking-label">Booking reference</span><input id="booking" autofocus autocomplete="off" spellcheck="false" placeholder="e.g. PP-2048" value="PP-2048" maxlength="30" required /></label><div class="booking-card"><span>EXPECTED DELIVERY</span><b>PP-2048 · Ghent</b><small>General cargo · 1 trailer</small></div><div id="form-error" class="form-error" role="alert"></div><button id="register-button" class="primary" type="submit">Check in <span>↗</span></button></form><p class="privacy-note">Practice kiosk. No personal details or real registration.</p>`,
+      "Driver check-in",
+      `<div class="kiosk-site"><span class="live-dot"></span> SELF-SERVICE REGISTRATION</div><p class="dialog-description">Check in using your booking reference.</p><form id="registration"><label class="field">Language<select id="language"><option>English</option><option>Nederlands</option><option>Français</option><option>Deutsch</option></select></label><label class="field"><span id="booking-label">Booking reference</span><input id="booking" autofocus autocomplete="off" spellcheck="false" placeholder="e.g. PP-2048" value="PP-2048" maxlength="30" required /></label><div class="booking-card"><span>EXPECTED DELIVERY</span><b>PP-2048 · Ghent</b><small>General cargo · 1 trailer</small></div><div id="form-error" class="form-error" role="alert"></div><button id="register-button" class="primary" type="submit">Check in <span>↗</span></button></form><p class="privacy-note">Practice kiosk. No personal details or real registration.</p>`,
       "kiosk-dialog",
     );
     $("language").onchange = () => {
       const lang = ($("language") as HTMLSelectElement).value;
       const copy: Record<string, [string, string, string]> = {
-        English: ["Welcome, driver.", "Booking reference", "Check in"],
-        Nederlands: ["Welkom, chauffeur.", "Boekingsreferentie", "Aanmelden"],
+        English: ["Driver check-in", "Booking reference", "Check in"],
+        Nederlands: [
+          "Chauffeursregistratie",
+          "Boekingsreferentie",
+          "Aanmelden",
+        ],
         Français: [
-          "Bienvenue, chauffeur.",
+          "Enregistrement chauffeur",
           "Référence de réservation",
           "S’enregistrer",
         ],
-        Deutsch: ["Willkommen, Fahrer.", "Buchungsreferenz", "Anmelden"],
+        Deutsch: ["Fahrerregistrierung", "Buchungsreferenz", "Anmelden"],
       };
       const c = copy[lang];
       $("dialog-title").textContent = c[0];
@@ -462,7 +466,7 @@ function syncDialog() {
     };
   } else if (kind === "pin") {
     modal(
-      "You have the green light.",
+      "Automated gate access",
       `<p class="dialog-description">Enter the gate PIN from your check-in message.</p><div class="message-ticket"><span>YOUR PERIPASS MESSAGE</span><b>Gate PIN <strong>2 0 4 8</strong></b><small>Proceed to dock 03 after entry.</small></div><form id="pin-form"><label class="field">Gate PIN<input id="pin-input" autofocus inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="Four digit gate PIN" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? "Delete digit" : k}">${k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">Open the gate <span>↗</span></button></form>`,
       "pin-dialog",
     );
@@ -488,12 +492,9 @@ function syncDialog() {
       }
     };
   } else {
-    const d = docking(state),
-      minutes = Math.floor(state.elapsed / 60),
-      seconds = Math.floor(state.elapsed % 60);
     modal(
-      "A good day in the yard.",
-      `<div class="complete-symbol">✓</div><p class="dialog-description">Trailer on dock 03. Delivery complete.<br>The yard keeps moving, thanks to you.</p><div class="completion-route"><span>✓ Parked</span><span>✓ Registered</span><span>✓ Admitted</span><span>✓ Docked</span></div><div class="results"><div><b>${state.contacts === 0 ? "Clean" : state.contacts}</b><span>${state.contacts === 0 ? "No contacts" : "Contacts"}</span></div><div><b>${d.angleDegrees.toFixed(1)}°</b><span>Dock alignment</span></div><div><b>${minutes}:${String(seconds).padStart(2, "0")}</b><span>Your shift</span></div></div><p class="result-caption">${state.recoveries ? `${state.recoveries} safe-stop recoveries. Every attempt is practice.` : state.contacts === 0 ? "Smooth moves. A clean delivery from start to finish." : "A little more room on the turns next time. You made it."}</p><button id="play-again" class="primary">Another shift? <span>↗</span></button>`,
+      "Truck at dock 03",
+      `<div class="complete-symbol">✓</div><p class="dialog-description">From self-service check-in to the assigned dock, Peripass coordinates the visit.</p><a class="primary" href="https://peripass.com/" target="_blank" rel="noopener noreferrer">Discover Peripass <span>↗</span></a><button id="play-again" class="text-button">Restart demo</button>`,
       "complete-dialog",
     );
     $("close-dialog").classList.add("hidden");
@@ -652,12 +653,12 @@ function updateUI() {
     ? "PIN 2048 → Dock 03"
     : "PP-2048 → Ghent";
   $("note-detail").textContent = state.registered
-    ? "Your access code stays here."
+    ? "Gate access code"
     : "Registration reference";
   $("stage-hint").textContent =
     state.phase === "arrive"
       ? p.ready
-        ? "✓ Nicely parked. Step out when ready."
+        ? "Parked. Press E to exit."
         : p.inside
           ? "Release the accelerator to stop."
           : "Start with W / ↑. Release to slow down."
@@ -665,7 +666,7 @@ function updateUI() {
         ? "Reverse assist: aim the trailer with A / D."
         : isWalking
           ? "WASD / arrows to walk. E to interact."
-          : "Follow the marked lane to the gate. R recovers to a safe stop.";
+          : "Follow the marked lane to the gate.";
   $("dock-guide").classList.toggle(
     "hidden",
     state.phase !== "dock" || !started,
@@ -679,14 +680,14 @@ function updateUI() {
     d.angleDegrees > 90
       ? "Turn the cab away."
       : d.ready
-        ? "Hold still. You’re home."
+        ? "Hold position."
         : d.lateral > 0.85
           ? "Line up your trailer."
           : d.angleDegrees > 6
-            ? "Straighten it gently."
+            ? "Straighten the trailer."
             : d.gap < 2
-              ? "Brake. Almost there."
-              : "Nice line. Ease it back.";
+              ? "Brake at the bumper."
+              : "Reverse slowly.";
   $("dock-tip").textContent =
     d.angleDegrees > 90
       ? "The back of the trailer goes against the dock. Use the open apron to turn around."
@@ -816,7 +817,7 @@ if (context?.registerTool) {
     {
       name: "yard_control",
       description:
-        "Drive or walk in Yard Shift through the same controls as the player. Commands: reset, input, interact, register, pin, recover, assist, drive-to, walk-to, demo. Input durations are seconds. Does not contact a real logistics system.",
+        "Drive or walk in the Peripass yard through the same controls as the visitor. Commands: reset, input, interact, register, pin, recover, assist, drive-to, walk-to, demo. Input durations are seconds. Does not contact a real logistics system.",
       inputSchema: {
         type: "object",
         properties: {
@@ -869,12 +870,12 @@ import.meta.hot?.dispose(() => toolLifecycle.abort());
 scene
   .load()
   .then(() => {
-    $("start").innerHTML = "Start your shift <span>↗</span>";
+    $("start").innerHTML = "Explore the yard <span>↗</span>";
     $("start").removeAttribute("disabled");
     import.meta.hot?.send("yard:ready", {});
   })
   .catch((error) => {
-    $("start").textContent = "Asset loading failed · reload to retry";
+    $("start").textContent = "Loading failed · reload to retry";
     console.error(error);
   });
 requestAnimationFrame(frame);

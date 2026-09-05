@@ -1,4 +1,4 @@
-# Peripass · Yard Shift
+# Peripass yard demo
 
 Version 2 of [ThomasStock/peritruck](https://github.com/ThomasStock/peritruck), the game originally served at [truck.placeholder.app](https://truck.placeholder.app/).
 

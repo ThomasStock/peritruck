@@ -86,11 +86,6 @@ button:active {
   width: 135px;
   height: auto;
 }
-.brand-divider {
-  height: 29px;
-  width: 1px;
-  background: #879e9155;
-}
 .brand > span:last-child {
   font-size: 15px;
   font-weight: 700;
@@ -102,14 +97,6 @@ button:active {
   font-weight: 600;
   letter-spacing: 2.1px;
   margin-top: 5px;
-}
-.site-tag {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.4px;
 }
 .live-dot {
   display: inline-block;
@@ -132,12 +119,6 @@ button:active {
   color: var(--ink);
   font-size: 18px;
 }
-.edition {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.4px;
-  margin-left: 12px;
-}
 .panel {
   box-shadow: 0 12px 50px #153b2c13;
 }
@@ -146,8 +127,8 @@ button:active {
   left: 40px;
   top: 50%;
   transform: translateY(-42%);
-  width: 342px;
-  border-radius: 3px 28px 28px 28px;
+  width: 320px;
+  border-radius: 18px;
   padding: 31px;
   background: var(--ink);
   color: #f5f9ec;
@@ -161,15 +142,12 @@ button:active {
   letter-spacing: 1.7px;
   font-weight: 700;
 }
-.intro .eyebrow {
-  color: #b4dbc9;
-}
 .intro h1 {
-  font-size: 48px;
-  line-height: 1.06;
-  letter-spacing: -2.7px;
+  font-size: 34px;
+  line-height: 1.15;
+  letter-spacing: -1.2px;
   font-weight: 600;
-  margin: 24px 0 18px;
+  margin: 0 0 16px;
 }
 .intro p {
   color: #bdcec2;
@@ -178,15 +156,8 @@ button:active {
   font-weight: 400;
   margin: 0 0 25px;
 }
-.intro-steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px 13px;
-  font-size: 10px;
-  color: #c1d6c8;
-  margin-bottom: 26px;
-}
 .primary {
+  text-decoration: none;
   background: #c6f389;
   border: 0;
   border-radius: 8px;
@@ -202,13 +173,6 @@ button:active {
 .primary span {
   font-size: 20px;
   line-height: 14px;
-}
-.intro-note {
-  display: block;
-  font-size: 10px;
-  color: #8ca89b;
-  text-align: center;
-  margin-top: 17px;
 }
 .mission {
   position: fixed;
@@ -311,12 +275,6 @@ kbd {
   border-radius: 4px;
   background: #f7fbf388;
   text-align: center;
-}
-.edition-note {
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 1.6px;
-  color: #718976;
 }
 .telemetry {
   position: fixed;
@@ -488,7 +446,7 @@ kbd {
     padding: 36px;
   }
   .intro h1 {
-    font-size: 55px;
+    font-size: 38px;
   }
 }
 @media (max-width: 900px) {
@@ -511,7 +469,7 @@ kbd {
     padding: 26px;
   }
   .intro h1 {
-    font-size: 43px;
+    font-size: 32px;
   }
   .controls-hint {
     gap: 8px;
@@ -570,7 +528,7 @@ kbd {
     padding: 23px;
   }
   .intro h1 {
-    font-size: 35px;
+    font-size: 28px;
     letter-spacing: -1.5px;
     margin: 14px 0;
     line-height: 1.03;
@@ -1096,47 +1054,6 @@ kbd {
   place-items: center;
   margin: 23px auto;
 }
-.completion-route {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  font-size: 9px;
-  color: #008c75;
-  margin: 22px 0;
-}
-.results {
-  display: flex;
-  justify-content: center;
-  gap: 0;
-  margin: 20px 0;
-  padding: 20px 0;
-  border-block: 1px solid #dae6d1;
-}
-.results > div {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border-right: 1px solid #dae6d1;
-}
-.results > div:last-child {
-  border-right: 0;
-}
-.results b {
-  font-size: 25px;
-  font-weight: 500;
-  letter-spacing: -1px;
-}
-.results span {
-  font-size: 9px;
-  color: #7b9070;
-}
-.result-caption {
-  font-size: 11px;
-  color: #7b9070;
-  line-height: 1.8;
-  margin: 17px 0 23px;
-}
 #touch-controls {
   display: none;
   position: fixed;
@@ -1495,4 +1412,8 @@ body:not(.playing) #touch-controls {
   .controls-hint {
     font-size: 10px;
   }
+}
+
+.complete-dialog > .text-button {
+  margin-top: 14px;
 }
