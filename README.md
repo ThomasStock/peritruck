@@ -110,6 +110,7 @@ npm run models       # Rebuild original GLB assets with installed Blender
 | `src/game/simulation.ts`  | Articulated kinematics, oriented collision, progression, proximity, parking/docking, measurements |
 | `src/game/commands.ts`    | Validated CLI/WebMCP commands and feedback driver                                                 |
 | `src/scene.ts`            | Three.js rendering, camera, lights, models, projected path                                        |
+| `src/rig.ts`              | Driver rig: displacement-driven gait, turning, idle motion                                        |
 | `src/main.ts`             | Input adapters, accessible overlays, HUD, sound and agent tool registration                       |
 | `src/kiosk/`              | Kiosk replica: step flow, six-language copy, DOM view and stylesheet                              |
 | `vite.config.ts`          | Local-only CLI/browser bridge                                                                     |
@@ -122,7 +123,7 @@ Collision uses oriented rectangles for both tractor and trailer. A closed gate a
 
 ## Assets and design research
 
-All 3D assets were authored in Blender from `scripts/build_models.py`, validated with Blender 5.2.1 LTS, and exported as GLB. A generated cab-over tractor, 13.6 m trailer, driver and yard require about 3.4 MB uncompressed. Assets include bevelled bodywork, mirrors, grille, multi-axle wheels, trailer rails, docking equipment, solar roof panels, fencing, kiosk, footpath, trees and lighting columns. Front wheels animate with steering. Distant scenery is joined by material to keep draw calls down.
+All 3D assets were authored in Blender from `scripts/build_models.py`, validated with Blender 5.2.1 LTS, and exported as GLB. A generated cab-over tractor, 13.6 m trailer, driver and yard require about 3.4 MB uncompressed. Assets include bevelled bodywork, mirrors, grille, multi-axle wheels, trailer rails, docking equipment, solar roof panels, fencing, kiosk, footpath, trees and lighting columns. Front wheels animate with steering. The driver's legs, arms, head and torso hang from named empties so the renderer can pose them. Distant scenery is joined by material to keep draw calls down.
 
 The Peripass logo is the official first-party SVG. The house-style starting point is Montserrat and Peripass teal `#00A990`; the game adds dark green and lime feedback accents. The kiosk uses Open Sans and the kiosk app's tokens (page background `#F4F6F9`, primary teal, 56 px controls). Fonts are bundled locally. See [the cited research](docs/research.md) for the real yard process, control rationale, source links and which dimensions are deliberately simplified for play. This is a game, not a truck-driving simulator or an operational safety tool.
 
