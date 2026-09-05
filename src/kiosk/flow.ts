@@ -12,7 +12,7 @@ export type Flow = {
   language: Lang;
   method?: Method;
   profile?: Profile;
-  /** Expected full reference, e.g. PP-2048; the prefix is derived from it. */
+  /** Expected full reference, e.g. PP-K4M7Q2; the prefix is derived from it. */
   booking: string;
   /** What the visitor typed after the fixed prefix. */
   reference: string;
@@ -54,10 +54,10 @@ export function createFlow(booking: string): Flow {
     phoneNumber: "",
   };
 }
-/** "PP-2048" → "PP-". A booking without a dash has no prefix. */
+/** "PP-K4M7Q2" → "PP-". A booking without a dash has no prefix. */
 export const referencePrefix = (booking: string) =>
   booking.slice(0, booking.indexOf("-") + 1);
-/** "PP-2048" → "2048". */
+/** "PP-K4M7Q2" → "K4M7Q2". */
 export const referenceBody = (booking: string) =>
   booking.slice(referencePrefix(booking).length);
 /** Combine the fixed prefix with what was typed; a repeated prefix is forgiven. */

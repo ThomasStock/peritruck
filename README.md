@@ -2,7 +2,7 @@
 
 Version 2 of [ThomasStock/peritruck](https://github.com/ThomasStock/peritruck), the game originally served at [truck.placeholder.app](https://truck.placeholder.app/).
 
-A small 3D logistics yard: arrive in your articulated truck, park in holding bay P02, check in at a self-service kiosk, receive gate PIN 2048 by SMS, enter the site, and reverse into dock 03.
+A small 3D logistics yard: arrive in your articulated truck, park in holding bay P02, check in at a self-service kiosk, receive a gate PIN by SMS, enter the site, and reverse into dock 03.
 
 ## Play locally
 
@@ -34,7 +34,7 @@ Reverse assist is on by default. In reverse, the steering command asks the _trai
 
 ## Kiosk check-in
 
-The kiosk is a replica of the Peripass kiosk app. On a desktop viewport it renders as a physical kiosk with navigation rails; on phone-sized viewports it renders as the Mobile Driver Portal with the inline top bar. Your delivery note lies next to the kiosk (desktop). On mobile it is a drawer on the right, offered only on the reference step: tap the **Delivery note** tab or swipe it in to read it, and keep it open while you type. Swipe it out, tap the tab or **Hide** to put it away. It carries the reference `PP-2048`.
+The kiosk is a replica of the Peripass kiosk app. On a desktop viewport it renders as a physical kiosk with navigation rails; on phone-sized viewports it renders as the Mobile Driver Portal with the inline top bar. Your delivery note lies next to the kiosk (desktop). On mobile it is a drawer on the right, offered only on the reference step: tap the **Delivery note** tab or swipe it in to read it, and keep it open while you type. Swipe it out, tap the tab or **Hide** to put it away. It carries the reference `PP-K4M7Q2`.
 
 | Step       | What the driver sees                                                                    |
 | ---------- | --------------------------------------------------------------------------------------- |
@@ -64,7 +64,7 @@ npm run truck -- interact
 npm run truck -- walk-to --x -28 --z 29
 npm run truck -- walk-to --x -33.7 --z 28.2
 npm run truck -- interact
-npm run truck -- register --booking PP-2048
+npm run truck -- register --booking PP-K4M7Q2
 ```
 
 `drive-to` is a feedback controller using ordinary pedals and steering. It does not plan around obstacles: provide clear intermediate waypoints. Forward targets track the fifth-wheel position; `--reverse` targets track the trailer rear. A route blocked by an obstacle exits with an error. `walk-to` uses the same walking and collision code as human play.

@@ -72,6 +72,11 @@ export const STOP_SPEED = { park: 0.18, gate: 0.3, dock: 0.18 };
 export const SLOW_ZONE = 4;
 /** Seconds between leaving the kiosk and the gate PIN landing on the driver's phone. */
 export const SMS_DELAY = 2;
+/** The booking reference printed on the delivery note: fixed prefix, six-character body. */
+export const BOOKING = "PP-K4M7Q2";
+/** A fresh four-digit gate PIN for every session; leading zeros are kept. */
+export const randomPin = () =>
+  String(Math.floor(Math.random() * 10000)).padStart(4, "0");
 export const idleInput = (): Input => ({
   throttle: 0,
   steer: 0,
@@ -117,8 +122,8 @@ export function createState(): State {
     gateOpen: false,
     registered: false,
     smsAt: 0,
-    pin: "2048",
-    booking: "PP-2048",
+    pin: randomPin(),
+    booking: BOOKING,
     elapsed: 0,
     distance: 0,
     contacts: 0,
@@ -375,7 +380,7 @@ export function interact(s: State): boolean {
   else if (s.phase === "walk-truck") {
     s.phase = "gate";
     s.checkpoint = { ...s.truck };
-    note(s, "Gate PIN 2048 · Dock 03", "entered-truck");
+    note(s, `Gate PIN ${s.pin} · Dock 03`, "entered-truck");
   } else if (s.phase === "gate") s.phase = "pin";
   return true;
 }
@@ -385,7 +390,7 @@ export function register(s: State, booking: string): boolean {
     return false;
   }
   if (booking.trim().toUpperCase() !== s.booking) {
-    note(s, "Use booking reference PP-2048 from your delivery note.");
+    note(s, `Use booking reference ${s.booking} from your delivery note.`);
     return false;
   }
   s.registered = true;
@@ -410,7 +415,7 @@ export function enterPin(s: State, pin: string): boolean {
     return false;
   }
   if (pin !== s.pin) {
-    note(s, "That PIN doesn’t match. Your message says 2048.");
+    note(s, `That PIN doesn’t match. Your message says ${s.pin}.`);
     return false;
   }
   s.gateOpen = true;
