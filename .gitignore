@@ -1,2 +1,7 @@
-.vercel
+node_modules/
+dist/
+.vercel/
+.yard-sessions/
+artifacts/
+*.blend1
 .DS_Store
