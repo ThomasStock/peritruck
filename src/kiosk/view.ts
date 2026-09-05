@@ -80,6 +80,8 @@ export function mountKiosk(
     paperOpen = open;
     stage.dataset.paper = open ? "open" : "closed";
     paperWrap.classList.toggle("is-open", open);
+    // The closed drawer nudges in and out until the driver has found it once.
+    if (open) paperWrap.classList.remove("is-nudging");
     for (const b of paperToggles) b.setAttribute("aria-expanded", String(open));
     paperTab.innerHTML = `${open ? icons.chevronRight : icons.chevronLeft}<span>Delivery note</span>`;
   };
@@ -90,6 +92,7 @@ export function mountKiosk(
     if (mode === "physical") setPaper(false);
   };
   applyMode();
+  paperWrap.classList.add("is-nudging");
   setPaper(false);
   window.addEventListener("resize", applyMode);
   // Swipe: the drawer follows the finger and settles by distance or flick speed.
@@ -115,6 +118,7 @@ export function mountKiosk(
       moved: false,
       tap: !!(e.target as Element).closest("[data-paper-toggle]"),
     };
+    paperWrap.classList.remove("is-nudging");
     paperWrap.classList.add("is-dragging");
   };
   const onDragMove = (e: PointerEvent) => {

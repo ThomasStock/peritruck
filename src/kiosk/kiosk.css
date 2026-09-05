@@ -1147,6 +1147,23 @@
 }
 .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap.is-dragging {
   transition: none;
+  animation: none;
+}
+/* Until the note has been opened once, the closed drawer slips a finger's width
+   into view every few seconds so the tab reads as something to pull. */
+.kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap.is-nudging:not(.is-open) {
+  animation: kiosk-paper-nudge 5s cubic-bezier(0.4, 0, 0.2, 1) 0.8s infinite;
+}
+@keyframes kiosk-paper-nudge {
+  0%,
+  22%,
+  100% {
+    transform: translateX(100%);
+  }
+  6%,
+  16% {
+    transform: translateX(calc(100% - 28px));
+  }
 }
 .kiosk-stage[data-mode="mdp"]:not([data-step="reference"]) .kiosk-paper-wrap,
 .kiosk-stage[data-mode="mdp"][data-overlay] .kiosk-paper-wrap {
@@ -1218,10 +1235,10 @@
   flex: none;
   height: 28px;
   padding: 0 8px 0 11px;
-  border: 0;
+  border: 1px solid #d9d2c3;
   border-radius: 14px;
-  background: #163e38;
-  color: #e5f6d6;
+  background: #f4f0e7;
+  color: #4a4a4a;
   font:
     700 11px "Open Sans",
     system-ui,
@@ -1232,6 +1249,12 @@
 .kiosk-stage[data-mode="mdp"] .kiosk-paper__toggle svg {
   width: 15px;
   height: 15px;
+}
+/* The drawer is taller than its content: keep the stamp with the footer, not the screen edge. */
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__stamp {
+  position: static;
+  float: right;
+  margin: -26px 6px 0 0;
 }
 /* Landscape phones have room to keep the whole screen visible beside the open note. */
 @media (min-width: 720px) {
@@ -1338,5 +1361,6 @@
 @media (prefers-reduced-motion: reduce) {
   .kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap {
     transition: none;
+    animation: none;
   }
 }
