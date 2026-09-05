@@ -11,6 +11,7 @@ import {
   DT,
   objective,
   prompt,
+  slowDown,
   interact,
   walking,
   distance,
@@ -618,17 +619,6 @@ function updateUI() {
     !action || !started || settingsOpen,
   );
   $("action-text").textContent = action;
-  const screen = scene.project(o.target);
-  $("target-label").classList.toggle(
-    "hidden",
-    !started ||
-      !screen.visible ||
-      !!action ||
-      state.phase === "complete" ||
-      settingsOpen,
-  );
-  $("target-label").style.transform =
-    `translate(${screen.x}px,${screen.y}px) translate(-50%,-115%)`;
   $("target-symbol").textContent = ["P", "↟", "↗", "03", "✓"][o.step];
   $("target-name").textContent =
     state.phase === "walk-truck"
@@ -640,8 +630,11 @@ function updateUI() {
           "DOCK 03",
           "DELIVERED",
         ][o.step];
-  $("target-distance").textContent =
-    `${Math.round(distance(isWalking ? state.driver : state.truck, o.target))} m away`;
+  const slow = slowDown(state);
+  $("target-label").classList.toggle("slow", slow);
+  $("target-distance").textContent = slow
+    ? "Slow down"
+    : `${Math.round(distance(isWalking ? state.driver : state.truck, o.target))} m away`;
   $("toast").textContent = state.message;
   $("toast").classList.toggle(
     "hidden",
@@ -697,6 +690,25 @@ function updateUI() {
   drawMap();
   syncDialog();
 }
+// Runs every rendered frame, not on the throttled UI tick, so the label tracks
+// the camera as smoothly as the 3D marker. Positions snap to device pixels:
+// fractional offsets re-rasterise the text each frame and make it shimmer.
+function placeTargetLabel() {
+  const label = $("target-label"),
+    screen = scene.project(objective(state).target),
+    dpr = devicePixelRatio || 1,
+    x = Math.round(screen.x * dpr) / dpr,
+    y = Math.round(screen.y * dpr) / dpr;
+  label.classList.toggle(
+    "hidden",
+    !started ||
+      !screen.visible ||
+      !!prompt(state) ||
+      state.phase === "complete" ||
+      settingsOpen,
+  );
+  label.style.transform = `translate(${x}px,${y}px) translate(-50%,-115%)`;
+}
 function frame(now: number) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
@@ -729,6 +741,7 @@ function frame(now: number) {
     }
   } else accumulator = 0;
   scene.render(state, input, dt, started);
+  placeTargetLabel();
   if (audio && engine && engineGain) {
     engine.frequency.setTargetAtTime(
       38 + Math.abs(state.truck.speed) * 10,

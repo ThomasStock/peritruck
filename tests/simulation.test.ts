@@ -20,6 +20,7 @@ import {
   rear,
   distance,
   skipToGate,
+  slowDown,
   YARD,
   type State,
 } from "../src/game/simulation";
@@ -140,6 +141,38 @@ test("dock success requires rear-first alignment, lateral position and stationar
   assert.equal(docking(wrong).ready, false);
   wrong.truck = { ...s.truck, speed: -0.7 };
   assert.equal(docking(wrong).ready, false);
+});
+
+test("slow-down warning appears within 4 m of each driving target until the step can complete", () => {
+  const s = createState();
+  // Holding bay: target is 2 m ahead.
+  s.truck.z = 41;
+  s.truck.speed = 1;
+  assert.ok(slowDown(s));
+  s.truck.speed = 0.1;
+  assert.equal(slowDown(s), false);
+  s.truck.speed = 1;
+  s.truck.z = 50;
+  assert.equal(slowDown(s), false);
+  // Gate: prompt accepts anything under 0.3 m/s.
+  s.phase = "gate";
+  s.truck = { ...s.truck, x: YARD.gate.x, z: YARD.gate.z + 3, speed: 0.5 };
+  assert.ok(slowDown(s));
+  s.truck.speed = 0.25;
+  assert.equal(slowDown(s), false);
+  s.truck = { ...s.truck, z: YARD.gate.z + 4.5, speed: 0.5 };
+  assert.equal(slowDown(s), false);
+  // Dock: reversing at 2.5 m from the target.
+  s.phase = "dock";
+  s.truck = { ...s.truck, x: 0, z: -30, speed: -0.5 };
+  assert.ok(slowDown(s));
+  s.truck.speed = -0.1;
+  assert.equal(slowDown(s), false);
+  // Walking has no speed to shed.
+  s.phase = "walk-kiosk";
+  s.driver = { x: YARD.kiosk.x, z: YARD.kiosk.z + 3 };
+  s.truck.speed = 2;
+  assert.equal(slowDown(s), false);
 });
 
 test("gate blocks cab and trailer, including when cab has crossed it", () => {
