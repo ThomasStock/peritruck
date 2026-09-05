@@ -49,6 +49,7 @@ test("complete delivery through real controls: park, walk, register, PIN, revers
 test("deterministic controls produce identical outcomes and replay split durations", () => {
   const a = createState(),
     b = createState();
+  b.pin = a.pin; // the PIN is the only random part of a fresh session
   const i = { ...idleInput(), throttle: 1, steer: 0.17 };
   advance(a, i, 3);
   advance(b, i, 1);
@@ -247,17 +248,18 @@ test("rotated rectangle collision detects crossing edges even when no centre is 
 test("kiosk and gate cannot be skipped, wrong booking/PIN preserve progress", () => {
   const s = createState();
   assert.equal(interact(s), false);
-  assert.equal(register(s, "PP-2048"), false);
-  assert.equal(enterPin(s, "2048"), false);
+  assert.equal(register(s, s.booking), false);
+  assert.equal(enterPin(s, s.pin), false);
   s.phase = "kiosk";
   assert.equal(register(s, "WRONG"), false);
   assert.equal(s.registered, false);
-  assert.ok(register(s, "pp-2048"));
+  assert.ok(register(s, s.booking.toLowerCase()));
   assert.equal(s.phase, "walk-truck");
   s.phase = "pin";
-  assert.equal(enterPin(s, "0000"), false);
+  const wrongPin = s.pin === "0000" ? "1111" : "0000";
+  assert.equal(enterPin(s, wrongPin), false);
   assert.equal(s.gateOpen, false);
-  assert.ok(enterPin(s, "2048"));
+  assert.ok(enterPin(s, s.pin));
   assert.equal(s.phase, "dock");
 });
 
@@ -265,7 +267,7 @@ test("the gate PIN lands on the driver's phone shortly after leaving the kiosk",
   const s = createState();
   assert.equal(smsReceived(s), false);
   s.phase = "kiosk";
-  assert.ok(register(s, "PP-2048"));
+  assert.ok(register(s, s.booking));
   assert.equal(s.registered, true);
   assert.equal(smsReceived(s), false);
   assert.equal(s.message, "");
@@ -360,4 +362,13 @@ test("skipping from the road or on foot snaps to the gate line first", () => {
   assert.ok(skipAhead(s));
   assert.equal(s.phase, "dock");
   assert.ok(s.truck.z < YARD.gateZ);
+});
+
+test("every session draws a fresh four-digit PIN and keeps the six-character booking", () => {
+  const pins = new Set(Array.from({ length: 50 }, () => createState().pin));
+  for (const pin of pins) assert.match(pin, /^\d{4}$/);
+  assert.ok(pins.size > 1);
+  const s = createState();
+  assert.equal(s.booking, "PP-K4M7Q2");
+  assert.equal(s.booking.slice(s.booking.indexOf("-") + 1).length, 6);
 });
