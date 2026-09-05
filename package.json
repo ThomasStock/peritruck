@@ -1,0 +1,28 @@
+{
+  "name": "peritruck",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "tsx --test tests/*.test.ts",
+    "truck": "tsx scripts/truck.ts",
+    "models": "blender --background --python scripts/build_models.py",
+    "format": "prettier --write src tests scripts/truck.ts vite.config.ts README.md docs/*.md",
+    "format:check": "prettier --check src tests scripts/truck.ts vite.config.ts README.md docs/*.md"
+  },
+  "dependencies": {
+    "@fontsource/montserrat": "^5.2.6",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "@types/three": "^0.180.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.20.5",
+    "typescript": "~5.9.2",
+    "vite": "^7.1.4"
+  }
+}
