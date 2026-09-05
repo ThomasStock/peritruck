@@ -9,6 +9,7 @@ import "@fontsource/open-sans/700.css";
 import "@fontsource/open-sans/800.css";
 import "./style.css";
 import "./kiosk/kiosk.css";
+import "./sms.css";
 import { YardScene } from "./scene";
 import {
   createState,
@@ -27,7 +28,8 @@ import {
   register,
   enterPin,
   recover,
-  skipToGate,
+  skipAhead,
+  smsReceived,
   note,
   snapshot,
   rigRects,
@@ -38,6 +40,7 @@ import {
 } from "./game/simulation";
 import { execute } from "./game/commands";
 import { mountKiosk, type KioskController } from "./kiosk/view";
+import { clock, phoneHtml, smsBannerHtml } from "./sms";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `
 <div id="world"></div>
@@ -48,6 +51,7 @@ app.innerHTML = `
 <div id="target-label" class="target-label hidden"><span id="target-symbol" class="target-number">P</span><div><b id="target-name">HOLDING BAY P02</b><small id="target-distance"></small></div></div>
 <div id="action-wrap" class="action-wrap hidden"><button id="interact" class="action"><kbd id="interact-key">E</kbd><span id="action-text"></span><span>↗</span></button></div>
 <div id="toast" role="status" aria-live="polite" class="toast hidden"></div>
+<div id="sms-banner" role="status" aria-live="polite" class="sms-banner hidden" title="Dismiss"></div>
 <button id="cli-resume" class="cli-resume hidden">CLI control · Resume ↗</button>
 <footer class="bottom-bar"><div class="controls-hint" id="controls-hint"></div></footer>
 <div id="dock-guide" class="dock-guide panel hidden"><div class="eyebrow">03 · DOCKING GUIDE</div><strong id="dock-coach">Trailer first.</strong><div class="dock-measure"><span>Side offset</span><b id="dock-offset"></b></div><div class="dock-meter"><i id="dock-needle"></i><span></span></div><div class="dock-measure"><span>Trailer angle</span><b id="dock-angle"></b></div><div class="dock-measure"><span>To bumper</span><b id="dock-gap"></b></div><p id="dock-tip"></p></div>
@@ -450,16 +454,14 @@ function syncDialog() {
       booking: state.booking,
       onQuit: closeDialog,
       onComplete: (reference) => {
-        if (register(state, reference)) {
-          beep();
-          syncDialog();
-        }
+        if (register(state, reference)) syncDialog();
       },
     });
   } else if (kind === "pin") {
+    // The driver reads the SMS on their phone and types the PIN into the gate terminal.
     modal(
       "Automated gate access",
-      `<p class="dialog-description">Enter the gate PIN from your check-in message.</p><div class="message-ticket"><span>YOUR PERIPASS MESSAGE</span><b>Gate PIN <strong>2 0 4 8</strong></b><small>Proceed to dock 03 after entry.</small></div><form id="pin-form"><label class="field">Gate PIN<input id="pin-input" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="Four digit gate PIN" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? "Delete digit" : k}">${k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">Open the gate <span>↗</span></button></form>`,
+      `<p class="dialog-description">Read the PIN in the SMS on your phone and enter it at the gate terminal.</p><div class="gate-layout"><div class="phone-peek">${phoneHtml(state.booking, state.pin, smsClock || clock())}</div><form id="pin-form" class="gate-terminal"><div class="eyebrow"><span class="live-dot"></span> GATE TERMINAL</div><label class="field">Gate PIN<input id="pin-input" inputmode="none" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="Four digit gate PIN" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? "Delete digit" : k}">${k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">Open the gate <span>↗</span></button></form></div>`,
       "pin-dialog",
     );
     for (const b of document.querySelectorAll<HTMLButtonElement>("[data-pin]"))
@@ -571,6 +573,56 @@ function drawMap() {
 let uiTick = 0,
   lastGamepadAction = false,
   skipHeldSince = 0;
+// The SMS lands SMS_DELAY seconds of simulation time after check-in. The banner
+// is presentation only: what the phone shows comes from the simulation state.
+let smsSeen = false,
+  smsClock = "",
+  smsBannerUntil = 0,
+  smsBannerTimer: ReturnType<typeof setTimeout> | undefined;
+function showSmsBanner() {
+  const banner = $("sms-banner");
+  clearTimeout(smsBannerTimer);
+  banner.innerHTML = smsBannerHtml(state.booking, state.pin);
+  banner.classList.remove("hidden");
+  void banner.offsetWidth; // commit display before the slide-in transition
+  banner.classList.add("is-in");
+  smsBannerUntil = state.elapsed + 9;
+  beep(880);
+  setTimeout(() => beep(1175), 130);
+  try {
+    navigator.vibrate?.([90, 60, 90]);
+  } catch {
+    /* no haptics */
+  }
+}
+function hideSmsBanner() {
+  const banner = $("sms-banner");
+  if (banner.classList.contains("hidden")) return;
+  banner.classList.remove("is-in");
+  clearTimeout(smsBannerTimer);
+  smsBannerTimer = setTimeout(() => banner.classList.add("hidden"), 600);
+}
+$("sms-banner").onclick = hideSmsBanner;
+function syncSms() {
+  const received = smsReceived(state);
+  if (!state.registered && smsSeen) {
+    // Restart or reset: the next check-in gets a fresh message.
+    smsSeen = false;
+    smsClock = "";
+    smsBannerUntil = 0;
+    hideSmsBanner();
+  }
+  if (received && !smsSeen) {
+    smsSeen = true;
+    smsClock = clock();
+    // Only a message received on foot or in the cab drops in; a skip straight to the dock is silent.
+    if (["walk-truck", "gate"].includes(state.phase)) showSmsBanner();
+  }
+  if (smsBannerUntil && state.elapsed > smsBannerUntil) {
+    smsBannerUntil = 0;
+    hideSmsBanner();
+  }
+}
 function updateUI() {
   const o = objective(state),
     p = parking(state),
@@ -631,13 +683,13 @@ function updateUI() {
     state.elapsed > state.messageUntil || !state.message || settingsOpen,
   );
   $("cli-resume").classList.toggle("hidden", !cliPaused);
-  $("note-label").textContent = state.registered
-    ? "CHECK-IN MESSAGE"
-    : "YOUR DELIVERY";
-  $("delivery-reference").textContent = state.registered
-    ? "PIN 2048 → Dock 03"
-    : "PP-2048 → Ghent";
-  $("note-detail").textContent = state.registered
+  syncSms();
+  const sms = smsReceived(state);
+  $("note-label").textContent = sms ? "SMS FROM PERIPASS" : "YOUR DELIVERY";
+  $("delivery-reference").textContent = sms
+    ? `PIN ${state.pin} → Dock 03`
+    : `${state.booking} → Ghent`;
+  $("note-detail").textContent = sms
     ? "Gate access code"
     : "Registration reference";
   $("stage-hint").textContent =
@@ -711,7 +763,8 @@ function frame(now: number) {
     syncDialog();
   }
   lastGamepadAction = pressed;
-  // Holding X for a second jumps to the open gate. Playtest aid, deliberately unlisted.
+  // Holding X for a second jumps to the next place to act: kiosk, gate line, dock.
+  // Playtest aid, deliberately unlisted.
   const holdingSkip =
     started &&
     !paused &&
@@ -721,7 +774,7 @@ function frame(now: number) {
   else if (!skipHeldSince) skipHeldSince = now;
   else if (now - skipHeldSince >= 1000) {
     skipHeldSince = Infinity;
-    skipToGate(state);
+    skipAhead(state);
   }
   if (started && !paused) {
     accumulator += dt;

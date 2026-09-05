@@ -878,35 +878,6 @@ kbd {
   width: 100%;
   font-size: 14px;
 }
-.booking-card,
-.message-ticket {
-  padding: 16px;
-  background: #e7efdf;
-  border: 1px solid #d6e2cb;
-  border-radius: 8px;
-  margin: 0 0 17px;
-}
-.booking-card > span,
-.message-ticket > span {
-  font-size: 8px;
-  letter-spacing: 1.2px;
-  color: #708367;
-  display: block;
-  margin-bottom: 8px;
-}
-.booking-card b,
-.message-ticket b {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-}
-.booking-card small,
-.message-ticket small {
-  display: block;
-  font-size: 10px;
-  color: #7b8d73;
-  margin-top: 8px;
-}
 .privacy-note {
   font-size: 9px;
   text-align: center;
@@ -945,12 +916,6 @@ kbd {
   font-size: 25px;
   font-weight: 500;
   padding: 11px;
-}
-.message-ticket strong {
-  margin-left: 26px;
-  font-size: 21px;
-  color: #007e68;
-  font-weight: 600;
 }
 .settings-dialog {
   width: min(520px, 100%);
