@@ -4,12 +4,15 @@ import { readFile } from "node:fs/promises";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createYardCamera, mergeByMaterial } from "../src/scene";
+import { RigWheels, WHEEL_RADIUS } from "../src/wheels";
 import {
+  DT,
   angle,
   blendPoint,
   blendTruck,
   createState,
   idleInput,
+  integrate,
   lerpAngle,
   predict,
   staticRigs,
@@ -242,7 +245,10 @@ test("parked rigs merge into one mesh per material with geometry and materials i
         : new THREE.Box3().setFromObject(o),
     );
   const merged = mergeByMaterial(parked);
-  assert.equal(originals.length, 3 * (29 + 8));
+  // Per rig: the cab's 10 joined material groups plus 3 meshes for each of its
+  // 6 wheels, and the trailer's 7 groups plus 18. Wheels hang from their own
+  // pivots so they can roll, which keeps them out of the by-material joins.
+  assert.equal(originals.length, 3 * (28 + 25));
   assert.equal(merged.length, materials.size);
   assert.deepEqual(new Set(merged.map((m) => m.material)), materials);
   assert.equal(
@@ -279,6 +285,146 @@ test("parked rigs merge into one mesh per material with geometry and materials i
     });
     assert.ok(inside, `rig at ${t.x},${t.z}`);
   }
+});
+
+const wheelPivots = (root: THREE.Object3D) => {
+  const found: THREE.Object3D[] = [];
+  root.traverse((o) => {
+    if (o.name.startsWith("wheel-")) found.push(o);
+  });
+  return found;
+};
+/** Wheel rotations, unwrapped, so a test can accumulate past a half turn. */
+function spun(before: number[], after: THREE.Object3D[]) {
+  return after.map((w, i) => angle(w.rotation.x - before[i]));
+}
+const pose = (t: Partial<Truck>): Truck => ({
+  x: 0,
+  z: 0,
+  heading: 0,
+  trailerHeading: 0,
+  speed: 0,
+  steer: 0,
+  ...t,
+});
+
+test("every wheel rolls the ground it covers, with a turn's inside wheels slower", async () => {
+  const [tractor, trailer] = await Promise.all([
+    loadModel("tractor"),
+    loadModel("trailer"),
+  ]);
+  const cab = tractor.scene,
+    box = trailer.scene;
+  const cabWheels = wheelPivots(cab),
+    boxWheels = wheelPivots(box);
+  assert.equal(cabWheels.length, 6);
+  assert.equal(boxWheels.length, 6);
+  // The steered pair hangs inside the empties the renderer yaws.
+  assert.equal(
+    cabWheels.filter((w) => w.parent?.name.startsWith("steering")).length,
+    2,
+  );
+  const wheels = new RigWheels();
+  wheels.bind(cab, box);
+  const all = [...cabWheels, ...boxWheels];
+  const read = () => all.map((w) => w.rotation.x);
+  // The first pose seen is a placement, not travel: nothing rolls.
+  let mark = read();
+  wheels.update(pose({ z: 40 }));
+  assert.deepEqual(
+    spun(mark, all),
+    all.map(() => 0),
+  );
+  // Straight ahead: one turn of the wheel per 2*pi*r metres, every wheel alike.
+  mark = read();
+  wheels.update(pose({ z: 41 }));
+  for (const d of spun(mark, all))
+    assert.ok(Math.abs(d - 1 / WHEEL_RADIUS) < 1e-9, String(d));
+  // Reversing runs them backwards.
+  mark = read();
+  wheels.update(pose({ z: 40.5 }));
+  for (const d of spun(mark, all))
+    assert.ok(Math.abs(d + 0.5 / WHEEL_RADIUS) < 1e-9, String(d));
+  // A right turn: the right-hand wheels are on the inside and cover less.
+  mark = read();
+  wheels.update(pose({ z: 41.5, heading: 0.1, trailerHeading: 0.1 }));
+  const turn = spun(mark, all);
+  const side = (sign: number) =>
+    turn.filter(
+      (_, i) =>
+        Math.sign(all[i].getWorldPosition(new THREE.Vector3()).x) === sign,
+    );
+  const [left, right] = [side(-1), side(1)];
+  assert.equal(left.length, 6);
+  assert.equal(right.length, 6);
+  // Both sides agree within themselves, and the inside of the turn rolls less.
+  for (const rolled of [left, right])
+    for (const d of rolled)
+      assert.ok(Math.abs(d - rolled[0]) < 1e-9, String(d));
+  assert.ok(right[0] < left[0], `${right[0]} < ${left[0]}`);
+  // The centre line still rolls the distance the rig actually covered.
+  const centre = Math.cos(0.1) / WHEEL_RADIUS;
+  assert.ok(Math.abs((left[0] + right[0]) / 2 - centre) < 1e-9);
+  // A steered wheel travels further than the drive axle it is measured from.
+  mark = read();
+  wheels.update(
+    pose({ z: 42.5, heading: 0.1, trailerHeading: 0.1, steer: 0.4 }),
+  );
+  const steered = spun(mark, all);
+  const front = cabWheels.findIndex((w) =>
+    w.parent?.name.startsWith("steering"),
+  );
+  assert.ok(steered[front] > steered[all.indexOf(boxWheels[0])]);
+  // A teleport (recover, restart) is skipped rather than spun through.
+  mark = read();
+  wheels.update(pose({ z: 60, heading: 0.1, trailerHeading: 0.1 }));
+  assert.deepEqual(
+    spun(mark, all),
+    all.map(() => 0),
+  );
+  // Reduced motion holds the wheels still, as it does the driver's gait.
+  mark = read();
+  wheels.update(pose({ z: 61, heading: 0.1, trailerHeading: 0.1 }), true);
+  assert.deepEqual(
+    spun(mark, all),
+    all.map(() => 0),
+  );
+  // Standing still never creeps.
+  mark = read();
+  for (let i = 0; i < 5; i++)
+    wheels.update(pose({ z: 61, heading: 0.1, trailerHeading: 0.1 }));
+  assert.deepEqual(
+    spun(mark, all),
+    all.map(() => 0),
+  );
+});
+
+test("rolled distance matches the distance the simulation drives", async () => {
+  const { scene: cab } = await loadModel("tractor");
+  const { scene: box } = await loadModel("trailer");
+  const wheels = new RigWheels();
+  wheels.bind(cab, box);
+  const drive = wheelPivots(cab).find(
+    (w) => !w.parent?.name.startsWith("steering"),
+  )!;
+  const truck = pose({ z: 40 });
+  const input = { ...idleInput(), throttle: 1 };
+  wheels.update({ ...truck });
+  let travelled = 0,
+    rolled = 0;
+  for (let i = 0; i < 240; i++) {
+    const from = { ...truck };
+    integrate(truck, input, false, DT);
+    travelled += Math.hypot(truck.x - from.x, truck.z - from.z);
+    const before = drive.rotation.x;
+    wheels.update({ ...truck });
+    rolled += angle(drive.rotation.x - before);
+  }
+  assert.ok(travelled > 5, `drove ${travelled} m`);
+  assert.ok(
+    Math.abs(rolled * WHEEL_RADIUS - travelled) < 1e-9,
+    `${rolled * WHEEL_RADIUS} vs ${travelled}`,
+  );
 });
 
 function assertPrediction(path: PredictionPath, state: State, input: Input) {

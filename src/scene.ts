@@ -14,6 +14,7 @@ import {
   YARD,
 } from "./game/simulation";
 import { DriverRig } from "./rig";
+import { RigWheels } from "./wheels";
 import { PredictionPath } from "./prediction";
 import { RouteDots } from "./route";
 export type CameraMode = "follow" | "yard" | "overhead";
@@ -95,6 +96,7 @@ export class YardScene {
   private rig = new DriverRig(this.driver);
   private operatorRig = new DriverRig(this.operator);
   private steering: THREE.Object3D[] = [];
+  private wheels = new RigWheels();
   private parkingHighlight: THREE.Mesh;
   private dockHighlight: THREE.Mesh;
   /** Number panel and signal lamp per dock; the assigned dock lights up teal and green. */
@@ -293,6 +295,7 @@ export class YardScene {
       const wheel = this.tractor.getObjectByName(name);
       return wheel ? [wheel] : [];
     });
+    this.wheels.bind(this.tractor, this.trailer);
     this.scene.traverse((o) => {
       if (o instanceof THREE.Mesh) {
         o.castShadow = true;
@@ -356,6 +359,7 @@ export class YardScene {
     for (const wheel of this.steering) wheel.rotation.y = s.truck.steer;
     this.trailer.position.copy(this.tractor.position);
     this.trailer.rotation.y = s.truck.trailerHeading;
+    this.wheels.update(s.truck, this.reducedMotion);
     this.rig.update(s, input, dt, this.reducedMotion);
     this.operatorRig.stand(
       YARD.operator.x,

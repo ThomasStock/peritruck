@@ -62,30 +62,47 @@ def text(label,p,size,mat,rotate=(math.pi/2,0,0)):
     o.data.body=label;o.data.align_x='CENTER';o.data.size=size;o.data.extrude=.004;o.rotation_euler=rotate
     o.data.materials.append(M[mat]);bpy.ops.object.convert(target='MESH');return bpy.context.object
 
+def pivot(name,p,children):
+    """Named empty the runtime can rotate; children keep their world placement."""
+    bpy.ops.object.empty_add(location=pos(*p));root=bpy.context.object;root.name=name
+    for child in children:
+        matrix=child.matrix_world.copy();child.parent=root;child.matrix_world=matrix
+    return root
+
+def join_by_material(objects):
+    """Join meshes sharing a material into one; returns the surviving objects."""
+    # Grouped before any join: joining removes objects from the scene.
+    groups={}
+    for o in objects:
+        if o.type=='MESH' and o.data.materials:groups.setdefault(o.data.materials[0].name,[]).append(o)
+    joined=[]
+    for mat in M.values():
+        group=groups.get(mat.name,[])
+        if len(group)>1:
+            bpy.ops.object.select_all(action='DESELECT')
+            for o in group:o.select_set(True)
+            bpy.context.view_layer.objects.active=group[0];bpy.ops.object.join()
+        joined+=group[:1]
+    return joined
+
+# Every wheel hangs from a `wheel-*` empty at its hub so the runtime can roll it
+# about the axle (local X). Tyre, hub and cap+bolts join into three meshes per
+# wheel. Front wheels sit inside a `steering-*` empty that yaws with the steer.
 def wheel(x,z,front=False):
     before=set(bpy.context.scene.objects)
-    tire=cyl('Front wheel' if front else 'Tire',(x,.58,z),.58,.38,'rubber','x',24)
+    cyl('Front wheel' if front else 'Tire',(x,.58,z),.58,.38,'rubber','x',24)
     cyl('Alloy hub',(x+math.copysign(.2,x),.58,z),.32,.05,'metal','x',16)
     cyl('Hub cap',(x+math.copysign(.235,x),.58,z),.12,.06,'dark','x',12)
     for a in range(6):
         t=a*math.tau/6
         cyl('Wheel bolt',(x+math.copysign(.235,x),.58+math.sin(t)*.22,z+math.cos(t)*.22),.032,.02,'dark','x',6)
-
-    if front:
-        children=set(bpy.context.scene.objects)-before
-        bpy.ops.object.empty_add(location=pos(x,.58,z))
-        root=bpy.context.object;root.name='steering-left' if x<0 else 'steering-right'
-        for child in children:
-            matrix=child.matrix_world.copy();child.parent=root;child.matrix_world=matrix
+    side='left' if x<0 else 'right'
+    hub=pivot('wheel-'+side,(x,.58,z),join_by_material(set(bpy.context.scene.objects)-before))
+    if front:pivot('steering-'+side,(x,.58,z),[hub])
 
 def export(name):
     # Join by material: small draw-call budget, full bevel geometry retained.
-    for mat in M.values():
-        objects=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.parent is None and o.data.materials and o.data.materials[0]==mat]
-        if not objects:continue
-        bpy.ops.object.select_all(action='DESELECT')
-        for o in objects:o.select_set(True)
-        bpy.context.view_layer.objects.active=objects[0];bpy.ops.object.join()
+    join_by_material([o for o in bpy.context.scene.objects if o.parent is None])
     bpy.ops.export_scene.gltf(filepath=os.path.join(OUT,name+'.glb'),export_format='GLB',export_yup=True,export_materials='EXPORT')
     bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 
@@ -259,11 +276,6 @@ for x,z in [(-30,60),(-18,60),(26,19),(10,19),(40,-38)]:
 export('yard')
 # Driver: hi-vis figure for walking stage. Limbs hang from named empties (hip,
 # shoulder, neck) so the runtime can swing them; the meshes stay unjoined.
-def pivot(name,p,children):
-    bpy.ops.object.empty_add(location=pos(*p));root=bpy.context.object;root.name=name
-    for child in children:
-        matrix=child.matrix_world.copy();child.parent=root;child.matrix_world=matrix
-    return root
 for side,x in [('left',-.16),('right',.16)]:
     pivot('leg-'+side,(x,.92,0),[box('Boot',(x*1.06,.12,.06),(.25,.23,.42),'dark',.065),box('Trouser leg',(x,.55,0),(.25,.74,.28),'dark',.07)])
 arms=[pivot('arm-'+side,(x,1.29,0),[box('Arm',(x,1.03,0),(.18,.58,.23),'teal',.055)]) for side,x in [('left',-.39),('right',.39)]]
