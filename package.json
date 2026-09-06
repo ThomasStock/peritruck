@@ -19,8 +19,10 @@
     "three": "^0.180.0"
   },
   "devDependencies": {
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^22.18.0",
     "@types/three": "^0.180.0",
+    "jsdom": "^27.0.1",
     "prettier": "^3.9.6",
     "tsx": "^4.20.5",
     "typescript": "~5.9.2",
