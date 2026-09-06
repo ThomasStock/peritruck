@@ -26,6 +26,7 @@ import {
   distance,
   parking,
   docking,
+  DOCK_TOLERANCE,
   angle,
   register,
   enterPin,
@@ -1047,9 +1048,9 @@ function updateUI() {
       ? "Turn the cab away."
       : d.ready
         ? "Hold position."
-        : d.lateral > 0.85
+        : d.lateral >= DOCK_TOLERANCE.lateral
           ? "Line up your trailer."
-          : d.angleDegrees > 6
+          : d.headingError >= DOCK_TOLERANCE.heading
             ? "Straighten the trailer."
             : d.gap < 2
               ? "Brake at the bumper."
