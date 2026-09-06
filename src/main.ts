@@ -56,10 +56,10 @@ import { mountDispatch, type DispatchController } from "./dispatch/view";
 import { clock, phoneHtml, smsBannerHtml } from "./sms";
 import { flags } from "./kiosk/icons";
 import {
+  DEFAULT_LANGUAGE,
   LANGUAGES,
   isLang,
   language,
-  resolveLanguage,
   setLanguage,
   t,
   type Lang,
@@ -101,8 +101,9 @@ const shared = leaderboard.shared;
 /** Copy that differs between the shared (Convex) and the local board. */
 const board = (global: StringKey, local: StringKey) =>
   t(shared ? global : local);
-// The game speaks the language the player picked last time, else the first
-// browser language the kiosk also offers. The kiosk keeps its own language step.
+// The game opens in English and stays there until the player picks another
+// language; the choice is remembered. Browser language is deliberately not
+// consulted. The kiosk keeps its own language step.
 const LANGUAGE_KEY = "yard-language";
 function savedLanguage(): Lang | undefined {
   try {
@@ -112,10 +113,7 @@ function savedLanguage(): Lang | undefined {
     return undefined;
   }
 }
-setLanguage(
-  savedLanguage() ??
-    resolveLanguage(navigator.languages ?? [navigator.language]),
-);
+setLanguage(savedLanguage() ?? DEFAULT_LANGUAGE);
 document.documentElement.lang = language();
 let langMenuOpen = false;
 let leaderboardOpen = false;
@@ -152,8 +150,8 @@ document.addEventListener(
 app.innerHTML = `
 <div id="world"></div>
 <header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><div class="lang-control"><button id="language" class="lang-button" aria-haspopup="listbox" aria-expanded="false"></button><div id="language-menu" class="lang-menu" role="listbox" hidden></div></div><button id="leaderboard-button" class="leaderboard-button">♛ <span data-t="topbar.leaderboard"></span></button><button id="feedback" class="feedback-button" data-t="topbar.feedback" data-t-title="topbar.feedbackTitle"></button><button id="camera" class="icon-button">◩</button><button id="help" class="icon-button" data-t-aria="topbar.helpAria" data-t-title="topbar.helpTitle">?</button></div></header>
-<section id="intro" class="intro panel"><div id="intro-languages" class="intro-languages" role="radiogroup"></div><div class="race-kicker" data-t="intro.kicker"></div><h1 data-t-html="intro.title"></h1><p data-t="intro.tagline"></p><div class="intro-stages">${STAGES.map((stage, i) => `<span><b>0${i + 1}</b><span data-t="stage.${stage.key}.short"></span></span>`).join("")}</div><button id="start" class="primary" disabled></button><small class="race-intro-note" data-t="intro.note"></small><div id="intro-best" class="intro-best"></div></section>
-<section id="race-hud" class="race-hud hidden" data-t-aria="race.progressAria"><div class="race-clock-row"><div><span class="race-kicker" id="race-status"></span><strong id="race-clock" role="timer" data-t-aria="race.elapsedAria">00:00.00</strong></div><div class="race-best"><span id="race-best-label"></span><b id="race-best">—</b></div></div><ol class="race-stages">${STAGES.map((stage, i) => `<li id="race-stage-${i}"><span class="stage-number">${i + 1}</span><span data-t="stage.${stage.key}.short"></span><b id="race-split-${i}">—</b></li>`).join("")}</ol></section>
+<section id="intro" class="intro panel"><div id="intro-languages" class="intro-languages" role="radiogroup"></div><div class="race-kicker" data-t="intro.kicker"></div><h1 data-t-html="intro.title"></h1><p data-t="intro.tagline"></p><div class="intro-stages">${STAGES.map((stage, i) => `<span><b>0${i + 1}</b><span data-t="stage.${stage.key}.short"></span></span>`).join("")}</div><button id="start" class="primary" disabled></button><small class="race-intro-note" data-t="intro.note"></small></section>
+<section id="race-hud" class="race-hud hidden" data-t-aria="race.progressAria"><div class="race-clock-row"><div><span class="race-kicker" id="race-status"></span><strong id="race-clock" role="timer" data-t-aria="race.elapsedAria">00:00.00</strong></div></div><ol class="race-stages">${STAGES.map((stage, i) => `<li id="race-stage-${i}"><span class="stage-number">${i + 1}</span><span data-t="stage.${stage.key}.short"></span><b id="race-split-${i}">—</b></li>`).join("")}</ol></section>
 <aside id="mission" class="mission panel hidden"><div class="eyebrow" id="step-label"></div><h1 id="objective-title"></h1><p id="objective-detail"></p><div class="mission-progress"><i></i><i></i><i></i><i></i></div><div class="delivery-note"><span id="note-label"></span><b id="delivery-reference">${BOOKING} <span>→</span> ${t("mission.city")}</b><small id="note-detail"></small></div><div id="stage-hint" class="stage-hint"></div></aside>
 <button id="map-button" class="minimap panel hidden" data-t-aria="map.showAria"><div><span data-t="map.title"></span><span>↗</span></div><canvas id="map" width="340" height="270" data-t-aria="map.canvasAria"></canvas><span class="map-key"><i></i> <small data-t="map.you"></small> <b>◎</b> <small data-t="map.destination"></small> <span class="map-north">N ↑</span></span></button>
 <div id="target-label" class="target-label hidden"><span id="target-symbol" class="target-number">P</span><div><b id="target-name"></b><small id="target-distance"></small></div></div>
@@ -705,9 +703,10 @@ function syncDialog() {
   } else if (kind === "leaderboard") {
     modal(
       t("lb.title"),
-      `<p class="dialog-description">${board("lb.descGlobal", "lb.descLocal")}</p><div id="leaderboard-list"></div><p class="local-note">${board("lb.noteGlobal", "lb.noteLocal")}</p><button id="back-to-yard" class="primary">${t("lb.back")} <span>↗</span></button>`,
+      `<p class="dialog-description">${board("lb.descGlobal", "lb.descLocal")}</p><div id="time-to-beat" class="time-to-beat"></div><div id="leaderboard-list"></div><p class="local-note">${board("lb.noteGlobal", "lb.noteLocal")}</p><button id="back-to-yard" class="primary">${t("lb.back")} <span>↗</span></button>`,
       "leaderboard-dialog",
     );
+    refreshBest();
     renderLeaderboard();
     $("back-to-yard").onclick = closeDialog;
   } else if (kind === "settings") {
@@ -836,12 +835,12 @@ function syncDialog() {
         : eligible
           ? t("res.titleDone")
           : t("res.titlePractice"),
-      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? t("res.badgePractice") : newBest ? board("res.badgeBestGlobal", "res.badgeBestLocal") : t("res.badgeComplete")}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? t("res.tryFull") : !best ? t("res.firstRun") : newBest ? t(shared ? "res.fasterGlobal" : "res.fasterLocal", { time: formatTime(best.seconds - result.seconds) }) : t(shared ? "res.offGlobal" : "res.offLocal", { time: formatTime(result.seconds - best.seconds) })}</p><div id="result-splits"></div><div class="result-stats"><span>${t("res.contacts", { n: result.contacts })}</span><span>${t("res.recoveries", { n: result.recoveries })}</span><span>${t(result.assisted ? "res.assistOn" : "res.classic")}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">${t("res.nameLabel")}</label><div><input id="player-name" maxlength="24" placeholder="${t("res.namePlaceholder")}" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">${t("res.save")} <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? t("res.practiceNote") : saved ? t("res.onBoard") : board("res.saveGlobal", "res.saveLocal")}</p><div class="result-board-title"><b>${t("res.legends")}</b><span>${board("res.top5Global", "res.top5Local")}</span></div><div id="leaderboard-list"></div><button id="play-again" class="primary play-again">${t("res.again")} <span>↻</span></button><button id="results-feedback" class="secondary results-feedback">${t("res.feedback")}</button>`,
+      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? t("res.badgePractice") : newBest ? board("res.badgeBestGlobal", "res.badgeBestLocal") : t("res.badgeComplete")}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? t("res.tryFull") : !best ? t("res.firstRun") : newBest ? t(shared ? "res.fasterGlobal" : "res.fasterLocal", { time: formatTime(best.seconds - result.seconds) }) : t(shared ? "res.offGlobal" : "res.offLocal", { time: formatTime(result.seconds - best.seconds) })}</p><div id="result-splits"></div><div class="result-stats"><span>${t("res.contacts", { n: result.contacts })}</span><span>${t("res.recoveries", { n: result.recoveries })}</span><span>${t(result.assisted ? "res.assistOn" : "res.classic")}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">${t("res.nameLabel")}</label><div><input id="player-name" maxlength="24" placeholder="${t("res.namePlaceholder")}" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">${t("res.save")} <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? t("res.practiceNote") : saved ? t("res.onBoard") : board("res.saveGlobal", "res.saveLocal")}</p><div class="result-board-title"><b>${t("res.legends")}</b><span>${board("res.top20Global", "res.top20Local")}</span></div><div id="leaderboard-list" class="board-scroll"></div><button id="play-again" class="primary play-again">${t("res.again")} <span>↻</span></button><button id="results-feedback" class="secondary results-feedback">${t("res.feedback")}</button>`,
       "complete-dialog race-results",
     );
     $("results-feedback").onclick = () => openFeedback("results");
     $("close-dialog").classList.add("hidden");
-    renderLeaderboard(result.id, 5);
+    renderLeaderboard(result.id, 20);
     renderSplits();
     $("score-form").onsubmit = async (event) => {
       event.preventDefault();
@@ -884,7 +883,7 @@ function syncDialog() {
         return;
       }
       if (document.getElementById("leaderboard-list"))
-        renderLeaderboard(result.id, 5);
+        renderLeaderboard(result.id, 20);
       renderSplits();
       refreshBest();
       document.getElementById("play-again")?.focus();
@@ -900,12 +899,16 @@ function syncDialog() {
     };
   }
 }
+/** "Time to beat" lives only in the leaderboard dialog and on the results
+ * screen, never on the start screen or the in-race HUD, so nobody drives
+ * against a ticking target. */
 function refreshBest() {
+  const root = document.getElementById("time-to-beat");
+  if (!root) return;
   const best = leaderboard.list()[0];
-  $("race-best").textContent = best ? formatTime(best.seconds) : "—";
-  $("intro-best").textContent = best
+  root.textContent = best
     ? t("intro.timeToBeat", { time: formatTime(best.seconds), name: best.name })
-    : t("intro.fresh");
+    : "";
 }
 function renderLeaderboard(highlight = "", limit = 100) {
   const rows = leaderboard.list();
@@ -1011,7 +1014,7 @@ function renderSplits() {
     if (open) {
       const title = document.createElement("div");
       title.className = "split-board-title";
-      title.innerHTML = `<b>${t("res.fastest", { label })}</b><span>${board("res.top5Global", "res.top5Local")}</span>`;
+      title.innerHTML = `<b>${t("res.fastest", { label })}</b><span>${board("res.top20Global", "res.top20Local")}</span>`;
       panel.append(title);
       if (!entries.length) {
         const empty = document.createElement("p");
@@ -1020,8 +1023,8 @@ function renderSplits() {
         panel.append(empty);
       } else {
         const list = document.createElement("ol");
-        list.className = "leaderboard-rows";
-        const visible = entries.slice(0, 5);
+        list.className = "leaderboard-rows board-scroll";
+        const visible = entries.slice(0, 20);
         if (own && !visible.includes(own)) visible.push(own);
         const best = entries[0].seconds;
         for (const entry of visible) {
@@ -1355,7 +1358,6 @@ function applyLanguage() {
     "aria-label",
     board("topbar.leaderboardGlobalAria", "topbar.leaderboardLocalAria"),
   );
-  $("race-best-label").textContent = board("race.bestGlobal", "race.bestLocal");
   $("touch-controls").setAttribute(
     "aria-label",
     t(touchWalking ? "touch.walking" : "touch.driving"),

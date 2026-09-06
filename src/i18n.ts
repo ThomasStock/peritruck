@@ -19,14 +19,6 @@ export const language = () => current;
 export function setLanguage(lang: Lang) {
   current = lang;
 }
-/** First offered language matching the browser's preferences, else English. */
-export function resolveLanguage(preferred: readonly string[]): Lang {
-  for (const tag of preferred) {
-    const code = tag.toLowerCase().split("-")[0];
-    if (isLang(code)) return code;
-  }
-  return DEFAULT_LANGUAGE;
-}
 type Copy = Record<Lang, string>;
 export const STRINGS = {
   // Top bar
@@ -151,12 +143,6 @@ export const STRINGS = {
     fr: "♛ Temps à battre  {{time}} · {{name}}",
     de: "♛ Zeit zu schlagen  {{time}} · {{name}}",
   },
-  "intro.fresh": {
-    en: "Fresh leaderboard. Set the first record.",
-    nl: "Leeg klassement. Zet het eerste record.",
-    fr: "Classement vierge. Établissez le premier record.",
-    de: "Leere Bestenliste. Setze den ersten Rekord.",
-  },
   // Stages
   "stage.parking.name": {
     en: "Park the truck",
@@ -272,18 +258,6 @@ export const STRINGS = {
     nl: "Verstreken rittijd",
     fr: "Temps écoulé",
     de: "Verstrichene Fahrzeit",
-  },
-  "race.bestGlobal": {
-    en: "GLOBAL BEST",
-    nl: "WERELDRECORD",
-    fr: "RECORD MONDIAL",
-    de: "WELTBESTZEIT",
-  },
-  "race.bestLocal": {
-    en: "LOCAL BEST",
-    nl: "LOKAAL RECORD",
-    fr: "RECORD LOCAL",
-    de: "LOKALE BESTZEIT",
   },
   "race.stageAria": {
     en: "{{stage}}: {{status}}",
@@ -1255,17 +1229,17 @@ export const STRINGS = {
     fr: "♛ Légendes de la cour",
     de: "♛ Yard-Legenden",
   },
-  "res.top5Global": {
-    en: "GLOBAL TOP 5",
-    nl: "WERELDWIJDE TOP 5",
-    fr: "TOP 5 MONDIAL",
-    de: "WELTWEITE TOP 5",
+  "res.top20Global": {
+    en: "GLOBAL TOP 20",
+    nl: "WERELDWIJDE TOP 20",
+    fr: "TOP 20 MONDIAL",
+    de: "WELTWEITE TOP 20",
   },
-  "res.top5Local": {
-    en: "LOCAL TOP 5",
-    nl: "LOKALE TOP 5",
-    fr: "TOP 5 LOCAL",
-    de: "LOKALE TOP 5",
+  "res.top20Local": {
+    en: "LOCAL TOP 20",
+    nl: "LOKALE TOP 20",
+    fr: "TOP 20 LOCAL",
+    de: "LOKALE TOP 20",
   },
   "res.again": {
     en: "Beat your time",

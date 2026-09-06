@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  DEFAULT_LANGUAGE,
   LANGUAGES,
   STRINGS,
   obstacleName,
-  resolveLanguage,
   setLanguage,
   t,
   type Lang,
@@ -39,13 +39,9 @@ test("every string is translated into all four languages with the same placehold
   }
 });
 
-test("browser language resolves to an offered language, else English", () => {
-  assert.equal(resolveLanguage(["nl-BE", "en"]), "nl");
-  assert.equal(resolveLanguage(["pt-BR", "de-AT"]), "de");
-  assert.equal(resolveLanguage(["pt-BR"]), "en");
-  // The kiosk offers Polish and Romanian; the game UI does not.
-  assert.equal(resolveLanguage(["pl-PL"]), "en");
-  assert.equal(resolveLanguage([]), "en");
+test("English is the default language", () => {
+  assert.equal(DEFAULT_LANGUAGE, "en");
+  assert.equal(LANGUAGES[0].code, "en");
 });
 
 test("placeholders fill in and unknown ones vanish", () => {
