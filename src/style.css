@@ -517,7 +517,7 @@ kbd {
   font-size: 13px;
   margin-left: 5px;
 }
-.map-key > span {
+.map-key > .map-north {
   margin-left: auto;
 }
 .articulation {
@@ -907,9 +907,12 @@ kbd {
 }
 .touch-group button small {
   font-size: 7px;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.4px;
   display: block;
-  margin-top: 3px;
+  /* Longer words than "DRIVE" (ACHTERUIT, RÜCKWÄRTS) get the button's full
+     width instead of being clipped by its padding. */
+  margin: 3px -8px 0;
+  white-space: nowrap;
 }
 .touch-group button[data-touch="forward"] {
   background: #c6f389ef;
@@ -1125,6 +1128,7 @@ kbd {
   }
   .touch-group button small {
     font-size: 8px;
+    letter-spacing: 0.2px;
   }
   .telemetry {
     width: auto;
@@ -2292,4 +2296,185 @@ body.operator .race-hud {
   margin-top: 10px;
   padding: 13px;
   font-size: 13px;
+}
+
+/* Language: a flag button in the top bar opens a list of the six languages the
+   kiosk offers; the start screen repeats them as chips above the title so the
+   control is the first thing a non-English driver sees, on phones too. */
+.lang-control {
+  position: relative;
+}
+.lang-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #8da59977;
+  border-radius: 24px;
+  background: #f5faf5ee;
+  color: var(--ink);
+  padding: 7px 12px 7px 9px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  min-height: 36px;
+}
+.lang-button[aria-expanded="true"] {
+  background: var(--ink);
+  color: #f5f9ec;
+  border-color: var(--ink);
+}
+.lang-flag {
+  width: 21px;
+  height: 14px;
+  flex: none;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px #16403833;
+  display: block;
+}
+.lang-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 190px;
+  padding: 6px;
+  border-radius: 14px;
+  background: #fbfdfa;
+  border: 1px solid #8da59966;
+  box-shadow: 0 14px 40px #153b2c2e;
+  display: grid;
+  gap: 2px;
+  z-index: 20;
+}
+.lang-menu[hidden] {
+  display: none;
+}
+body.lang-open .topbar {
+  z-index: 30;
+}
+.lang-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  padding: 9px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+}
+.lang-menu button:hover,
+.lang-menu button:focus-visible {
+  background: #e6f3ea;
+  filter: none;
+}
+.lang-menu button[aria-selected="true"] {
+  background: #d9f4ec;
+  color: #0b5d4f;
+}
+.lang-menu button[aria-selected="true"]::after {
+  content: "✓";
+  margin-left: auto;
+  font-weight: 800;
+}
+.intro-languages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 20px;
+}
+.lang-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #ffffff2e;
+  border-radius: 20px;
+  background: #ffffff12;
+  color: #e6efe8;
+  padding: 6px 11px 6px 7px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+.lang-chip:hover {
+  background: #ffffff24;
+  filter: none;
+}
+.lang-chip[aria-checked="true"] {
+  background: #c6f389;
+  border-color: #c6f389;
+  color: #173b32;
+  font-weight: 700;
+}
+.lang-chip .lang-flag {
+  width: 18px;
+  height: 12px;
+}
+.lang-chip-code {
+  display: none;
+  letter-spacing: 0.5px;
+}
+@media (max-width: 600px), (max-height: 510px) and (orientation: landscape) {
+  .top-actions {
+    gap: 6px;
+  }
+  .lang-button {
+    padding: 0;
+    gap: 0;
+    width: 32px;
+    min-height: 32px;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .lang-button .lang-code {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .lang-button .lang-flag {
+    width: 20px;
+    height: 14px;
+  }
+  /* The list would run off the left edge of a narrow phone: pin it to the
+     viewport under the top bar instead of to the button. */
+  .lang-menu {
+    position: fixed;
+    top: 54px;
+    left: 10px;
+    right: 10px;
+    min-width: 0;
+  }
+  .intro-languages {
+    gap: 5px;
+    margin-bottom: 14px;
+  }
+  .lang-chip {
+    padding: 6px 9px 6px 6px;
+    font-size: 11px;
+  }
+}
+/* Small phones and short landscape windows: the start card has to fit the
+   screen, so the chips shrink to flag + code on one row. */
+@media (max-width: 360px),
+  (max-height: 700px) and (max-width: 600px),
+  (max-height: 510px) and (orientation: landscape) {
+  .lang-chip-name {
+    display: none;
+  }
+  .lang-chip-code {
+    display: block;
+  }
+  .lang-chip {
+    gap: 5px;
+    padding: 5px 8px 5px 5px;
+    font-size: 10px;
+  }
+  .lang-chip .lang-flag {
+    width: 16px;
+    height: 11px;
+  }
 }

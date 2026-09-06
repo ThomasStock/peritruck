@@ -3,6 +3,9 @@
  * demo-only strings (visit types, scan-frame guidance, phone demo note, endscreen)
  * are written here.
  */
+/** The kiosk replicates the production kiosk's own language page, which offers
+ * six languages; the surrounding game UI offers four (see `src/i18n.ts`).
+ */
 export const LANGUAGES = [
   { code: "en", native: "English", english: "English", flag: "GB" },
   { code: "nl", native: "Nederlands", english: "Dutch", flag: "NL" },

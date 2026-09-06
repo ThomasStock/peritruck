@@ -28,6 +28,8 @@ Open the exact localhost address printed by Vite. No accounts, remote kiosk serv
 | R                   | Recover to last safe stop                   |
 | Escape / ?          | Pause, settings, remapping                  |
 
+The game speaks English, Dutch, French, German, Polish and Romanian: the same six languages as the kiosk. The start screen shows them as chips above the title, and the flag button in the top bar lists them at any time. The choice covers every layer of copy (start screen, HUD, mission card, docking guide, dialogs, results, the SMS on the driver's phone and the simulation's own toasts and prompts), persists in `localStorage` (`yard-language`), and otherwise follows the browser's language. Copy lives in `src/i18n.ts`; the kiosk keeps its own production translations and language page, and the yard operator's phone stays in the operator's English.
+
 Touch steering and pedals appear on touch devices and small screens. Standard gamepads support left-stick steering, RT/LT pedals, B brake and A interaction. Controls can be remapped; arrow-key alternatives remain available. Gamepad mapping assumes the browser's standard layout and has not been tested with physical hardware.
 
 Reverse assist is on by default. In reverse, the steering command asks the _trailer_ to turn; the controller counter-steers the tractor. Releasing steering stabilizes articulation. Classic steering is available in settings. Neither mode teleports the rig into a bay. There is no countdown or failure screen; pull forward to try again, or recover with R.
@@ -134,6 +136,7 @@ npm run models       # Rebuild original GLB assets with installed Blender
 | `src/prediction.ts`       | Projected tyre track, recomputed only when pose or controls change                                |
 | `src/rig.ts`              | Driver rig: displacement-driven gait, turning, idle motion                                        |
 | `src/main.ts`             | Input adapters, accessible overlays, HUD, sound and agent tool registration                       |
+| `src/i18n.ts`             | Game copy in six languages; the current language for UI, SMS and simulation text                  |
 | `src/kiosk/`              | Kiosk replica: step flow, six-language copy, DOM view and stylesheet                              |
 | `src/dispatch/`           | Yard operator's phone: call-off flow, Yard Operator App replica, icons and stylesheet             |
 | `src/sms.ts`              | The driver's phone: SMS banner and handset with the Messages thread                               |

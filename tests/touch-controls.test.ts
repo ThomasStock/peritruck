@@ -568,3 +568,91 @@ test("feedback form opens from the top bar and the results screen and sends to S
     dom.window.close();
   }
 });
+
+test("the language control switches every layer of copy and persists the choice", async () => {
+  const { run, document } = await game();
+  const html = document.documentElement;
+  assert.equal(html.lang, "en");
+  const chips = document.querySelectorAll("#intro-languages [data-lang]");
+  assert.equal(chips.length, 4, "the start screen offers all four languages");
+  assert.equal(
+    document
+      .querySelector('#intro-languages [aria-checked="true"]')!
+      .getAttribute("data-lang"),
+    "en",
+  );
+  (
+    document.querySelector(
+      '#intro-languages [data-lang="nl"]',
+    ) as HTMLButtonElement
+  ).click();
+  run("updateUI()");
+  assert.equal(html.lang, "nl");
+  assert.equal(
+    document.querySelector("#intro h1")!.textContent,
+    "Grote truck.Snelle levering.",
+  );
+  assert.equal(
+    document.getElementById("objective-title")!.textContent,
+    "Chauffeursparking",
+  );
+  assert.equal(
+    document.getElementById("target-name")!.textContent,
+    "WACHTVAK P02",
+  );
+  assert.equal(
+    document.getElementById("race-status")!.textContent,
+    "RIJ WEG OM TE STARTEN",
+  );
+  assert.equal(
+    document.getElementById("touch-controls")!.getAttribute("aria-label"),
+    "Aanraakbesturing rijden",
+  );
+  assert.equal(
+    document.querySelector("#language .lang-code")!.textContent,
+    "NL",
+  );
+  assert.equal(
+    document.defaultView!.localStorage.getItem("yard-language"),
+    "nl",
+  );
+  // The top-bar button opens a list; picking an entry closes it and re-renders open dialogs.
+  const button = document.getElementById("language") as HTMLButtonElement;
+  button.click();
+  assert.equal(button.getAttribute("aria-expanded"), "true");
+  assert.equal(document.getElementById("language-menu")!.hidden, false);
+  // The list has to clear the race HUD, which paints above the top bar.
+  assert.ok(document.body.classList.contains("lang-open"));
+  run("settingsOpen = true; syncDialog()");
+  assert.equal(
+    document.getElementById("dialog-title")!.textContent,
+    "Besturing",
+  );
+  (
+    document.querySelector(
+      '#language-menu [data-lang="fr"]',
+    ) as HTMLButtonElement
+  ).click();
+  assert.equal(document.getElementById("language-menu")!.hidden, true);
+  assert.equal(document.body.classList.contains("lang-open"), false);
+  assert.equal(html.lang, "fr");
+  assert.equal(
+    document.getElementById("dialog-title")!.textContent,
+    "Commandes",
+  );
+  assert.match(
+    document.querySelector(".settings-tip")!.textContent!,
+    /Maintenez S/,
+  );
+  run("closeDialog()");
+  // Escape closes the list without opening the controls dialog.
+  button.click();
+  document.dispatchEvent(
+    new document.defaultView!.KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+    }),
+  );
+  assert.equal(document.getElementById("language-menu")!.hidden, true);
+  assert.equal(document.getElementById("modal-root")!.firstChild, null);
+});
