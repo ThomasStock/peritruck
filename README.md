@@ -30,6 +30,8 @@ Open the exact localhost address printed by Vite. No accounts, remote kiosk serv
 
 Touch steering and pedals appear on touch devices and small screens. Standard gamepads support left-stick steering, RT/LT pedals, B brake and A interaction. Controls can be remapped; arrow-key alternatives remain available. Gamepad mapping assumes the browser's standard layout and has not been tested with physical hardware.
 
+The rig's lamps work: daytime running lights while the engine is on, brake lamps while braking or slowing against the throttle, and white reverse lamps once reverse gear is in.
+
 Reverse assist is on by default. In reverse, the steering command asks the _trailer_ to turn; the controller counter-steers the tractor. Releasing steering stabilizes articulation. Classic steering is available in settings. Neither mode teleports the rig into a bay. There is no countdown or failure screen; pull forward to try again, or recover with R.
 
 ## Kiosk check-in
