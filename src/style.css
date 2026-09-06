@@ -132,6 +132,9 @@ button:active {
   gap: 8px;
 }
 .icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid #8da59977;
   background: #f5faf5bb;
   border-radius: 50%;
@@ -139,6 +142,10 @@ button:active {
   width: 36px;
   color: var(--ink);
   font-size: 18px;
+}
+.icon-button svg {
+  width: 19px;
+  height: 19px;
 }
 .panel {
   box-shadow: 0 12px 50px #153b2c13;
@@ -1082,6 +1089,10 @@ kbd {
     width: 32px;
     height: 32px;
     font-size: 16px;
+  }
+  .icon-button svg {
+    width: 17px;
+    height: 17px;
   }
   .mission {
     padding: 12px 14px;
