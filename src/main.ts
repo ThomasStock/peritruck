@@ -164,6 +164,7 @@ app.innerHTML = `
 <div id="telemetry" class="telemetry panel hidden"><div class="gear"><b id="gear">N</b><span data-t="tele.auto"></span></div><div class="speed"><b id="speed">00</b><span data-t="tele.kmh"></span></div><div id="assist-tag" class="assist-tag"></div><div class="articulation"><span data-t="tele.trailer"></span><div><i id="articulation-bar"></i></div><b id="articulation-value">0°</b></div></div>
 <div id="touch-controls"><div class="touch-group"><button data-touch="left" data-t-aria="touch.left">←</button><button data-touch="right" data-t-aria="touch.right">→</button></div><div class="touch-group pedals"><button data-touch="reverse" data-t-aria="touch.reverseAria">↓<small data-t="touch.reverse"></small></button><button data-touch="forward" data-t-aria="touch.forwardAria">↑<small data-t="touch.drive"></small></button><button data-touch="brake" data-t-aria="touch.brake">■</button></div><div id="walk-joystick" class="walking-joystick" role="group" data-t-aria="touch.joystick" hidden><span class="joystick-knob"></span></div></div>
 <div class="letterbox" aria-hidden="true"><i></i><i></i></div>
+<div id="operator-caption" class="operator-caption"><span class="eyebrow" data-t="operator.eyebrow"></span><b data-t="operator.caption"></b></div>
 <div id="dispatch-root"></div>
 <div id="modal-root"></div>
 `;

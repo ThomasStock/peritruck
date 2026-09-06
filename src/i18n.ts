@@ -1520,6 +1520,20 @@ export const STRINGS = {
     fr: "Saisir le PIN",
     de: "Tor-PIN eingeben",
   },
+  // The yard operator's turn: the camera leaves the driver, so the caption over
+  // the cut says whose phone this is and what it is about to do.
+  "operator.eyebrow": {
+    en: "Yard operator · dock 05",
+    nl: "Yardoperator · dok 05",
+    fr: "Opérateur de cour · quai 05",
+    de: "Yard-Operator · Dock 05",
+  },
+  "operator.caption": {
+    en: "Assigning your dock in the Peripass app",
+    nl: "Wijst je dok toe in de Peripass-app",
+    fr: "Choisit votre quai dans l’app Peripass",
+    de: "Wählt dein Dock in der Peripass-App",
+  },
   // Simulation: toasts
   "note.waitingOperator": {
     en: "Waiting for the yard operator to assign your dock.",
