@@ -56,6 +56,7 @@ import {
   cleanName,
   type Result,
 } from "./game/leaderboard";
+import { createConvexLeaderboard } from "./leaderboard-convex";
 import {
   identifyBest,
   initAnalytics,
@@ -64,7 +65,12 @@ import {
   trackAction,
 } from "./analytics";
 initAnalytics();
-const leaderboard = createLeaderboard(() => localStorage);
+const convexUrl: string | undefined = import.meta.env?.VITE_CONVEX_URL;
+const leaderboard = convexUrl
+  ? createConvexLeaderboard(convexUrl)
+  : createLeaderboard(() => localStorage);
+const BOARD = leaderboard.shared ? "GLOBAL" : "LOCAL";
+const boardLabel = leaderboard.shared ? "global" : "local";
 let leaderboardOpen = false;
 let completedRace: Race | undefined;
 let completedResult: Result | undefined;
@@ -94,9 +100,9 @@ document.addEventListener(
 );
 app.innerHTML = `
 <div id="world"></div>
-<header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><button id="leaderboard-button" class="leaderboard-button" aria-label="View local leaderboard">♛ <span>Leaderboard</span></button><button id="camera" class="icon-button" aria-label="Change camera view" title="Camera · C">◩</button><button id="help" class="icon-button" aria-label="Controls and settings" title="Controls · Escape">?</button></div></header>
+<header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><button id="leaderboard-button" class="leaderboard-button" aria-label="View ${boardLabel} leaderboard">♛ <span>Leaderboard</span></button><button id="camera" class="icon-button" aria-label="Change camera view" title="Camera · C">◩</button><button id="help" class="icon-button" aria-label="Controls and settings" title="Controls · Escape">?</button></div></header>
 <section id="intro" class="intro panel"><div class="race-kicker">PERITRUCK · TIME TRIAL</div><h1>Big truck.<br/>Quick delivery.</h1><p>Park. Check in. Open the gate. Nail the dock. How fast can you finish?</p><div class="intro-stages">${STAGES.map((stage, i) => `<span><b>0${i + 1}</b>${stage.short}</span>`).join("")}</div><button id="start" class="primary" disabled>Loading… <span>↗</span></button><small class="race-intro-note">The clock starts when your truck moves.</small><div id="intro-best" class="intro-best"></div></section>
-<section id="race-hud" class="race-hud hidden" aria-label="Time trial progress"><div class="race-clock-row"><div><span class="race-kicker" id="race-status">READY WHEN YOU ARE</span><strong id="race-clock" role="timer" aria-label="Elapsed run time">00:00.00</strong></div><div class="race-best"><span>LOCAL BEST</span><b id="race-best">—</b></div></div><ol class="race-stages">${STAGES.map((stage, i) => `<li id="race-stage-${i}"><span class="stage-number">${i + 1}</span><span>${stage.short}</span><b id="race-split-${i}">—</b></li>`).join("")}</ol></section>
+<section id="race-hud" class="race-hud hidden" aria-label="Time trial progress"><div class="race-clock-row"><div><span class="race-kicker" id="race-status">READY WHEN YOU ARE</span><strong id="race-clock" role="timer" aria-label="Elapsed run time">00:00.00</strong></div><div class="race-best"><span>${BOARD} BEST</span><b id="race-best">—</b></div></div><ol class="race-stages">${STAGES.map((stage, i) => `<li id="race-stage-${i}"><span class="stage-number">${i + 1}</span><span>${stage.short}</span><b id="race-split-${i}">—</b></li>`).join("")}</ol></section>
 <aside id="mission" class="mission panel hidden"><div class="eyebrow" id="step-label">01 / 04 · ARRIVAL</div><h1 id="objective-title"></h1><p id="objective-detail"></p><div class="mission-progress"><i></i><i></i><i></i><i></i></div><div class="delivery-note"><span id="note-label">YOUR DELIVERY</span><b id="delivery-reference">${BOOKING} <span>→</span> Ghent</b><small id="note-detail">Registration reference</small></div><div id="stage-hint" class="stage-hint"></div></aside>
 <button id="map-button" class="minimap panel hidden" aria-label="Show whole yard map"><div><span>YARD MAP</span><span>↗</span></div><canvas id="map" width="340" height="270" aria-label="Yard map showing the truck, destination, gate and docks"></canvas><span class="map-key"><i></i> You <b>◎</b> Destination <span>N ↑</span></span></button>
 <div id="target-label" class="target-label hidden"><span id="target-symbol" class="target-number">P</span><div><b id="target-name">HOLDING BAY P02</b><small id="target-distance"></small></div></div>
@@ -482,7 +488,7 @@ function syncDialog() {
   if (kind === "leaderboard") {
     modal(
       "Yard legends",
-      `<p class="dialog-description">Fastest deliveries on this browser. Your next run could take the top spot.</p><div id="leaderboard-list"></div><p class="local-note">Local leaderboard · Top 100 · Lower is better</p><button id="back-to-yard" class="primary">Back to the yard <span>↗</span></button>`,
+      `<p class="dialog-description">${leaderboard.shared ? "Fastest deliveries worldwide." : "Fastest deliveries on this browser."} Your next run could take the top spot.</p><div id="leaderboard-list"></div><p class="local-note">${leaderboard.shared ? "Global" : "Local"} leaderboard · Top 100 · Lower is better</p><button id="back-to-yard" class="primary">Back to the yard <span>↗</span></button>`,
       "leaderboard-dialog",
     );
     renderLeaderboard();
@@ -619,14 +625,14 @@ function syncDialog() {
         : eligible
           ? "Delivery nailed!"
           : "Practice complete!",
-      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? "↻ PRACTICE RUN" : newBest ? "★ LOCAL BEST" : "✓ RUN COMPLETE"}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? "Ready to try the full delivery?" : !best ? "First run on the board. Set the pace!" : newBest ? `${formatTime(best.seconds - result.seconds)} faster than the local best` : `${formatTime(result.seconds - best.seconds)} off the local best. Go again?`}</p><ol class="result-splits">${STAGES.map((stage, i) => `<li><span class="stage-number">✓</span><span>${stage.name}</span><b>${result.splits[i] === undefined ? "—" : formatTime(result.splits[i] - (result.splits[i - 1] ?? 0))}</b></li>`).join("")}</ol><div class="result-stats"><span>${result.contacts} contacts</span><span>${result.recoveries} recoveries</span><span>${result.assisted ? "Assist on" : "Classic steering"}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">Put your name on the board</label><div><input id="player-name" maxlength="24" placeholder="Your driver name" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">Save run <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? "Skipped stages make this a practice run. Complete all four stages to join the leaderboard." : saved ? "Your run is on the board." : "Save your run on this browser. No account needed."}</p><div class="result-board-title"><b>♛ Yard legends</b><span>LOCAL TOP 5</span></div><div id="leaderboard-list"></div><button id="play-again" class="primary play-again">Beat your time <span>↻</span></button>`,
+      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? "↻ PRACTICE RUN" : newBest ? `★ ${BOARD} BEST` : "✓ RUN COMPLETE"}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? "Ready to try the full delivery?" : !best ? "First run on the board. Set the pace!" : newBest ? `${formatTime(best.seconds - result.seconds)} faster than the ${boardLabel} best` : `${formatTime(result.seconds - best.seconds)} off the ${boardLabel} best. Go again?`}</p><ol class="result-splits">${STAGES.map((stage, i) => `<li><span class="stage-number">✓</span><span>${stage.name}</span><b>${result.splits[i] === undefined ? "—" : formatTime(result.splits[i] - (result.splits[i - 1] ?? 0))}</b></li>`).join("")}</ol><div class="result-stats"><span>${result.contacts} contacts</span><span>${result.recoveries} recoveries</span><span>${result.assisted ? "Assist on" : "Classic steering"}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">Put your name on the board</label><div><input id="player-name" maxlength="24" placeholder="Your driver name" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">Save run <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? "Skipped stages make this a practice run. Complete all four stages to join the leaderboard." : saved ? "Your run is on the board." : leaderboard.shared ? "Save your run to the global board. No account needed." : "Save your run on this browser. No account needed."}</p><div class="result-board-title"><b>♛ Yard legends</b><span>${BOARD} TOP 5</span></div><div id="leaderboard-list"></div><button id="play-again" class="primary play-again">Beat your time <span>↻</span></button>`,
       "complete-dialog race-results",
     );
     $("close-dialog").classList.add("hidden");
     renderLeaderboard(result.id, 5);
-    $("score-form").onsubmit = (event) => {
+    $("score-form").onsubmit = async (event) => {
       event.preventDefault();
-      if (!eligible) return;
+      if (!eligible || savedResultId === result.id) return;
       const input = $("player-name") as HTMLInputElement;
       const name = cleanName(input.value);
       if (!name) {
@@ -634,21 +640,36 @@ function syncDialog() {
         input.reportValidity();
         return;
       }
-      const saved = leaderboard.save({ ...result, name });
       savedResultId = result.id;
-      trackAction("score_saved", state, {
-        rank: saved.rank,
-        persisted: saved.persisted,
-        best: saved.rank === 1,
-      });
-      identifyBest(leaderboard.list()[0]?.seconds ?? result.seconds);
-      $("score-form").classList.add("hidden");
-      $("save-status").textContent = saved.persisted
-        ? `You're #${saved.rank}! ${saved.rank > 100 ? "Only the fastest 100 runs stay on the board." : "Run saved on this browser."}`
-        : `You're #${saved.rank}! Browser storage is unavailable; this run stays for this visit only.`;
-      renderLeaderboard(result.id, 5);
+      const form = $("score-form"),
+        status = $("save-status");
+      form.querySelector("button")!.disabled = true;
+      status.textContent = "Saving your run…";
+      try {
+        const saved = await leaderboard.save({ ...result, name });
+        trackAction("score_saved", state, {
+          rank: saved.rank,
+          persisted: saved.persisted,
+          best: saved.rank === 1,
+        });
+        identifyBest(leaderboard.list()[0]?.seconds ?? result.seconds);
+        form.classList.add("hidden");
+        status.textContent = saved.persisted
+          ? `You're #${saved.rank}! ${saved.rank > 100 ? "Only the fastest 100 runs stay on the board." : leaderboard.shared ? "Run saved to the global board." : "Run saved on this browser."}`
+          : `You're #${saved.rank}! Browser storage is unavailable; this run stays for this visit only.`;
+      } catch (error) {
+        savedResultId = "";
+        form.querySelector("button")!.disabled = false;
+        status.textContent =
+          error instanceof Error && !/Server Error/i.test(error.message)
+            ? error.message
+            : "Could not reach the leaderboard. Check your connection and try again.";
+        return;
+      }
+      if (document.getElementById("leaderboard-list"))
+        renderLeaderboard(result.id, 5);
       refreshBest();
-      $("play-again").focus();
+      document.getElementById("play-again")?.focus();
     };
     $("player-name").oninput = () =>
       ($("player-name") as HTMLInputElement).setCustomValidity("");
@@ -706,14 +727,16 @@ function renderLeaderboard(highlight = "", limit = 100) {
   root.append(ol);
 }
 refreshBest();
-window.addEventListener("storage", () => {
+function refreshBoard() {
   refreshBest();
   if (document.getElementById("leaderboard-list"))
     renderLeaderboard(
       completedResult?.id,
       state.phase === "complete" && !leaderboardOpen ? 5 : 100,
     );
-});
+}
+window.addEventListener("storage", refreshBoard);
+leaderboard.onChange(refreshBoard);
 let mapKey = "";
 function drawMap() {
   // A full redraw every UI tick repaints the panel even when nothing moved.

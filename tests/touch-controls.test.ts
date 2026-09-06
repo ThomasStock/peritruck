@@ -49,6 +49,7 @@ async function game() {
     require: (id: string) => {
       if (id.endsWith(".css")) return {};
       if (id === "./sentry") return {};
+      if (id === "./leaderboard-convex") return {};
       if (id === "./analytics")
         return {
           identifyBest() {},
@@ -312,6 +313,7 @@ test("a completed delivery renders splits, saves a literal driver name once, and
       );
     submit();
     submit();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     assert.equal(document.querySelectorAll(".leaderboard-rows li").length, 1);
     assert.equal(document.querySelector(".leaderboard-name b"), null);
     assert.ok(

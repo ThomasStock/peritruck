@@ -11,13 +11,16 @@
     "truck": "tsx scripts/truck.ts",
     "models": "blender --background --python scripts/build_models.py",
     "format": "prettier --write src tests scripts/truck.ts vite.config.ts README.md docs/*.md",
-    "format:check": "prettier --check src tests scripts/truck.ts vite.config.ts README.md docs/*.md"
+    "format:check": "prettier --check src tests scripts/truck.ts vite.config.ts README.md docs/*.md",
+    "build:vercel": "convex deploy --cmd 'npm run build'",
+    "convex": "convex dev"
   },
   "dependencies": {
     "@amplitude/analytics-browser": "^2.45.8",
     "@fontsource/montserrat": "^5.2.6",
     "@fontsource/open-sans": "^5.3.0",
     "@sentry/browser": "^10.73.0",
+    "convex": "^1.45.0",
     "three": "^0.180.0"
   },
   "devDependencies": {
