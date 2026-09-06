@@ -96,16 +96,16 @@ export const STRINGS = {
   },
   // Start screen
   "intro.kicker": {
-    en: "PERITRUCK · TIME TRIAL",
-    nl: "PERITRUCK · TIJDRIT",
-    fr: "PERITRUCK · CONTRE-LA-MONTRE",
-    de: "PERITRUCK · ZEITFAHREN",
+    en: "PERIPASS · TIME TRIAL",
+    nl: "PERIPASS · TIJDRIT",
+    fr: "PERIPASS · CONTRE-LA-MONTRE",
+    de: "PERIPASS · ZEITFAHREN",
   },
   "intro.title": {
-    en: "Big truck.<br/>Quick delivery.",
-    nl: "Grote truck.<br/>Snelle levering.",
-    fr: "Gros camion.<br/>Livraison express.",
-    de: "Großer Truck.<br/>Schnelle Lieferung.",
+    en: "Fastest truck<br/>in the yard.",
+    nl: "Snelste truck<br/>op het terrein.",
+    fr: "Le camion le plus rapide<br/>de la cour.",
+    de: "Schnellster Truck<br/>auf dem Hof.",
   },
   "intro.tagline": {
     en: "Park. Check in. Open the gate. Nail the dock. How fast can you finish?",
@@ -739,10 +739,10 @@ export const STRINGS = {
     de: "Sag uns, was du denkst",
   },
   "fb.description": {
-    en: "Found a bug, got stuck, or have an idea? A few words help us make Peritruck better.",
-    nl: "Een bug gevonden, vastgelopen of een idee? Een paar woorden helpen ons Peritruck beter te maken.",
-    fr: "Un bug, un blocage ou une idée ? Quelques mots nous aident à améliorer Peritruck.",
-    de: "Einen Fehler gefunden, festgehangen oder eine Idee? Ein paar Worte helfen uns, Peritruck besser zu machen.",
+    en: "Found a bug, got stuck, or have an idea? A few words help us make Peripass better.",
+    nl: "Een bug gevonden, vastgelopen of een idee? Een paar woorden helpen ons Peripass beter te maken.",
+    fr: "Un bug, un blocage ou une idée ? Quelques mots nous aident à améliorer Peripass.",
+    de: "Einen Fehler gefunden, festgehangen oder eine Idee? Ein paar Worte helfen uns, Peripass besser zu machen.",
   },
   "fb.label": {
     en: "Your feedback",
