@@ -1,11 +1,13 @@
 """Rebuild original Yard Shift assets. Blender 4.4+; metres; GLTF front = +Z.
 No downloaded models. Shapes, materials and asset placement are authored here.
 """
-import bpy, math, random, os
+import bpy, math, random, os, sys
 from mathutils import Vector
 random.seed(18)
 OUT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../public/models'))
 os.makedirs(OUT, exist_ok=True)
+# Optional asset names after Blender's `--` keep unrelated GLBs untouched.
+ONLY = set(sys.argv[sys.argv.index('--')+1:]) if '--' in sys.argv else set()
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete(use_global=False)
 
@@ -103,7 +105,8 @@ def wheel(x,z,front=False):
 def export(name):
     # Join by material: small draw-call budget, full bevel geometry retained.
     join_by_material([o for o in bpy.context.scene.objects if o.parent is None])
-    bpy.ops.export_scene.gltf(filepath=os.path.join(OUT,name+'.glb'),export_format='GLB',export_yup=True,export_materials='EXPORT')
+    if not ONLY or name in ONLY:
+        bpy.ops.export_scene.gltf(filepath=os.path.join(OUT,name+'.glb'),export_format='GLB',export_yup=True,export_materials='EXPORT')
     bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 
 # European cab-over tractor, hitch at rear axle.
@@ -180,9 +183,18 @@ box('North apron',(0,.005,-29),(101,.05,30),'concrete')
 # expansion joints
 for x in range(-50,51,10):box('Apron joint',(x,.035,-29),(.045,.005,30),'roof')
 for z in [-42,-32,-22]:box('Apron joint',(0,.035,z),(100,.005,.045),'roof')
-# warehouse front -45
-box('Distribution centre',(0,4.8,-54),(101,9.6,18),'warehouse',.12)
-for x in range(-50,51,2):box('Facade seam',(x,5.1,-44.93),(.045,8.8,.08),'roof')
+# Hollow warehouse, with genuine loading openings (floor 1.15, lintel 5 m).
+# The rolling shutters and arrival crew are animated by src/docks.ts.
+box('Warehouse back',(0,4.8,-62.7),(101,9.6,.6),'warehouse',.12)
+for x in [-50.2,50.2]:box('Warehouse side',(x,4.8,-54),(.6,9.6,18),'warehouse',.1)
+box('Facade above docks',(0,7.3,-45.2),(101,4.6,.4),'warehouse')
+box('Dock foundation',(0,.575,-45.2),(101,1.15,.4),'warehouse')
+edges=[-50.5,-38.1,-33.9,-20.1,-15.9,-2.1,2.1,15.9,20.1,33.9,38.1,50.5]
+for a,b in zip(edges[::2],edges[1::2]):
+    box('Facade pier',((a+b)/2,3.075,-45.2),(b-a,3.85,.4),'warehouse')
+for x in range(-50,51,2):
+    opening=any(abs(x-d)<2.15 for d in [-36,-18,0,18,36])
+    box('Facade seam',(x,7.25 if opening else 5.1,-44.93),(.045,4.3 if opening else 8.8,.08),'roof')
 box('Roof',(0,9.68,-54),(102,.3,19),'roof',.06)
 box('Teal parapet',(0,9.35,-44.74),(102,.45,.23),'teal')
 for x in range(-48,50,2):box('Roof seam',(x,9.89,-54),(.055,.06,18.5),'metal')
@@ -191,9 +203,25 @@ for x in [-39,-23,-7,9,25,41]:
         box('Solar module',(x,10.02,z),(10,.18,4.4),'blue',.035)
         for dx in [-3.4,0,3.4]:box('Solar cell line',(x+dx,10.13,z),(.04,.012,4.4),'metal')
 for i,x in enumerate([-36,-18,0,18,36]):
-    box('Dock surround',(x,2.65,-44.68),(5.2,5.3,.7),'dark',.12)
-    box('Dock door',(x,2.48,-44.25),(3.4,3.55,.09),'roof')
-    for y in [1,1.5,2,2.5,3,3.5,4]:box('Door rib',(x,y,-44.19),(3.35,.04,.08),'metal')
+    for dx in [-2.35,2.35]:box('Dock jamb',(x+dx,2.65,-44.68),(.5,5.3,.7),'dark',.08)
+    box('Dock lintel',(x,5.18,-44.68),(4.3,.36,.7),'dark',.06)
+    box('Shutter housing',(x,5.28,-44.4),(4.5,.55,.75),'roof',.08)
+    box('Dock sill',(x,.575,-44.68),(4.2,1.15,.7),'dark')
+    box('Loading floor',(x,1.03,-50.1),(8,.24,11.8),'concrete')
+    box('Dock leveller',(x,1.165,-45.25),(3.8,.03,2.1),'metal')
+    box('Interior back wall',(x,3.55,-56),(8,4.8,.2),'dark')
+    for dx in [-4,4]:box('Loading bay wall',(x+dx,3.55,-50.3),(.16,4.8,11.4),'warehouse')
+    # A lit threshold, safety lanes, and stocked pallet racks give the opening depth.
+    box('Dock strip light',(x,4.88,-45.5),(3.4,.07,.2),'light')
+    for dx in [-1.95,1.95]:box('Loading lane',(x+dx,1.178,-48.8),(.07,.012,8.8),'yellow')
+    for side in [-1,1]:
+        for z in [-49,-52.5]:
+            for dx in [-.65,.65]:
+                for dz in [-.65,.65]:box('Rack upright',(x+side*3+dx,3.05,z+dz),(.09,3.8,.09),'teal')
+            for y in [1.35,3.1]:
+                box('Rack shelf',(x+side*3,y,z),(1.5,.14,1.5),'orange')
+                box('Stored carton',(x+side*3,y+.58,z),(1.2,1,1.2),'wood',.035)
+                box('Carton strap',(x+side*3,y+.58,z+.607),(.09,1,.015),'paint')
     for dx in [-2,2]:
         box('Dock bumper',(x+dx,.65,-44.12),(.34,1.3,.45),'rubber',.06)
         cyl('Bollard',(x+dx*1.45,.7,-43),.13,1.4,'yellow')
@@ -278,6 +306,52 @@ for x,z in [(-30,60),(-18,60),(26,19),(10,19),(40,-38)]:
     bpy.context.object.data.materials.append(M['orange'])
     cyl('Cone reflector',(x,.53,z),.155,.12,'white')
 export('yard')
+
+# Compact electric forklift, facing +Z. Pallet and carton stay on the forks.
+box('Forklift chassis',(0,.42,-.15),(1.32,.38,2.25),'dark',.08)
+box('Counterweight',(0,.85,-.94),(1.4,.82,.72),'yellow',.16)
+box('Battery cover',(0,.73,-.34),(1.22,.48,.68),'yellow',.07)
+for side in [-1,1]:
+    for z in [-.91,.64]:
+        wheel_parts=[cyl('Forklift tire',(side*.66,.33,z),.33,.23,'rubber','x',20),cyl('Forklift hub',(side*.79,.33,z),.17,.025,'metal','x',16)]
+        pivot('forklift-wheel',(side*.66,.33,z),wheel_parts)
+    box('Foot step',(side*.67,.36,.06),(.22,.1,.65),'metal',.025)
+    for z in [-.85,.57]:box('Overhead guard post',(side*.6,1.6,z),(.075,1.5,.075),'dark')
+    box('Guard side',(side*.6,2.36,-.13),(.08,.1,1.65),'dark')
+for z in [-.9,-.5,-.1,.3,.65]:box('Guard crossbar',(0,2.36,z),(1.28,.08,.065),'dark')
+box('Seat cushion',(0,1.02,-.38),(.66,.13,.57),'rubber',.06)
+box('Seat back',(0,1.28,-.66),(.66,.55,.12),'rubber',.06)
+box('Control console',(0,1.04,.35),(.7,.45,.26),'dark',.035)
+cyl('Steering wheel',(0,1.33,.32),.23,.035,'rubber')
+for x in [-.53,.53]:
+    box('Lift mast',(x,1.42,.88),(.12,2.7,.17),'dark',.025)
+    box('Mast rail',(x,1.42,.98),(.045,2.45,.05),'metal')
+    box('Fork heel',(x*.7,.61,1.1),(.12,.55,.09),'metal')
+    box('Fork tine',(x*.7,.37,1.66),(.13,.085,1.2),'metal',.015)
+for y in [.51,1.02,2.72]:box('Mast crossbar',(0,y,.88),(1.12,.12,.18),'dark')
+cyl('Lift ram',(0,1.22,.83),.065,1.65,'metal')
+for x in [-.45,0,.45]:box('Pallet runner',(x,.49,1.66),(.15,.15,1.18),'wood')
+for z in [1.14,1.4,1.66,1.92,2.18]:box('Pallet deck',(0,.61,z),(1.22,.09,.19),'wood')
+box('Delivery carton',(0,1.19,1.66),(1.12,1.08,1.06),'wood',.035)
+box('Packing tape',(0,1.738,1.66),(.14,.015,1.08),'paint')
+box('Packing tape front',(0,1.19,2.197),(.14,1.08,.015),'paint')
+box('Shipping label',(-.28,1.3,2.209),(.29,.23,.015),'white')
+for x in [-.38,-.33,-.27,-.21]:box('Label barcode',(x,1.29,2.221),(.018,.12,.008),'dark')
+# Seated operator, hands at the controls and boots in the footwell.
+box('Forklift operator torso',(0,1.42,-.36),(.57,.58,.32),'orange',.08)
+box('Forklift operator vest',(0,1.39,-.35),(.59,.065,.34),'white')
+for x in [-.16,.16]:
+    box('Seated thigh',(x,1.01,-.03),(.24,.23,.52),'dark',.05)
+    box('Seated shin',(x,.8,.19),(.22,.42,.24),'dark',.04)
+    box('Operator boot',(x,.6,.27),(.24,.17,.39),'rubber',.04)
+for x in [-.34,.34]:
+    box('Operator upper arm',(x,1.36,-.31),(.17,.38,.21),'teal',.04)
+    box('Operator forearm',(x,1.2,-.05),(.17,.18,.45),'teal',.04)
+cyl('Forklift operator head',(0,1.86,-.3),.18,.27,'wood')
+cyl('Forklift operator hat',(0,2.03,-.3),.23,.13,'yellow')
+cyl('Forklift hat brim',(0,1.98,-.27),.27,.025,'yellow')
+cyl('Amber beacon',(.46,2.49,-.66),.09,.17,'orange')
+export('forklift')
 # Driver: hi-vis figure for walking stage. Limbs hang from named empties (hip,
 # shoulder, neck) so the runtime can swing them; the meshes stay unjoined.
 for side,x in [('left',-.16),('right',.16)]:

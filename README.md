@@ -59,6 +59,8 @@ Two seconds after leaving the kiosk the game changes hands. The camera pulls up 
 
 The chosen dock is real: its number panel lights up teal and its lamp turns green, the guide dots, the docking guide and the gate SMS ("Then proceed to dock 02.") all follow it, and delivery completes at that door. After **Call off another driver** the queue is empty ("You're all done!"), the phone goes away and the camera flies back to the driver; the gate PIN SMS lands two seconds later as a lock-screen banner over the yard (tap it to dismiss). At the gate the same message is open on a rendered handset beside the terminal keypad. Both come from `src/sms.ts`.
 
+Once inside the site, the assigned dock's rolling shutter opens when it comes into view within 72 m of the rig. It reveals a lit loading bay, stocked racks and a worker beside the opening. Within 30 m, a forklift carrying a boxed pallet rolls forward after the shutter has cleared, then waits entirely inside the threshold. The door and crew stay ready through the turnaround and delivery; restarting resets them. Reduced motion shows each stage immediately.
+
 On desktop the phone is a handset beside the 3D view; on phone-sized viewports the app fills the screen. The screens are laid out at a phone's 390 logical pixels and zoomed. The flow is a pure step machine in `src/dispatch/flow.ts`, covered by `tests/dispatch.test.ts`; the simulation holds a `dispatch` phase in which the driver waits, and the CLI `dispatch --dock N` command performs the same call-off. Hold X during the operator's turn to skip it.
 
 ## Time trial and leaderboard
@@ -135,6 +137,7 @@ npm run share-card   # Rebuild the link preview card from a running dev server
 | `src/game/simulation.ts`       | Articulated kinematics, oriented collision, progression, proximity, parking/docking, measurements |
 | `src/game/commands.ts`         | Validated CLI/WebMCP commands and feedback driver                                                 |
 | `src/scene.ts`                 | Three.js rendering, camera, lights, models, merged parked rigs                                    |
+| `src/docks.ts`                 | Rolling shutters, visible dock approach, loading worker and loaded forklift arrival               |
 | `src/route.ts`                 | Guide dots per phase as one reusable instanced mesh                                               |
 | `src/prediction.ts`            | Projected tyre track, recomputed only when pose or controls change                                |
 | `src/rig.ts`                   | Driver rig: displacement-driven gait, turning, idle motion                                        |
@@ -154,7 +157,7 @@ Collision uses oriented rectangles for both tractor and trailer. A closed gate a
 
 ## Assets and design research
 
-All 3D assets were authored in Blender from `scripts/build_models.py`, validated with Blender 5.2.1 LTS, and exported as GLB. A generated cab-over tractor, 12.8 m trailer, driver and yard require about 3.4 MB uncompressed. Assets include bevelled bodywork, mirrors, grille, multi-axle wheels, trailer rails, docking equipment, solar roof panels, fencing, kiosk, footpath, trees and lighting columns. Every wheel hangs from a named empty and rolls with the ground it covers, inside wheels slower through a turn; the front pair also steers. The driver's legs, arms, head and torso hang from named empties so the renderer can pose them. Distant scenery is joined by material to keep draw calls down.
+The vehicle, character and static yard assets were authored in Blender from `scripts/build_models.py`, validated with Blender 5.2.1 LTS, and exported as GLB. A generated cab-over tractor, 12.8 m trailer, driver, loaded forklift and yard require about 4.1 MB uncompressed. Assets include bevelled bodywork, mirrors, grille, multi-axle wheels, trailer rails, docking equipment, solar roof panels, fencing, kiosk, footpath, trees and lighting columns. Every wheel hangs from a named empty and rolls with the ground it covers, inside wheels slower through a turn; the front pair also steers. The driver's legs, arms, head and torso hang from named empties so the renderer can pose them. Distant scenery is joined by material to keep draw calls down. Dock shutter slats are instanced in Three.js so they can roll into their housings without adding a draw call per slat. To rebuild only the changed dock assets, run `blender --background --python scripts/build_models.py -- yard forklift`.
 
 The Peripass logo is the official first-party SVG. The house-style starting point is Montserrat and Peripass teal `#00A990`; the game adds dark green and lime feedback accents. The kiosk uses Open Sans and the kiosk app's tokens (page background `#F4F6F9`, primary teal, 56 px controls). Fonts are bundled locally. See [the cited research](docs/research.md) for the real yard process, control rationale, source links and which dimensions are deliberately simplified for play. This is a game, not a truck-driving simulator or an operational safety tool.
 
