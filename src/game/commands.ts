@@ -8,6 +8,7 @@ import {
   snapshot,
   interact,
   register,
+  dispatch,
   enterPin,
   recover,
   walking,
@@ -17,6 +18,7 @@ import {
   rear,
   YARD,
   DT,
+  DISPATCH_DELAY,
   docking,
 } from "./simulation";
 export type Command = { op: string; [key: string]: unknown };
@@ -84,6 +86,11 @@ export function walkTo(s: State, target: Point) {
     throw new Error("Step out of the truck before walking.");
   const start = s.elapsed;
   while (distance(s.driver, target) > 0.3 && s.elapsed - start < 60) {
+    // The operator's phone buzzed: time is frozen until the dock is assigned.
+    if (s.phase === "dispatch")
+      throw new Error(
+        "The yard operator is assigning your dock. Run dispatch --dock N first.",
+      );
     const input = idleInput();
     input.walkX = target.x - s.driver.x;
     input.walkZ = target.z - s.driver.z;
@@ -100,6 +107,9 @@ export function demo(s: State) {
   walkTo(s, YARD.kiosk);
   interact(s);
   register(s, s.booking);
+  // The driver waits by the kiosk while the yard operator calls them off to dock 03.
+  advance(s, idleInput(), DISPATCH_DELAY + 0.5);
+  if (!dispatch(s, 3)) throw new Error("Demo could not dispatch.");
   walkTo(s, { x: -28, z: 29 });
   walkTo(s, { x: -27, z: 37 });
   interact(s);
@@ -159,6 +169,9 @@ export function execute(s: State, raw: unknown) {
     case "pin":
       if (typeof c.pin !== "string") throw new Error("pin must be a string.");
       if (!enterPin(s, c.pin)) throw new Error(s.message);
+      break;
+    case "dispatch":
+      if (!dispatch(s, number(c.dock, "dock"))) throw new Error(s.message);
       break;
     case "recover":
       recover(s);

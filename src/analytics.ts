@@ -11,6 +11,7 @@ const PHASES: Phase[] = [
   "walk-kiosk",
   "kiosk",
   "walk-truck",
+  "dispatch",
   "gate",
   "pin",
   "dock",
@@ -149,7 +150,8 @@ export function trackAction(
     | "recover_used"
     | "leaderboard_opened"
     | "section_board_opened"
-    | "score_saved",
+    | "score_saved"
+    | "visitor_dispatched",
   s: State,
   props: Record<string, unknown> = {},
 ) {

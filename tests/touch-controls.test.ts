@@ -60,11 +60,25 @@ async function game() {
         };
       if (id === "./kiosk/view")
         return { mountKiosk: () => ({ destroy() {} }) };
+      if (id === "./dispatch/view")
+        return {
+          mountDispatch: () => ({
+            flow: { screen: "home" },
+            dismiss: () => Promise.resolve(),
+            destroy() {},
+          }),
+        };
       if (id === "./scene")
         return {
           YardScene: class {
             loaded = true;
             mode = "follow";
+            attention = "driver";
+            cutting = false;
+            operatorPhone = false;
+            cutTo(target: string) {
+              this.attention = target;
+            }
             renderer = { domElement: window.document.createElement("canvas") };
             load() {
               return Promise.resolve();
@@ -240,6 +254,18 @@ test("kiosk hides controls; return walk restores joystick; entering truck restor
     assert.equal(run("state.phase"), "walk-truck");
     assert.equal(document.getElementById("walk-joystick")!.hidden, false);
     assert.equal(document.getElementById("touch-controls")!.hidden, false);
+    // Two seconds later the yard operator's phone buzzes: the camera leaves
+    // the driver, the controls go, and they return once the dock is assigned.
+    run('execute(state, { op: "input", seconds: 3 }); updateUI()');
+    assert.equal(run("state.phase"), "dispatch");
+    assert.equal(run("scene.attention"), "operator");
+    assert.ok(document.getElementById("touch-controls")!.hidden);
+    assert.ok(document.body.classList.contains("operator"));
+    run('execute(state, { op: "dispatch", dock: 2 }); updateUI()');
+    assert.equal(run("state.phase"), "walk-truck");
+    assert.equal(run("scene.attention"), "driver");
+    assert.equal(document.body.classList.contains("operator"), false);
+    assert.equal(document.getElementById("touch-controls")!.hidden, false);
     run(
       'execute(state, { op: "walk-to", x: -28, z: 29 }); execute(state, { op: "walk-to", x: -26.5, z: state.truck.z - 2 }); interact(state); updateUI()',
     );
@@ -278,7 +304,8 @@ test("race HUD waits for movement and keeps real time while controls or leaderbo
     const elapsed = run("state.race.elapsed");
     const z = run("state.truck.z");
     run("frame(last + 5000)");
-    assert.equal(run("state.race.elapsed"), elapsed + 5);
+    // Wall time is a float difference of performance.now() values.
+    assert.ok(Math.abs(run("state.race.elapsed") - (elapsed + 5)) < 1e-9);
     assert.equal(run("state.truck.z"), z);
     assert.equal(
       document.getElementById("dialog-race-clock")!.textContent,
@@ -416,7 +443,7 @@ test("stage rows show your section rank and expand one section board at a time",
     assert.ok([0, 1, 2, 3].every((i) => board(i).hidden));
     assert.equal(
       toggle(3).getAttribute("aria-label"),
-      `Park at dock 03: ${toggle(3).querySelector("b")!.textContent}, ranked 1 of 3`,
+      `Park at your dock: ${toggle(3).querySelector("b")!.textContent}, ranked 1 of 3`,
     );
     toggle(3).click();
     assert.equal(toggle(3).getAttribute("aria-expanded"), "true");
