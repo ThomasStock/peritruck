@@ -17,7 +17,7 @@ function fixture(dock = 3) {
   });
   Object.assign(state.truck, {
     x: dockX(dock),
-    z: 10,
+    z: -5,
     heading: Math.PI,
     trailerHeading: Math.PI,
   });
@@ -49,7 +49,7 @@ test("assigned door opens at a distance in view; a closer truck calls the forkli
     );
     assert.equal(shutter().visible, true, "opening takes time");
     assert.equal(arrival.forklift.visible, false);
-    tick(3);
+    tick(4);
     assert.equal(shutter().visible, false);
     assert.equal(
       arrival.forklift.visible,
@@ -58,8 +58,8 @@ test("assigned door opens at a distance in view; a closer truck calls the forkli
     );
     for (const other of DOCKS.filter((d) => d.number !== dock))
       assert.equal(shutter(other.number).visible, true);
-    state.truck.z = -18;
-    tick(1);
+    state.truck.z = -28;
+    tick(6);
     assert.equal(arrival.forklift.visible, true);
     assert.ok(
       arrival.forklift.position.z > -52 && arrival.forklift.position.z < -46.8,
@@ -80,10 +80,10 @@ test("assigned door opens at a distance in view; a closer truck calls the forkli
 
 test("offscreen and distant docks wait; a quick arrival still waits for shutter clearance", () => {
   const { arrival, state, camera, tick, shutter } = fixture();
-  state.truck.z = 60;
+  state.truck.z = 10;
   tick(4);
   assert.equal(arrival.crew.visible, false);
-  state.truck.z = -18;
+  state.truck.z = -28;
   camera.lookAt(0, 3, 60);
   tick(4);
   assert.equal(arrival.crew.visible, false);
@@ -91,8 +91,22 @@ test("offscreen and distant docks wait; a quick arrival still waits for shutter 
   tick(2);
   assert.equal(shutter().visible, true);
   assert.equal(arrival.forklift.visible, false);
-  tick(2);
+  tick(3);
   assert.equal(shutter().visible, false);
+  assert.equal(arrival.forklift.visible, false);
+  const worker = arrival.root.getObjectByName("dock-worker")!;
+  const start = worker.position.z;
+  tick(2);
+  assert.ok(worker.position.z > start && worker.position.z < -45.05);
+  assert.equal(arrival.forklift.visible, false);
+  tick(2);
+  assert.equal(worker.position.z, -45.05);
+  assert.equal(
+    arrival.forklift.visible,
+    false,
+    "worker pauses before the forklift arrives",
+  );
+  tick(1);
   assert.equal(arrival.forklift.visible, true);
 });
 
@@ -101,7 +115,7 @@ test("reduced motion snaps to each stage; restart and reassignment reset the cre
   tick(DT, true);
   assert.equal(shutter().visible, false);
   assert.equal(arrival.forklift.visible, false);
-  state.truck.z = -18;
+  state.truck.z = -28;
   tick(DT, true);
   assert.equal(arrival.forklift.position.z, -46.8);
   Object.assign(state, createState());
@@ -123,6 +137,26 @@ test("reduced motion snaps to each stage; restart and reassignment reset the cre
   assert.equal(shutter(2).visible, false);
 });
 
+test("an edge glimpse cannot start the shutter, and a clear view must persist", () => {
+  const { arrival, camera, tick } = fixture();
+  camera.lookAt(0, 17, -44);
+  camera.updateMatrixWorld();
+  const centre = new THREE.Vector3(0, 3, -44).project(camera);
+  assert.ok(Math.abs(centre.y) < 1, "door centre is onscreen near the edge");
+  tick(4);
+  assert.equal(arrival.crew.visible, false);
+  camera.lookAt(0, 3, -44);
+  tick(0.5);
+  assert.equal(arrival.crew.visible, false);
+  camera.lookAt(0, 3, 60);
+  tick(0.1);
+  camera.lookAt(0, 3, -44);
+  tick(0.5);
+  assert.equal(arrival.crew.visible, false, "losing sight resets the wait");
+  tick(0.4);
+  assert.equal(arrival.crew.visible, true);
+});
+
 test("dispatch, closed site gates and unavailable docks do not call a crew", () => {
   for (const override of [
     { dispatched: false },
@@ -133,7 +167,7 @@ test("dispatch, closed site gates and unavailable docks do not call a crew", () 
   ]) {
     const { arrival, state, tick, shutter } = fixture();
     Object.assign(state, override);
-    state.truck.z = -18;
+    state.truck.z = -28;
     tick(10);
     assert.equal(arrival.crew.visible, false);
     assert.equal(shutter().visible, true);
@@ -175,8 +209,18 @@ test("authored openings reveal the interior; loaded forks and worker stay inside
   }
   const { arrival, state, tick } = fixture();
   arrival.bind(driver, forklift);
-  state.truck.z = -18;
-  tick(9);
+  state.truck.z = -28;
+  tick(6);
+  const walkingWorker = arrival.root.getObjectByName("dock-worker")!;
+  assert.ok(
+    walkingWorker.position.z > -48.3 && walkingWorker.position.z < -45.05,
+  );
+  const leg = walkingWorker.getObjectByName("leg-left")!;
+  const stride = leg.rotation.x;
+  tick(0.2);
+  assert.notEqual(leg.rotation.x, stride, "walking swings the model's legs");
+  assert.equal(arrival.forklift.visible, false);
+  tick(10);
   const bounds = new THREE.Box3().setFromObject(arrival.forklift, true);
   assert.ok(bounds.max.z < -44.25, `forks stop inside: ${bounds.max.z}`);
   assert.ok(

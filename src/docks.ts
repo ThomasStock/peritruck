@@ -11,9 +11,14 @@ import {
 import { DriverRig } from "./rig";
 
 /** Presentation only: a dock stays ready while the truck turns and reverses. */
-const OPEN_DISTANCE = 72;
-const FORKLIFT_DISTANCE = 30;
-const OPEN_SECONDS = 3;
+const OPEN_DISTANCE = 42;
+const VISIBLE_SECONDS = 0.8;
+const FORKLIFT_DISTANCE = 18;
+const OPEN_SECONDS = 3.5;
+const WORKER_SECONDS = 3.8;
+const WORKER_PAUSE = 1.5;
+const WORKER_START = -48.3;
+const WORKER_STOP = -45.05;
 const FORKLIFT_SECONDS = 4.5;
 const FLOOR = 1.15;
 const TOP = 5;
@@ -32,13 +37,13 @@ export class DockArrival {
   private wheels: THREE.Object3D[] = [];
   private shutters: THREE.InstancedMesh[] = [];
   private transform = new THREE.Object3D();
-  private frustum = new THREE.Frustum();
-  private projection = new THREE.Matrix4();
-  private doorway = new THREE.Sphere(new THREE.Vector3(), 2.5);
+  private projected = new THREE.Vector3();
   private assigned = 0;
   private opening = false;
   private approaching = false;
   private doorProgress = 0;
+  private visibleTime = 0;
+  private workerTime = 0;
   private forkliftProgress = 0;
   private lastElapsed = 0;
 
@@ -98,6 +103,8 @@ export class DockArrival {
       this.assigned = assigned;
       this.opening = this.approaching = false;
       this.doorProgress = this.forkliftProgress = 0;
+      this.visibleTime = this.workerTime = 0;
+      this.workerRig.walk(-1.38, WORKER_START, 0, 0, true);
       this.forklift.position.z = FORKLIFT_START;
       this.forklift.visible = false;
       for (const wheel of this.wheels) wheel.rotation.x = 0;
@@ -116,16 +123,21 @@ export class DockArrival {
         s.truck.z + Math.cos(s.truck.heading) * RIG.front - YARD.dock.z,
       ),
     );
-    if (!this.opening && distance <= OPEN_DISTANCE) {
+    if (!this.opening) {
       camera.updateMatrixWorld();
-      this.frustum.setFromProjectionMatrix(
-        this.projection.multiplyMatrices(
-          camera.projectionMatrix,
-          camera.matrixWorldInverse,
-        ),
-      );
-      this.doorway.center.set(x, 3, -44.25);
-      this.opening = this.frustum.intersectsSphere(this.doorway);
+      // A sliver at the edge of the screen used to open the door before the
+      // driver could notice it. Wait until the whole opening sits comfortably in view.
+      let visible = distance <= OPEN_DISTANCE;
+      for (const dx of [-2.1, 2.1]) {
+        for (const y of [FLOOR, TOP]) {
+          const p = this.projected.set(x + dx, y, -44.25).project(camera);
+          visible &&=
+            p.z > -1 && p.z < 1 && Math.abs(p.x) < 0.85 && Math.abs(p.y) < 0.9;
+        }
+      }
+      this.visibleTime = visible ? this.visibleTime + dt : 0;
+      this.opening =
+        visible && (reducedMotion || this.visibleTime >= VISIBLE_SECONDS);
     }
     if (!this.opening) return;
 
@@ -136,10 +148,27 @@ export class DockArrival {
     this.doorProgress = door;
     this.crew.visible = true;
     this.crew.position.set(x, FLOOR, 0);
-    this.workerRig.stand(-1.38, -45.05, -0.15, false, dt, reducedMotion);
+    if (door === 1)
+      this.workerTime = reducedMotion
+        ? WORKER_SECONDS + WORKER_PAUSE
+        : this.workerTime + dt;
+    const workerProgress = Math.min(1, this.workerTime / WORKER_SECONDS);
+    const workerZ = THREE.MathUtils.lerp(
+      WORKER_START,
+      WORKER_STOP,
+      workerProgress * workerProgress * (3 - 2 * workerProgress),
+    );
+    this.workerRig.walk(
+      -1.38,
+      workerZ,
+      workerProgress < 1 ? 0 : -0.15,
+      dt,
+      reducedMotion,
+    );
     // Wait for clearance, even when a quick approach crosses both thresholds.
     if (distance <= FORKLIFT_DISTANCE) this.approaching = true;
-    if (!this.approaching || door < 1) return;
+    if (!this.approaching || this.workerTime < WORKER_SECONDS + WORKER_PAUSE)
+      return;
 
     this.forklift.visible = true;
     this.forkliftProgress = reducedMotion
