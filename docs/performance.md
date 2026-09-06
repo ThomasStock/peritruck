@@ -100,6 +100,40 @@ node scripts/profile-frames.mjs current-frames-headless
 
 Results land in `artifacts/performance/<label>.json` with a Chrome trace and CPU profile of the driving window.
 
+## 5. Rolling wheels: a cost, not a saving
+
+Spinning the wheels needs each one to be its own transform, so the ten wheels of
+the player's rig can no longer be joined into the by-material meshes around
+them. This section records what that cost, because it moves numbers section 4
+established.
+
+Every wheel now hangs from a `wheel-*` empty authored in
+`scripts/build_models.py`, with its tyre, hub and cap+bolts joined into three
+meshes underneath. The front pair keeps its `steering-*` empty, which previously
+held nine loose meshes per wheel that no join ever reached.
+
+| Meshes under the moving rig | Before | After |
+| --------------------------- | -----: | ----: |
+| Tractor                     |     29 |    28 |
+| Trailer                     |      8 |    25 |
+
+The tractor barely moves: joining the two steered wheels gives back almost
+exactly what un-joining the four drive wheels costs. The trailer pays the full
+price of six wheels.
+
+Measured in the same isolated fixture as sections 1–3, follow camera, 1280 × 800
+at DPR 2, after 90 fixed steps of driving forward from the start pose, reading
+`renderer.info.render.calls` for a whole `render()` call (shadow pass and colour
+pass together): **84 → 100 draw calls per frame**, on an unchanged `yard.glb`.
+
+The three parked rigs are unaffected. `mergeByMaterial` merges by material
+regardless of hierarchy, so they stay at 13 draw calls; `tests/scene.test.ts`
+asserts their merged geometry, materials and world-space bounds.
+
+Instancing the wheels would undercut both numbers, since all ten share three
+geometries and three materials. That means lifting them out of the GLB and
+placing them at runtime, which is a larger change than this one and is not done.
+
 ## Environment and interpretation
 
 Browser profiles: Chrome `152.0.7977.83`, macOS arm64, Apple M4, ANGLE Metal renderer on Apple M4; 1280 × 800, DPR 1. Isolated same-origin development fixture loads the normal assets and `YardScene` without the app animation loop. Fixed yard camera, reduced motion, 30 warmup frames, then five batches of 30 frames. Moving prediction fixtures advance the truck at fixed `DT` outside the timed render interval.
