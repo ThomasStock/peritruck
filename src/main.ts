@@ -1,3 +1,4 @@
+import "./sentry";
 import "@fontsource/montserrat/400.css";
 import "@fontsource/montserrat/500.css";
 import "@fontsource/montserrat/600.css";
@@ -47,7 +48,30 @@ import {
 import { execute } from "./game/commands";
 import { mountKiosk, type KioskController } from "./kiosk/view";
 import { clock, phoneHtml, smsBannerHtml } from "./sms";
+import { walkingJoystick } from "./walking-joystick";
 const app = document.querySelector<HTMLDivElement>("#app")!;
+const isEditable = (target: EventTarget | null) =>
+  target instanceof Element &&
+  !!target.closest('input,textarea,[contenteditable="true"]');
+for (const type of ["selectstart", "contextmenu", "dblclick"]) {
+  app.addEventListener(type, (event) => {
+    if (!isEditable(event.target)) event.preventDefault();
+  });
+}
+app.addEventListener("dragstart", (event) => event.preventDefault());
+// Safari trackpad gestures and Ctrl+wheel can bypass touch-action.
+for (const type of ["gesturestart", "gesturechange"]) {
+  document.addEventListener(type, (event) => event.preventDefault(), {
+    passive: false,
+  });
+}
+document.addEventListener(
+  "wheel",
+  (event) => {
+    if (event.ctrlKey) event.preventDefault();
+  },
+  { passive: false },
+);
 app.innerHTML = `
 <div id="world"></div>
 <header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><button id="camera" class="icon-button" aria-label="Change camera view" title="Camera · C">◩</button><button id="help" class="icon-button" aria-label="Controls and settings" title="Controls · Escape">?</button></div></header>
@@ -62,7 +86,7 @@ app.innerHTML = `
 <footer class="bottom-bar"><div class="controls-hint" id="controls-hint"></div></footer>
 <div id="dock-guide" class="dock-guide panel hidden"><div class="eyebrow">03 · DOCKING GUIDE</div><strong id="dock-coach">Trailer first.</strong><div class="dock-measure"><span>Side offset</span><b id="dock-offset"></b></div><div class="dock-meter"><i id="dock-needle"></i><span></span></div><div class="dock-measure"><span>Trailer angle</span><b id="dock-angle"></b></div><div class="dock-measure"><span>To bumper</span><b id="dock-gap"></b></div><p id="dock-tip"></p></div>
 <div id="telemetry" class="telemetry panel hidden"><div class="gear"><b id="gear">N</b><span>AUTO</span></div><div class="speed"><b id="speed">00</b><span>KM/H</span></div><div id="assist-tag" class="assist-tag"><span class="live-dot"></span> REVERSE ASSIST</div><div class="articulation"><span>TRAILER</span><div><i id="articulation-bar"></i></div><b id="articulation-value">0°</b></div></div>
-<div id="touch-controls" aria-label="Touch driving controls"><div class="touch-group"><button data-touch="left" aria-label="Steer left">←</button><button data-touch="right" aria-label="Steer right">→</button></div><div class="touch-group pedals"><button data-touch="reverse" aria-label="Brake then reverse">↓<small>REVERSE</small></button><button data-touch="forward" aria-label="Drive forward">↑<small>DRIVE</small></button><button data-touch="brake" aria-label="Brake">■</button></div></div>
+<div id="touch-controls" aria-label="Touch driving controls"><div class="touch-group"><button data-touch="left" aria-label="Steer left">←</button><button data-touch="right" aria-label="Steer right">→</button></div><div class="touch-group pedals"><button data-touch="reverse" aria-label="Brake then reverse">↓<small>REVERSE</small></button><button data-touch="forward" aria-label="Drive forward">↑<small>DRIVE</small></button><button data-touch="brake" aria-label="Brake">■</button></div><div id="walk-joystick" class="walking-joystick" role="group" aria-label="Walking joystick: drag to move" hidden><span class="joystick-knob"></span></div></div>
 <div id="modal-root"></div>
 `;
 const $ = (id: string) => document.getElementById(id)!;
@@ -74,6 +98,9 @@ let state = createState(),
   settingsOpen = false;
 const keys = new Set<string>(),
   touch = new Set<string>();
+const joystick = walkingJoystick($("walk-joystick"));
+let touchWalking = false,
+  touchEnabled = false;
 const defaults: Record<string, string> = {
   forward: "w",
   reverse: "s",
@@ -186,6 +213,7 @@ function start() {
   scene.renderer.domElement.focus();
 }
 function currentInput(gamepad?: Gamepad): Input {
+  syncTouchControls();
   const down = (action: string, arrow = "") =>
     keys.has(bindings[action]) || keys.has(arrow) || touch.has(action);
   const i = idleInput();
@@ -204,6 +232,10 @@ function currentInput(gamepad?: Gamepad): Input {
   }
   i.walkX = -i.steer;
   i.walkZ = -i.throttle;
+  if (walking(state) && (joystick.value.x || joystick.value.z)) {
+    i.walkX = joystick.value.x;
+    i.walkZ = joystick.value.z;
+  }
   // Walking uses screen-relative arrows for the fixed isometric view.
   if (walking(state) && scene.mode === "follow") {
     const x = i.walkX,
@@ -269,8 +301,7 @@ function closeDialog() {
   if (state.phase === "kiosk") state.phase = "walk-kiosk";
   if (state.phase === "pin") state.phase = "gate";
   remapping = null;
-  keys.clear();
-  touch.clear();
+  clearInput();
   syncDialog();
 }
 window.addEventListener("keydown", (e) => {
@@ -350,7 +381,34 @@ window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 const clearInput = () => {
   keys.clear();
   touch.clear();
+  joystick.reset();
+  document.querySelectorAll("[data-touch].pressed").forEach((button) => {
+    button.classList.remove("pressed");
+  });
 };
+function syncTouchControls() {
+  const isWalking = walking(state);
+  const enabled =
+    started &&
+    !settingsOpen &&
+    !cliPaused &&
+    !document.hidden &&
+    !["kiosk", "pin", "complete"].includes(state.phase);
+  if (isWalking === touchWalking && enabled === touchEnabled) return;
+  clearInput();
+  touchWalking = isWalking;
+  touchEnabled = enabled;
+  $("touch-controls").hidden = !enabled;
+  $("touch-controls").setAttribute(
+    "aria-label",
+    isWalking ? "Touch walking controls" : "Touch driving controls",
+  );
+  $("walk-joystick").hidden = !isWalking;
+  document.querySelectorAll<HTMLElement>(".touch-group").forEach((group) => {
+    group.hidden = isWalking;
+  });
+  document.body.classList.toggle("walking", isWalking);
+}
 window.addEventListener("blur", clearInput);
 document.addEventListener("visibilitychange", () => {
   clearInput();
@@ -362,8 +420,7 @@ function modal(title: string, body: string, cls = "") {
   $("modal-root").innerHTML =
     `<div class="modal-scrim"><section class="dialog ${cls}" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabindex="-1"><button class="dialog-close" id="close-dialog" aria-label="Close dialog">×</button><div class="eyebrow">PERIPASS</div><h2 id="dialog-title">${title}</h2>${body}</section></div>`;
   $("close-dialog").onclick = closeDialog;
-  keys.clear();
-  touch.clear();
+  clearInput();
   // Move focus onto the dialog itself, not its first control, so nothing
   // lights up on open while Escape and the Tab trap keep working.
   $("modal-root")
@@ -453,8 +510,7 @@ function syncDialog() {
   } else if (kind === "kiosk") {
     // The self-service kiosk: language, check-in method, reference, phone, endscreen.
     modalReturnFocus = document.activeElement as HTMLElement;
-    keys.clear();
-    touch.clear();
+    clearInput();
     kiosk = mountKiosk($("modal-root"), {
       booking: state.booking,
       onQuit: closeDialog,
@@ -663,10 +719,12 @@ const style = (id: string, property: string, value: string) =>
   );
 const progress = [...document.querySelectorAll(".mission-progress i")];
 function updateUI() {
+  syncTouchControls();
   const o = objective(state),
     p = parking(state),
     d = docking(state),
     isWalking = walking(state);
+  $("telemetry").classList.toggle("hidden", !started || isWalking);
   text("objective-title", o.title);
   text("objective-detail", o.detail);
   text(
@@ -924,8 +982,7 @@ async function control(command: unknown) {
   if (c?.op !== "status") {
     cliPaused = true;
     settingsOpen = false;
-    keys.clear();
-    touch.clear();
+    clearInput();
   }
   const result = execute(state, command);
   updateUI();

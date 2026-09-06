@@ -5,3 +5,5 @@ dist/
 artifacts/
 *.blend1
 .DS_Store
+.vercel
+.env*.local
