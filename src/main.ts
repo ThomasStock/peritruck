@@ -699,12 +699,12 @@ function syncDialog() {
         : eligible
           ? "Delivery nailed!"
           : "Practice complete!",
-      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? "↻ PRACTICE RUN" : newBest ? `★ ${BOARD} BEST` : "✓ RUN COMPLETE"}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? "Ready to try the full delivery?" : !best ? "First run on the board. Set the pace!" : newBest ? `${formatTime(best.seconds - result.seconds)} faster than the ${boardLabel} best` : `${formatTime(result.seconds - best.seconds)} off the ${boardLabel} best. Go again?`}</p><div id="result-splits"></div><div class="result-stats"><span>${result.contacts} contacts</span><span>${result.recoveries} recoveries</span><span>${result.assisted ? "Assist on" : "Classic steering"}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">Put your name on the board</label><div><input id="player-name" maxlength="24" placeholder="Your driver name" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">Save run <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? "Skipped stages make this a practice run. Complete all four stages to join the leaderboard." : saved ? "Your run is on the board." : leaderboard.shared ? "Save your run to the global board. No account needed." : "Save your run on this browser. No account needed."}</p><div class="result-board-title"><b>♛ Yard legends</b><span>${BOARD} TOP 5</span></div><div id="leaderboard-list"></div><button id="play-again" class="primary play-again">Beat your time <span>↻</span></button><button id="results-feedback" class="secondary results-feedback">✎ Something off? Send feedback</button>`,
+      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? "↻ PRACTICE RUN" : newBest ? `★ ${BOARD} BEST` : "✓ RUN COMPLETE"}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? "Ready to try the full delivery?" : !best ? "First run on the board. Set the pace!" : newBest ? `${formatTime(best.seconds - result.seconds)} faster than the ${boardLabel} best` : `${formatTime(result.seconds - best.seconds)} off the ${boardLabel} best. Go again?`}</p><div id="result-splits"></div><div class="result-stats"><span>${result.contacts} contacts</span><span>${result.recoveries} recoveries</span><span>${result.assisted ? "Assist on" : "Classic steering"}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">Put your name on the board</label><div><input id="player-name" maxlength="24" placeholder="Your driver name" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">Save run <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? "Skipped stages make this a practice run. Complete all four stages to join the leaderboard." : saved ? "Your run is on the board." : leaderboard.shared ? "Save your run to the global board. No account needed." : "Save your run on this browser. No account needed."}</p><div class="result-board-title"><b>♛ Yard legends</b><span>${BOARD} TOP 20</span></div><div id="leaderboard-list" class="board-scroll"></div><button id="play-again" class="primary play-again">Beat your time <span>↻</span></button><button id="results-feedback" class="secondary results-feedback">✎ Something off? Send feedback</button>`,
       "complete-dialog race-results",
     );
     $("results-feedback").onclick = () => openFeedback("results");
     $("close-dialog").classList.add("hidden");
-    renderLeaderboard(result.id, 5);
+    renderLeaderboard(result.id, 20);
     renderSplits();
     $("score-form").onsubmit = async (event) => {
       event.preventDefault();
@@ -743,7 +743,7 @@ function syncDialog() {
         return;
       }
       if (document.getElementById("leaderboard-list"))
-        renderLeaderboard(result.id, 5);
+        renderLeaderboard(result.id, 20);
       renderSplits();
       refreshBest();
       document.getElementById("play-again")?.focus();
@@ -862,7 +862,7 @@ function renderSplits() {
     if (open) {
       const title = document.createElement("div");
       title.className = "split-board-title";
-      title.innerHTML = `<b>Fastest ${label}</b><span>${BOARD} TOP 5</span>`;
+      title.innerHTML = `<b>Fastest ${label}</b><span>${BOARD} TOP 20</span>`;
       panel.append(title);
       if (!board.length) {
         const empty = document.createElement("p");
@@ -871,8 +871,8 @@ function renderSplits() {
         panel.append(empty);
       } else {
         const list = document.createElement("ol");
-        list.className = "leaderboard-rows";
-        const visible = board.slice(0, 5);
+        list.className = "leaderboard-rows board-scroll";
+        const visible = board.slice(0, 20);
         if (own && !visible.includes(own)) visible.push(own);
         const best = board[0].seconds;
         for (const entry of visible) {
