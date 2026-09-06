@@ -49,6 +49,8 @@ import { execute } from "./game/commands";
 import { mountKiosk, type KioskController } from "./kiosk/view";
 import { clock, phoneHtml, smsBannerHtml } from "./sms";
 import { walkingJoystick } from "./walking-joystick";
+import { initAnalytics, observe, setControls, trackAction } from "./analytics";
+initAnalytics();
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const isEditable = (target: EventTarget | null) =>
   target instanceof Element &&
@@ -228,11 +230,13 @@ function currentInput(gamepad?: Gamepad): Input {
     const pedal =
       (gamepad.buttons[7]?.value ?? 0) - (gamepad.buttons[6]?.value ?? 0);
     if (Math.abs(pedal) > 0.05) i.throttle = pedal;
+    if (i.steer || i.throttle) setControls("gamepad");
     i.brake ||= !!gamepad.buttons[1]?.pressed;
   }
   i.walkX = -i.steer;
   i.walkZ = -i.throttle;
   if (walking(state) && (joystick.value.x || joystick.value.z)) {
+    setControls("touch");
     i.walkX = joystick.value.x;
     i.walkZ = joystick.value.z;
   }
@@ -282,6 +286,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(
     e.preventDefault();
     button.setPointerCapture(e.pointerId);
     touch.add(button.dataset.touch!);
+    setControls("touch");
     button.classList.add("pressed");
   };
   const release = () => {
@@ -374,7 +379,10 @@ window.addEventListener("keydown", (e) => {
     syncDialog();
   }
   if (k === bindings.camera) $("camera").click();
-  if (k === bindings.recover && started) recover(state);
+  if (k === bindings.recover && started) {
+    recover(state);
+    trackAction("recover_used", state);
+  }
   if (k === "enter" && !started) start();
 });
 window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
@@ -497,6 +505,7 @@ function syncDialog() {
     $("resume").onclick = closeDialog;
     $("recover").onclick = () => {
       recover(state);
+      trackAction("recover_used", state);
       closeDialog();
     };
     $("restart").onclick = () => {
@@ -542,6 +551,7 @@ function syncDialog() {
         beep(880);
         syncDialog();
       } else {
+        trackAction("pin_rejected", state);
         $("form-error").textContent = state.message;
         ($("pin-input") as HTMLInputElement).select();
       }
@@ -912,7 +922,7 @@ function frame(now: number) {
   else if (!skipHeldSince) skipHeldSince = now;
   else if (now - skipHeldSince >= 1000) {
     skipHeldSince = Infinity;
-    skipAhead(state);
+    if (skipAhead(state)) trackAction("skip_used", state);
   }
   if (started && !paused) {
     accumulator += dt;
@@ -934,6 +944,7 @@ function frame(now: number) {
     accumulator = 0;
     previous = null;
   }
+  if (started) observe(state);
   scene.render(viewState(), input, dt, started);
   placeTargetLabel();
   if (audio && engine && engineGain) {
@@ -963,6 +974,7 @@ function frame(now: number) {
 async function control(command: unknown) {
   const c = command as { op?: string };
   if (!scene.loaded) throw new Error("The yard is still loading.");
+  setControls("cli");
   if (!started && c?.op !== "status") start();
   if (c?.op === "resume") {
     cliPaused = false;

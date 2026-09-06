@@ -48,6 +48,13 @@ async function game() {
     require: (id: string) => {
       if (id.endsWith(".css")) return {};
       if (id === "./sentry") return {};
+      if (id === "./analytics")
+        return {
+          initAnalytics() {},
+          observe() {},
+          setControls() {},
+          trackAction() {},
+        };
       if (id === "./kiosk/view")
         return { mountKiosk: () => ({ destroy() {} }) };
       if (id === "./scene")
