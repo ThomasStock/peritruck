@@ -63,7 +63,7 @@ test("kiosk and PIN entry count toward stage splits while truck physics is froze
   assert.ok(Math.abs(s.race.splits[2] - beforePin - 2) < 1e-8);
 });
 
-test("full delivery records four ordered splits, freezes finish time, and yields a saveable result", () => {
+test("full delivery records four ordered splits, freezes finish time, and yields a saveable result", async () => {
   const s = createState();
   demo(s);
   assert.equal(s.race.splits.length, 4);
@@ -80,7 +80,7 @@ test("full delivery records four ordered splits, freezes finish time, and yields
     false,
     "save only leaderboard data, not the whole simulation",
   );
-  assert.ok(board.save({ ...result, name: "Driver" }).persisted);
+  assert.ok((await board.save({ ...result, name: "Driver" })).persisted);
 });
 
 test("playtest shortcuts mark the run as practice and its clock still freezes at the dock", () => {
@@ -139,25 +139,25 @@ function result(id: string, seconds = 100): Result {
   };
 }
 
-test("leaderboard persists, ranks fastest first, normalizes names and saves each run once", () => {
+test("leaderboard persists, ranks fastest first, normalizes names and saves each run once", async () => {
   const store = storage();
   const board = createLeaderboard(() => store);
-  board.save(result("slow", 120));
+  await board.save(result("slow", 120));
   assert.equal(
-    board.save({ ...result("fast"), name: "  Truck   Hero  " }).rank,
+    (await board.save({ ...result("fast"), name: "  Truck   Hero  " })).rank,
     1,
   );
-  board.save({ ...result("fast"), name: "New name" });
+  await board.save({ ...result("fast"), name: "New name" });
   assert.deepEqual(
     board.list().map((r) => r.id),
     ["fast", "slow"],
   );
   assert.equal(board.list()[0].name, "New name");
   assert.deepEqual(createLeaderboard(() => store).list(), board.list());
-  assert.throws(() => board.save({ ...result("empty"), name: "  " }));
+  await assert.rejects(board.save({ ...result("empty"), name: "  " }));
 });
 
-test("bad storage data is ignored and valid entries survive", () => {
+test("bad storage data is ignored and valid entries survive", async () => {
   const store = storage();
   store.setItem(
     "peritruck-leaderboard-v1",
@@ -178,10 +178,10 @@ test("bad storage data is ignored and valid entries survive", () => {
   store.setItem("peritruck-leaderboard-v1", "{bad json");
   const board = createLeaderboard(() => store);
   assert.deepEqual(board.list(), []);
-  assert.ok(board.save(result("fresh")).persisted);
+  assert.ok((await board.save(result("fresh"))).persisted);
 });
 
-test("unavailable or full storage retains results for the current visit and reports failure", () => {
+test("unavailable or full storage retains results for the current visit and reports failure", async () => {
   for (const getStorage of [
     () => {
       throw new Error("blocked");
@@ -195,16 +195,16 @@ test("unavailable or full storage retains results for the current visit and repo
   ]) {
     const board = createLeaderboard(getStorage);
     assert.deepEqual(board.list(), []);
-    assert.equal(board.save(result("local")).persisted, false);
+    assert.equal((await board.save(result("local"))).persisted, false);
     assert.equal(board.list()[0].id, "local");
   }
 });
 
-test("leaderboard retains the fastest 100 and reports a slower run's actual rank", () => {
+test("leaderboard retains the fastest 100 and reports a slower run's actual rank", async () => {
   const store = storage();
   const board = createLeaderboard(() => store);
-  for (let i = 0; i < 100; i++) board.save(result(String(i), 100 + i));
-  assert.equal(board.save(result("slowest", 300)).rank, 101);
+  for (let i = 0; i < 100; i++) await board.save(result(String(i), 100 + i));
+  assert.equal((await board.save(result("slowest", 300))).rank, 101);
   assert.equal(board.list().length, 100);
   assert.equal(board.list().at(-1)?.seconds, 199);
 });

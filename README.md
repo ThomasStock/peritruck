@@ -51,13 +51,13 @@ Two seconds after leaving the kiosk the SMS lands on the driver's phone: a lock-
 
 Production strings are reused where the real kiosk has them; demo-only copy (visit types, phone note, endscreen) is written in `src/kiosk/i18n.ts`. The flow itself is a pure step machine in `src/kiosk/flow.ts`, covered by `tests/kiosk.test.ts`. The CLI `register` command still completes the kiosk in one call.
 
-## Time trial and local leaderboard
+## Time trial and leaderboard
 
 Finish the delivery as fast as possible. The race starts on the truck’s first actual movement, with four timed sections: parking in P02 and stepping out, completing kiosk check-in, opening the gate, and parking at dock 03. Each section includes travel from the preceding milestone.
 
 The browser uses real elapsed time, including kiosk/PIN entry, settings, and hidden-tab time. Recovery preserves the clock and splits. The existing hold-X playtest shortcut marks the run as practice; skipped runs cannot enter the leaderboard. The final docking hold stops the clock. The results screen shows total time, stage durations, contacts, recoveries and steering mode; enter a driver name to save the run, or immediately race again.
 
-The leaderboard keeps the fastest 100 runs in this browser’s local storage (`peritruck-leaderboard-v1`), ranked by total time. It is shared across visits on the same browser/origin, not across devices. Blocked/full storage falls back to this visit only and explains that after saving. `src/game/leaderboard.ts` owns the storage adapter so a future backend can replace it. CLI runs use deterministic simulation steps for race timing, including explicit waits at the kiosk/gate; live CLI control suspends the browser clock while commands advance it.
+The leaderboard is backed by [Convex](https://convex.dev) when `VITE_CONVEX_URL` is set: `convex/schema.ts` defines the `results` table, `convex/leaderboard.ts` exposes the `top` query and `save` mutation (server-side validation, one row per run, rank computed on save), and `src/leaderboard-convex.ts` subscribes so every open client updates live. Without that variable (tests, offline dev) `src/game/leaderboard.ts` falls back to the fastest 100 runs in this browser’s local storage (`peritruck-leaderboard-v1`). Run `npm run convex` (`npx convex dev`) alongside `npm run dev` to push functions and write `.env.local`. Vercel builds with `npm run build:vercel` (`convex deploy --cmd 'npm run build'`), which needs `CONVEX_DEPLOY_KEY` in the project environment. CLI runs use deterministic simulation steps for race timing, including explicit waits at the kiosk/gate; live CLI control suspends the browser clock while commands advance it.
 
 ## Drive from the CLI
 
