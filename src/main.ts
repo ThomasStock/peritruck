@@ -38,7 +38,12 @@ import {
   corners,
   staticRigs,
   rear,
+  blendPoint,
+  blendTruck,
   type Input,
+  type Point,
+  type State,
+  type Truck,
 } from "./game/simulation";
 import { execute } from "./game/commands";
 import { mountKiosk, type KioskController } from "./kiosk/view";
@@ -209,7 +214,7 @@ function start() {
   $("telemetry").classList.remove("hidden");
   scene.renderer.domElement.focus();
 }
-function currentInput(): Input {
+function currentInput(gamepad?: Gamepad): Input {
   syncTouchControls();
   const down = (action: string, arrow = "") =>
     keys.has(bindings[action]) || keys.has(arrow) || touch.has(action);
@@ -220,7 +225,6 @@ function currentInput(): Input {
     Number(down("left", "arrowleft")) - Number(down("right", "arrowright"));
   i.brake = down("brake");
   i.precision = down("precision");
-  const gamepad = navigator.getGamepads?.().find((g) => g?.connected);
   if (gamepad && !settingsOpen) {
     if (Math.abs(gamepad.axes[0]) > 0.15) i.steer = -gamepad.axes[0];
     const pedal =
@@ -569,7 +573,25 @@ function syncDialog() {
     beep(880);
   }
 }
+let mapKey = "";
 function drawMap() {
+  // A full redraw every UI tick repaints the panel even when nothing moved.
+  // Redraw only once the truck, driver or destination shifts by a map pixel.
+  const t = state.truck,
+    o = objective(state);
+  const key = [
+    state.phase,
+    o.target.x,
+    o.target.z,
+    Math.round(t.x * 10),
+    Math.round(t.z * 10),
+    Math.round(t.heading * 20),
+    Math.round(t.trailerHeading * 20),
+    Math.round(state.driver.x * 10),
+    Math.round(state.driver.z * 10),
+  ].join();
+  if (key === mapKey) return;
+  mapKey = key;
   const canvas = $("map") as HTMLCanvasElement,
     ctx = canvas.getContext("2d")!,
     w = canvas.width,
@@ -622,8 +644,7 @@ function drawMap() {
       ctx.fill();
     }
   }
-  const o = objective(state),
-    p = xy(o.target.x, o.target.z);
+  const p = xy(o.target.x, o.target.z);
   ctx.strokeStyle = "#00a990";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -690,6 +711,23 @@ function syncSms() {
     hideSmsBanner();
   }
 }
+// Writing an unchanged string still replaces the text node and dirties style
+// and layout for the panel, so the HUD only touches the DOM when a value moves.
+const shown = new Map<string, string>();
+function write(key: string, value: string, apply: () => void) {
+  if (shown.get(key) === value) return;
+  shown.set(key, value);
+  apply();
+}
+const text = (id: string, value: string) =>
+  write(id, value, () => ($(id).textContent = value));
+const html = (id: string, value: string) =>
+  write(`${id}.html`, value, () => ($(id).innerHTML = value));
+const style = (id: string, property: string, value: string) =>
+  write(`${id}.${property}`, value, () =>
+    $(id).style.setProperty(property, value),
+  );
+const progress = [...document.querySelectorAll(".mission-progress i")];
 function updateUI() {
   syncTouchControls();
   const o = objective(state),
@@ -697,41 +735,55 @@ function updateUI() {
     d = docking(state),
     isWalking = walking(state);
   $("telemetry").classList.toggle("hidden", !started || isWalking);
-  $("objective-title").textContent = o.title;
-  $("objective-detail").textContent = o.detail;
-  $("step-label").textContent =
-    `0${Math.min(o.step + 1, 4)} / 04 · ${["ARRIVAL", "CHECK-IN", "ACCESS", "DELIVERY", "COMPLETE"][o.step]}`;
-  document
-    .querySelectorAll(".mission-progress i")
-    .forEach((el, i) => el.classList.toggle("active", i <= o.step));
-  $("speed").textContent = String(
-    Math.round(Math.abs(state.truck.speed) * 3.6),
-  ).padStart(2, "0");
-  $("gear").textContent = isWalking
-    ? "↟"
-    : state.truck.speed < -0.05
-      ? "R"
-      : state.truck.speed > 0.05
-        ? "D"
-        : "N";
-  $("assist-tag").innerHTML = state.assisted
-    ? '<span class="live-dot"></span> REVERSE ASSIST'
-    : "CLASSIC STEERING";
+  text("objective-title", o.title);
+  text("objective-detail", o.detail);
+  text(
+    "step-label",
+    `0${Math.min(o.step + 1, 4)} / 04 · ${["ARRIVAL", "CHECK-IN", "ACCESS", "DELIVERY", "COMPLETE"][o.step]}`,
+  );
+  progress.forEach((el, i) => el.classList.toggle("active", i <= o.step));
+  text(
+    "speed",
+    String(Math.round(Math.abs(state.truck.speed) * 3.6)).padStart(2, "0"),
+  );
+  text(
+    "gear",
+    isWalking
+      ? "↟"
+      : state.truck.speed < -0.05
+        ? "R"
+        : state.truck.speed > 0.05
+          ? "D"
+          : "N",
+  );
+  html(
+    "assist-tag",
+    state.assisted
+      ? '<span class="live-dot"></span> REVERSE ASSIST'
+      : "CLASSIC STEERING",
+  );
   const beta =
     (angle(state.truck.heading - state.truck.trailerHeading) * 180) / Math.PI;
-  $("articulation-value").textContent = `${Math.round(Math.abs(beta))}°`;
-  $("articulation-bar").style.width =
-    `${Math.min((Math.abs(beta) / 65) * 100, 100)}%`;
-  $("articulation-bar").style.background =
-    Math.abs(beta) > 45 ? "#dc8444" : "#00a990";
+  text("articulation-value", `${Math.round(Math.abs(beta))}°`);
+  style(
+    "articulation-bar",
+    "width",
+    `${Math.min((Math.abs(beta) / 65) * 100, 100)}%`,
+  );
+  style(
+    "articulation-bar",
+    "background",
+    Math.abs(beta) > 45 ? "#dc8444" : "#00a990",
+  );
   const action = prompt(state);
   $("action-wrap").classList.toggle(
     "hidden",
     !action || !started || settingsOpen,
   );
-  $("action-text").textContent = action;
-  $("target-symbol").textContent = ["P", "↟", "↗", "03", "✓"][o.step];
-  $("target-name").textContent =
+  text("action-text", action);
+  text("target-symbol", ["P", "↟", "↗", "03", "✓"][o.step]);
+  text(
+    "target-name",
     state.phase === "walk-truck"
       ? "YOUR TRUCK"
       : [
@@ -740,13 +792,17 @@ function updateUI() {
           "ENTRY GATE",
           "DOCK 03",
           "DELIVERED",
-        ][o.step];
+        ][o.step],
+  );
   const slow = slowDown(state);
   $("target-label").classList.toggle("slow", slow);
-  $("target-distance").textContent = slow
-    ? "Slow down"
-    : `${Math.round(distance(isWalking ? state.driver : state.truck, o.target))} m away`;
-  $("toast").textContent = state.message;
+  text(
+    "target-distance",
+    slow
+      ? "Slow down"
+      : `${Math.round(distance(isWalking ? state.driver : state.truck, o.target))} m away`,
+  );
+  text("toast", state.message);
   $("toast").classList.toggle(
     "hidden",
     state.elapsed > state.messageUntil || !state.message || settingsOpen,
@@ -754,14 +810,14 @@ function updateUI() {
   $("cli-resume").classList.toggle("hidden", !cliPaused);
   syncSms();
   const sms = smsReceived(state);
-  $("note-label").textContent = sms ? "SMS FROM PERIPASS" : "YOUR DELIVERY";
-  $("delivery-reference").textContent = sms
-    ? `PIN ${state.pin} → Dock 03`
-    : `${state.booking} → Ghent`;
-  $("note-detail").textContent = sms
-    ? "Gate access code"
-    : "Registration reference";
-  $("stage-hint").textContent =
+  text("note-label", sms ? "SMS FROM PERIPASS" : "YOUR DELIVERY");
+  text(
+    "delivery-reference",
+    sms ? `PIN ${state.pin} → Dock 03` : `${state.booking} → Ghent`,
+  );
+  text("note-detail", sms ? "Gate access code" : "Registration reference");
+  text(
+    "stage-hint",
     state.phase === "arrive"
       ? p.ready
         ? "Parked. Press E to exit."
@@ -772,17 +828,22 @@ function updateUI() {
         ? "Reverse assist: aim the trailer with A / D."
         : isWalking
           ? "WASD / arrows to walk. E to interact."
-          : "Follow the marked lane to the gate.";
+          : "Follow the marked lane to the gate.",
+  );
   $("dock-guide").classList.toggle(
     "hidden",
     state.phase !== "dock" || !started,
   );
-  $("dock-offset").textContent = `${d.lateral.toFixed(1)} m`;
-  $("dock-angle").textContent = `${d.angleDegrees.toFixed(0)}°`;
-  $("dock-gap").textContent = d.gap > 0 ? `${d.gap.toFixed(1)} m` : "At bumper";
-  $("dock-needle").style.left =
-    `${50 + Math.max(-47, Math.min(47, rear(state.truck).x * 10))}%`;
-  $("dock-coach").textContent =
+  text("dock-offset", `${d.lateral.toFixed(1)} m`);
+  text("dock-angle", `${d.angleDegrees.toFixed(0)}°`);
+  text("dock-gap", d.gap > 0 ? `${d.gap.toFixed(1)} m` : "At bumper");
+  style(
+    "dock-needle",
+    "left",
+    `${50 + Math.max(-47, Math.min(47, rear(state.truck).x * 10))}%`,
+  );
+  text(
+    "dock-coach",
     d.angleDegrees > 90
       ? "Turn the cab away."
       : d.ready
@@ -793,11 +854,14 @@ function updateUI() {
             ? "Straighten the trailer."
             : d.gap < 2
               ? "Brake at the bumper."
-              : "Reverse slowly.";
-  $("dock-tip").textContent =
+              : "Reverse slowly.",
+  );
+  text(
+    "dock-tip",
     d.angleDegrees > 90
       ? "The back of the trailer goes against the dock. Use the open apron to turn around."
-      : "Hold Shift for a slow approach. Release steering to let the trailer straighten.";
+      : "Hold Shift for a slow approach. Release steering to let the trailer straighten.",
+  );
   drawMap();
   syncDialog();
 }
@@ -820,13 +884,28 @@ function placeTargetLabel() {
   );
   label.style.transform = `translate(${x}px,${y}px) translate(-50%,-115%)`;
 }
+// The simulation advances in fixed 1/60 s steps while frames arrive at the
+// display rate. Drawing the raw state moves the rig on only some frames (every
+// other frame at 120 Hz, and irregularly at 60 Hz as timestamps drift), which
+// reads as stutter against the smoothly damped camera. Rendering blends the
+// poses before and after the latest step by the accumulator's remainder.
+let previous: { truck: Truck; driver: Point } | null = null;
+function viewState(): State {
+  if (!previous) return state;
+  const alpha = Math.min(accumulator / DT, 1);
+  return {
+    ...state,
+    truck: blendTruck(previous.truck, state.truck, alpha),
+    driver: blendPoint(previous.driver, state.driver, alpha),
+  };
+}
 function frame(now: number) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
-  const input = currentInput(),
+  const pad = navigator.getGamepads?.().find((g) => g?.connected) ?? undefined;
+  const input = currentInput(pad),
     paused = settingsOpen || cliPaused || document.hidden;
-  const pad = navigator.getGamepads?.().find((g) => g?.connected),
-    pressed = !!pad?.buttons[0]?.pressed;
+  const pressed = !!pad?.buttons[0]?.pressed;
   if (pressed && !lastGamepadAction && started && !paused) {
     interact(state);
     syncDialog();
@@ -848,12 +927,25 @@ function frame(now: number) {
   if (started && !paused) {
     accumulator += dt;
     while (accumulator >= DT) {
+      previous = { truck: { ...state.truck }, driver: { ...state.driver } };
       step(state, input);
       accumulator -= DT;
     }
-  } else accumulator = 0;
+    // Recover, skip and restart move the rig further than any step can; snap
+    // to the new pose instead of sliding there.
+    if (
+      previous &&
+      (distance(previous.truck, state.truck) > 0.5 ||
+        distance(previous.driver, state.driver) > 0.5 ||
+        Math.abs(angle(previous.truck.heading - state.truck.heading)) > 0.35)
+    )
+      previous = null;
+  } else {
+    accumulator = 0;
+    previous = null;
+  }
   if (started) observe(state);
-  scene.render(state, input, dt, started);
+  scene.render(viewState(), input, dt, started);
   placeTargetLabel();
   if (audio && engine && engineGain) {
     engine.frequency.setTargetAtTime(

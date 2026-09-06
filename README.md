@@ -113,7 +113,9 @@ npm run models       # Rebuild original GLB assets with installed Blender
 | ------------------------- | ------------------------------------------------------------------------------------------------- |
 | `src/game/simulation.ts`  | Articulated kinematics, oriented collision, progression, proximity, parking/docking, measurements |
 | `src/game/commands.ts`    | Validated CLI/WebMCP commands and feedback driver                                                 |
-| `src/scene.ts`            | Three.js rendering, camera, lights, models, projected path                                        |
+| `src/scene.ts`            | Three.js rendering, camera, lights, models, merged parked rigs                                    |
+| `src/route.ts`            | Guide dots per phase as one reusable instanced mesh                                               |
+| `src/prediction.ts`       | Projected tyre track, recomputed only when pose or controls change                                |
 | `src/rig.ts`              | Driver rig: displacement-driven gait, turning, idle motion                                        |
 | `src/main.ts`             | Input adapters, accessible overlays, HUD, sound and agent tool registration                       |
 | `src/kiosk/`              | Kiosk replica: step flow, six-language copy, DOM view and stylesheet                              |
