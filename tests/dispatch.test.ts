@@ -136,7 +136,7 @@ test("the assigned dock drives the docking target, guide route, SMS and skip pos
   });
   assert.deepEqual(dockRoute(-36)[3], [-36, -24]);
   assert.deepEqual(ROUTES.dock, dockRoute(0));
-  assert.match(smsLines(s.booking, s.pin, s.dock)[2], /dock 01\./);
+  assert.match(smsLines(s.booking, s.pin, s.dock)[2], /dock\s01\./);
   assert.ok(skipAhead(s));
   assert.equal(s.phase, "gate");
   assert.ok(skipAhead(s));
