@@ -6,7 +6,7 @@ import { createContext, runInContext } from "node:vm";
 import ts from "typescript";
 import { JSDOM } from "jsdom";
 
-// Run the real controls and simulation, without WebGL or the kiosk's own UI.
+// Run the real controls and simulation, without WebGL, telemetry or the kiosk's own UI.
 async function game() {
   const dom = new JSDOM('<div id="app"></div>', {
     url: "http://localhost",
@@ -47,6 +47,7 @@ async function game() {
     importMeta: {},
     require: (id: string) => {
       if (id.endsWith(".css")) return {};
+      if (id === "./sentry") return {};
       if (id === "./kiosk/view")
         return { mountKiosk: () => ({ destroy() {} }) };
       if (id === "./scene")
