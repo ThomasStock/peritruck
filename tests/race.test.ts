@@ -17,6 +17,8 @@ import { createRace, tickRace, formatTime } from "../src/game/race";
 import {
   createLeaderboard,
   resultFromRace,
+  sectionBoard,
+  sectionSeconds,
   type Result,
 } from "../src/game/leaderboard";
 
@@ -207,4 +209,53 @@ test("leaderboard retains the fastest 100 and reports a slower run's actual rank
   assert.equal((await board.save(result("slowest", 300))).rank, 101);
   assert.equal(board.list().length, 100);
   assert.equal(board.list().at(-1)?.seconds, 199);
+});
+
+test("section boards rank each stage on its own, tie on date, and seat the unsaved run", () => {
+  const rows = [
+    { ...result("a", 90), splits: [10, 30, 40, 90] },
+    { ...result("b", 95), splits: [5, 35, 45, 95] },
+    {
+      ...result("c", 100),
+      splits: [10, 40, 50, 100],
+      date: "2026-09-05T10:00:00.000Z",
+    },
+  ];
+  assert.deepEqual(
+    [0, 1, 2, 3].map((stage) => sectionSeconds(rows[0], stage)),
+    [10, 20, 10, 50],
+  );
+  assert.equal(sectionSeconds({ splits: [10, 20] }, 2), undefined);
+  assert.deepEqual(
+    sectionBoard(rows, 0).map((e) => [e.rank, e.result.id, e.seconds]),
+    [
+      [1, "b", 5],
+      [2, "c", 10],
+      [3, "a", 10],
+    ],
+    "equal section times rank by the earlier run",
+  );
+  assert.deepEqual(
+    sectionBoard(rows, 1).map((e) => e.result.id),
+    ["a", "c", "b"],
+  );
+  const own = { ...result("own", 130), name: "", splits: [8, 60, 70, 130] };
+  const parking = sectionBoard(rows, 0, own);
+  assert.deepEqual(
+    parking.map((e) => [e.rank, e.result.id]),
+    [
+      [1, "b"],
+      [2, "own"],
+      [3, "c"],
+      [4, "a"],
+    ],
+    "an unsaved run joins every section board",
+  );
+  assert.equal(sectionBoard([...rows, own], 0, own).length, 4, "saved once");
+  assert.equal(sectionBoard(rows, 3, own).at(-1)?.result.id, "own");
+  assert.deepEqual(
+    sectionBoard([{ ...own, splits: [8, 60] }], 2),
+    [],
+    "stages a run never reached stay off that section's board",
+  );
 });

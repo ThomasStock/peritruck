@@ -301,6 +301,11 @@ test("a completed delivery renders splits, saves a literal driver name once, and
     run('execute(state, { op: "demo" }); updateUI()');
     assert.equal(document.querySelectorAll(".result-splits li").length, 4);
     assert.equal(
+      document.querySelectorAll(".split-rank").length,
+      0,
+      "no section rank when yours is the only run",
+    );
+    assert.equal(
       document.activeElement,
       document.querySelector(".race-results"),
     );
@@ -353,6 +358,12 @@ test("skipping to the dock displays a practice result with no leaderboard submis
       document.getElementById("score-form")!.classList.contains("hidden"),
     );
     assert.equal(document.body.textContent!.includes("NaN"), false);
+    assert.equal(document.querySelectorAll(".split-toggle").length, 4);
+    assert.equal(
+      document.querySelectorAll(".split-rank").length,
+      0,
+      "skipped stages carry no section rank",
+    );
     assert.match(
       document.getElementById("save-status")!.textContent!,
       /Skipped stages/,
@@ -361,6 +372,101 @@ test("skipping to the dock displays a practice result with no leaderboard submis
       dom.window.localStorage.getItem("peritruck-leaderboard-v1"),
       null,
     );
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("stage rows show your section rank and expand one section board at a time", async () => {
+  const { dom, run, document } = await game();
+  try {
+    const rival = (name: string, splits: number[], date: string) => ({
+      id: name,
+      name,
+      seconds: splits[3],
+      splits,
+      contacts: 0,
+      recoveries: 0,
+      assisted: true,
+      date,
+    });
+    // Ace: instant parking, kiosk and gate, slow dock. Bea: slow everywhere.
+    dom.window.localStorage.setItem(
+      "peritruck-leaderboard-v1",
+      JSON.stringify([
+        rival("Ace", [1, 2, 3, 600], "2026-09-01T00:00:00.000Z"),
+        rival("Bea", [800, 1800, 2800, 3800], "2026-09-02T00:00:00.000Z"),
+      ]),
+    );
+    run('execute(state, { op: "demo" }); updateUI()');
+    const chips = () =>
+      [...document.querySelectorAll(".split-rank")].map((el) => [
+        el.textContent,
+        el.className,
+      ]);
+    assert.deepEqual(chips(), [
+      ["#2", "split-rank rank-podium"],
+      ["#2", "split-rank rank-podium"],
+      ["#2", "split-rank rank-podium"],
+      ["#1", "split-rank rank-first"],
+    ]);
+    const toggle = (i: number) =>
+      document.getElementById(`split-toggle-${i}`) as HTMLButtonElement;
+    const board = (i: number) => document.getElementById(`split-board-${i}`)!;
+    assert.ok([0, 1, 2, 3].every((i) => board(i).hidden));
+    assert.equal(
+      toggle(3).getAttribute("aria-label"),
+      `Park at dock 03: ${toggle(3).querySelector("b")!.textContent}, ranked 1 of 3`,
+    );
+    toggle(3).click();
+    assert.equal(toggle(3).getAttribute("aria-expanded"), "true");
+    assert.equal(board(3).hidden, false);
+    assert.equal(document.activeElement, toggle(3));
+    assert.equal(
+      board(3).querySelector(".split-board-title b")!.textContent,
+      "Fastest dock times",
+    );
+    const rows = board(3).querySelectorAll(".leaderboard-rows li");
+    assert.equal(rows.length, 3);
+    assert.ok(rows[0].classList.contains("your-result"));
+    assert.equal(
+      rows[0].querySelector(".leaderboard-name")!.firstChild!.textContent,
+      "You",
+    );
+    assert.equal(rows[0].querySelector("small")!.textContent, "Section best");
+    assert.match(
+      rows[1].querySelector("small")!.textContent!,
+      /^\+\d\d:\d\d\.\d\d$/,
+    );
+    toggle(0).click();
+    assert.equal(board(3).hidden, true, "only one section open at a time");
+    assert.equal(board(0).hidden, false);
+    assert.equal(
+      board(0).querySelector(".your-result .leaderboard-rank")!.textContent,
+      "02",
+    );
+    (document.getElementById("player-name") as HTMLInputElement).value =
+      "Truck hero";
+    document
+      .getElementById("score-form")!
+      .dispatchEvent(
+        new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+      );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(board(0).hidden, false, "saving keeps the open section");
+    const you = board(0).querySelector(".your-result .leaderboard-name")!;
+    assert.equal(you.firstChild!.textContent, "Truck hero");
+    assert.match(
+      you.querySelector("small")!.textContent!,
+      /^\+\d\d:\d\d\.\d\d · You$/,
+    );
+    assert.deepEqual(
+      chips().map(([rank]) => rank),
+      ["#2", "#2", "#2", "#1"],
+    );
+    toggle(0).click();
+    assert.ok([0, 1, 2, 3].every((i) => board(i).hidden));
+    assert.equal(toggle(0).getAttribute("aria-expanded"), "false");
   } finally {
     dom.window.close();
   }
