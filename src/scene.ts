@@ -404,6 +404,7 @@ export class YardScene {
       focus.lerp(this.tail.set(tail.x, 0, tail.z), 0.35);
     }
     const offset = this.offset.set(24, 34, 33);
+    let overhead = false;
     if (walking(s)) offset.set(14, 20, 19);
     if (!started || this.mode === "yard" || s.phase === "complete") {
       focus.set(0, 0, 13);
@@ -411,10 +412,12 @@ export class YardScene {
       if (this.camera.aspect < 0.85) offset.multiplyScalar(1.55);
     } else if (this.mode === "overhead") {
       offset.set(0, 65, 0.1);
+      overhead = true;
     }
     if (started && this.mode === "follow" && this.camera.aspect < 0.85)
       offset.multiplyScalar(1.3);
     if (started && this.attention === "operator") {
+      overhead = false;
       // Over the operator's shoulder: close and low, the rig at dock 05 behind.
       // The cut outranks the camera mode: from the overhead view the framing
       // above looks straight down from 65 m, so the move to dock 05 read as
@@ -445,7 +448,13 @@ export class YardScene {
         this.camera.updateProjectionMatrix();
       }
     }
-    this.camera.lookAt(this.focus);
+    // Straight down, the line to the focus is almost parallel to the world up,
+    // so lookAt takes the screen orientation from whatever horizontal lag the
+    // damped camera carries: the yard swung by tens of degrees as the driver
+    // walked, and the arrows stopped meaning a fixed direction on screen. Pin
+    // the overhead roll instead — north up, +X right, whichever way anyone moves.
+    if (overhead) this.camera.rotation.set(-Math.PI / 2, 0, 0);
+    else this.camera.lookAt(this.focus);
     this.renderer.render(this.scene, this.camera);
   }
   project(p: { x: number; z: number }, height = 2) {
