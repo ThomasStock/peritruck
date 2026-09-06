@@ -405,11 +405,6 @@ export class YardScene {
     }
     const offset = this.offset.set(24, 34, 33);
     if (walking(s)) offset.set(14, 20, 19);
-    if (this.attention === "operator") {
-      // Over the operator's shoulder: close and low, the rig at dock 05 behind.
-      focus.set(YARD.operator.x - 1.2, 0.9, YARD.operator.z - 1.5);
-      offset.set(8.5, 7.5, 11.5);
-    }
     if (!started || this.mode === "yard" || s.phase === "complete") {
       focus.set(0, 0, 13);
       offset.set(109, 113, 128);
@@ -419,6 +414,14 @@ export class YardScene {
     }
     if (started && this.mode === "follow" && this.camera.aspect < 0.85)
       offset.multiplyScalar(1.3);
+    if (started && this.attention === "operator") {
+      // Over the operator's shoulder: close and low, the rig at dock 05 behind.
+      // The cut outranks the camera mode: from the overhead view the framing
+      // above looks straight down from 65 m, so the move to dock 05 read as
+      // nothing happening and the operator's phone arrived with no context.
+      focus.set(YARD.operator.x - 1.2, 0.9, YARD.operator.z - 1.5);
+      offset.set(8.5, 7.5, 11.5);
+    }
     if (this.cut) {
       // The focus travels between the two subjects while the camera pulls up
       // and away through the middle of the move, then drops back in on arrival.
