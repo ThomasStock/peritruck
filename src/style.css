@@ -2231,6 +2231,21 @@ body.operator .race-hud {
 
 /* Feedback: top-bar pencil and results-screen button both open one short form
    that lands in Sentry User Feedback. */
+.feedback-button {
+  border: 1px solid #8da59977;
+  border-radius: 24px;
+  background: #f5faf5ee;
+  color: var(--ink);
+  padding: 9px 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+@media (max-width: 600px), (max-height: 510px) and (orientation: landscape) {
+  .feedback-button {
+    padding: 8px 11px;
+    font-size: 13px;
+  }
+}
 .feedback-dialog {
   width: min(460px, 100%);
 }
