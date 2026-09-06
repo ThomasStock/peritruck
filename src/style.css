@@ -2491,3 +2491,46 @@ body.lang-open .topbar {
     height: 11px;
   }
 }
+
+.result-pro-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 18px 0;
+  padding: 18px;
+  border: 1px solid #b8d9c9;
+  border-radius: 16px;
+  background: linear-gradient(120deg, #e5f5e9, #f4faed);
+  color: #163e38;
+}
+.result-pro-tip__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #163e38;
+  color: #c6f389;
+}
+.result-pro-tip__icon svg {
+  width: 25px;
+  height: 25px;
+}
+.result-pro-tip__label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #36705a;
+}
+.result-pro-tip h3 {
+  margin: 5px 0 6px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.result-pro-tip p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #486257;
+}

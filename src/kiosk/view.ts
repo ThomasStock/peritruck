@@ -34,7 +34,7 @@ import { flags, icons } from "./icons";
 export type KioskOptions = {
   booking: string;
   onQuit: () => void;
-  onComplete: (reference: string) => void;
+  onComplete: (reference: string, usedDocumentScanning: boolean) => void;
 };
 export type KioskController = { flow: Flow; destroy(): void };
 type Overlay = null | "help" | "leave" | "country";
@@ -222,7 +222,10 @@ export function mountKiosk(
     ...frame.querySelectorAll<T>(sel),
   ];
   function finish() {
-    opts.onComplete(fullReference(flow.booking, flow.reference));
+    opts.onComplete(
+      fullReference(flow.booking, flow.reference),
+      flow.usedDocumentScanning,
+    );
   }
   function quit() {
     opts.onQuit();

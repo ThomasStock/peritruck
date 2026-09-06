@@ -23,6 +23,7 @@ export type Flow = {
   profile?: Profile;
   /** Expected full reference, e.g. PP-K4M7Q2; the prefix is derived from it. */
   booking: string;
+  usedDocumentScanning: boolean;
   /** What the visitor typed after the fixed prefix. */
   reference: string;
   /** Last full reference that did not match, shown in the no-match alert. */
@@ -58,6 +59,7 @@ export function createFlow(booking: string): Flow {
     step: "language",
     language: "en",
     booking,
+    usedDocumentScanning: false,
     reference: "",
     phoneCountry: "BE",
     phoneNumber: "",
@@ -123,6 +125,7 @@ export function detectScan(f: Flow): boolean {
 /** The scanned note carries the booked reference, so a scan always matches. */
 export function finishScan(f: Flow): boolean {
   if (f.step !== "verifying") return false;
+  f.usedDocumentScanning = true;
   f.reference = referenceBody(f.booking);
   f.attempted = undefined;
   f.step = "phone";
