@@ -3,6 +3,7 @@
  * All entry points (keyboard, touch, CLI, WebMCP) use these transitions.
  */
 import { createRace, finishStage, tickRace, type Race } from "./race";
+import { obstacleName, t } from "../i18n";
 export type Point = { x: number; z: number };
 export type Truck = Point & {
   heading: number;
@@ -422,73 +423,73 @@ export function objective(s: State): {
   switch (s.phase) {
     case "arrive":
       return {
-        title: "Driver parking",
-        detail: "Pull into holding bay P02, then come to a stop.",
+        title: t("obj.arriveTitle"),
+        detail: t("obj.arriveDetail"),
         target: { x: -24, z: 39 },
         step: 0,
       };
     case "walk-kiosk":
     case "kiosk":
       return {
-        title: "Self-service check-in",
-        detail: "Follow the footpath to the driver check-in kiosk.",
+        title: t("obj.kioskTitle"),
+        detail: t("obj.kioskDetail"),
         target: YARD.kiosk,
         step: 1,
       };
     case "walk-truck":
       return {
-        title: "Driver instructions",
+        title: t("obj.instructionsTitle"),
         detail: !s.dispatched
-          ? "Checked in. The yard operator is assigning your dock."
+          ? t("obj.waitingDock")
           : smsReceived(s)
-            ? "Your gate PIN arrived by SMS. Walk back to the cab."
-            : "Dock assigned. Your gate PIN is on its way by SMS.",
+            ? t("obj.pinArrived")
+            : t("obj.pinOnWay"),
         target: offset(s.truck, s.truck.heading + Math.PI / 2, 2.5),
         step: 1,
       };
     case "dispatch":
       return {
-        title: "Yard dispatch",
-        detail: "The yard operator picks your dock in the Peripass app.",
+        title: t("obj.dispatchTitle"),
+        detail: t("obj.dispatchDetail"),
         target: offset(s.truck, s.truck.heading + Math.PI / 2, 2.5),
         step: 1,
       };
     case "gate":
     case "pin":
       return {
-        title: "Automated access",
-        detail: "Stop at the gate’s white line and enter your PIN.",
+        title: t("obj.gateTitle"),
+        detail: t("obj.gateDetail"),
         target: YARD.gate,
         step: 2,
       };
     case "dock":
       return {
-        title: `Assigned dock: ${dockLabel(s.dock)}`,
-        detail: `Turn in the apron. Reverse your trailer into dock ${dockLabel(s.dock)}.`,
+        title: t("obj.dockTitle", { dock: dockLabel(s.dock) }),
+        detail: t("obj.dockDetail", { dock: dockLabel(s.dock) }),
         target: { x: dockX(s.dock), z: -32.5 },
         step: 3,
       };
     case "complete":
       return {
-        title: "Ready for unloading",
-        detail: `Trailer positioned at dock ${dockLabel(s.dock)}.`,
+        title: t("obj.completeTitle"),
+        detail: t("obj.completeDetail", { dock: dockLabel(s.dock) }),
         target: dockPoint(s),
         step: 4,
       };
   }
 }
 export function prompt(s: State): string {
-  if (s.phase === "arrive" && parking(s).ready) return "Park & step out";
+  if (s.phase === "arrive" && parking(s).ready) return t("prompt.park");
   if (s.phase === "walk-kiosk" && distance(s.driver, YARD.kiosk) < 2.4)
-    return "Check in at kiosk";
+    return t("prompt.checkin");
   if (s.phase === "walk-truck" && distance(s.driver, s.truck) < 5.3)
-    return "Get back in";
+    return t("prompt.getIn");
   if (
     s.phase === "gate" &&
     distance(s.truck, YARD.gate) < 6 &&
     Math.abs(s.truck.speed) < STOP_SPEED.gate
   )
-    return "Enter gate PIN";
+    return t("prompt.pin");
   return "";
 }
 /** Within SLOW_ZONE of the driving target but still too fast for the step to complete. */
@@ -509,16 +510,11 @@ export function slowDown(s: State): boolean {
 }
 export function interact(s: State): boolean {
   if (s.phase === "dispatch") {
-    note(s, "Waiting for the yard operator to assign your dock.");
+    note(s, t("note.waitingOperator"));
     return false;
   }
   if (!prompt(s)) {
-    note(
-      s,
-      walking(s)
-        ? "Move closer to the marked destination."
-        : "Stop in the marked area first.",
-    );
+    note(s, walking(s) ? t("note.moveCloser") : t("note.stopInArea"));
     return false;
   }
   s.truck.speed = 0;
@@ -528,22 +524,26 @@ export function interact(s: State): boolean {
     s.driver = offset(s.truck, s.truck.heading + Math.PI / 2, 2.5);
     s.driver.z -= 2;
     s.checkpoint = { ...s.truck };
-    note(s, "Parked safely. The kiosk is along the footpath.", "parked");
+    note(s, t("note.parked"), "parked");
   } else if (s.phase === "walk-kiosk") s.phase = "kiosk";
   else if (s.phase === "walk-truck") {
     s.phase = "gate";
     s.checkpoint = { ...s.truck };
-    note(s, `Gate PIN ${s.pin} · Dock ${dockLabel(s.dock)}`, "entered-truck");
+    note(
+      s,
+      t("note.enteredTruck", { pin: s.pin, dock: dockLabel(s.dock) }),
+      "entered-truck",
+    );
   } else if (s.phase === "gate") s.phase = "pin";
   return true;
 }
 export function register(s: State, booking: string): boolean {
   if (s.phase !== "kiosk") {
-    note(s, "Check in at the kiosk first.");
+    note(s, t("note.checkInFirst"));
     return false;
   }
   if (booking.trim().toUpperCase() !== s.booking) {
-    note(s, `Use booking reference ${s.booking} from your delivery note.`);
+    note(s, t("note.useBooking", { booking: s.booking }));
     return false;
   }
   s.registered = true;
@@ -562,11 +562,11 @@ export function register(s: State, booking: string): boolean {
  * Only free docks are accepted; the gate PIN SMS follows the assignment. */
 export function dispatch(s: State, dock: number): boolean {
   if (s.phase !== "dispatch") {
-    note(s, "Nobody is waiting to be called off.");
+    note(s, t("note.nobodyWaiting"));
     return false;
   }
   if (!DOCKS.some((d) => d.number === dock)) {
-    note(s, "Choose one of docks 01 to 05.");
+    note(s, t("note.chooseDock"));
     return false;
   }
   const status = dockStatus(dock);
@@ -574,8 +574,8 @@ export function dispatch(s: State, dock: number): boolean {
     note(
       s,
       status === "occupied"
-        ? `Dock ${dockLabel(dock)} is occupied.`
-        : `Dock ${dockLabel(dock)} is out of service.`,
+        ? t("note.dockOccupied", { dock: dockLabel(dock) })
+        : t("note.dockOutOfService", { dock: dockLabel(dock) }),
     );
     return false;
   }
@@ -602,21 +602,17 @@ const insideGate: Truck = {
 };
 export function enterPin(s: State, pin: string): boolean {
   if (s.phase !== "pin" || !s.registered) {
-    note(s, "Stop at the gate terminal first.");
+    note(s, t("note.stopAtTerminal"));
     return false;
   }
   if (pin !== s.pin) {
-    note(s, `That PIN doesn’t match. Your message says ${s.pin}.`);
+    note(s, t("note.pinMismatch", { pin: s.pin }));
     return false;
   }
   s.gateOpen = true;
   finishStage((s.race ??= createRace()), 2);
   s.phase = "dock";
-  note(
-    s,
-    `Access granted. Proceed to dock ${dockLabel(s.dock)}.`,
-    "gate-opened",
-  );
+  note(s, t("note.accessGranted", { dock: dockLabel(s.dock) }), "gate-opened");
   s.checkpoint = { ...insideGate };
   return true;
 }
@@ -709,7 +705,7 @@ export function recover(s: State) {
     if (s.phase === "kiosk") s.phase = "walk-kiosk";
   }
   if (s.phase === "pin") s.phase = "gate";
-  note(s, "Returned to the last safe stop.", "recovered");
+  note(s, t("note.recovered"), "recovered");
 }
 /** Truck physics used by both live simulation and projected tyre tracks. */
 export function integrate(
@@ -793,19 +789,19 @@ export function step(s: State, input = idleInput(), dt = DT, timed = true) {
   }
   const before = { ...s.truck };
   integrate(s.truck, input, s.assisted, dt);
-  const obstacleName = collision(s);
+  const hit = collision(s);
   const jackknife =
     Math.abs(angle(s.truck.heading - s.truck.trailerHeading)) > 1.12 &&
     s.truck.speed < 0;
-  if (obstacleName || jackknife) {
+  if (hit || jackknife) {
     s.truck = { ...before, speed: 0 };
     if (s.collisionCooldown <= 0 && Math.abs(before.speed) > 0.02) {
       if (!jackknife) s.contacts++;
       note(
         s,
         jackknife
-          ? "Trailer getting tight. Pull forward to straighten up."
-          : `${obstacleName}. Brake, then pull away.`,
+          ? t("note.jackknife")
+          : t("note.contact", { obstacle: obstacleName(hit ?? "") }),
         jackknife ? "jackknife" : "contact",
       );
       s.collisionCooldown = 1.5;
@@ -825,7 +821,7 @@ export function step(s: State, input = idleInput(), dt = DT, timed = true) {
       finishStage(s.race, 3);
       s.race.finished = true;
       s.truck.speed = 0;
-      note(s, `Delivered to dock ${dockLabel(s.dock)}.`, "completed");
+      note(s, t("note.delivered", { dock: dockLabel(s.dock) }), "completed");
     }
   }
 }

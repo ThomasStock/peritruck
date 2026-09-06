@@ -1,9 +1,15 @@
+import { t } from "../i18n";
+/** Stage keys are stable identifiers (analytics, section boards); copy comes from i18n. */
 export const STAGES = [
-  { name: "Park the truck", short: "Parking", icon: "P" },
-  { name: "Complete check-in", short: "Kiosk", icon: "↟" },
-  { name: "Open the gate", short: "Gate", icon: "↗" },
-  { name: "Park at your dock", short: "Dock", icon: "03" },
+  { key: "parking", icon: "P" },
+  { key: "kiosk", icon: "↟" },
+  { key: "gate", icon: "↗" },
+  { key: "dock", icon: "03" },
 ] as const;
+export type StageKey = (typeof STAGES)[number]["key"];
+export const stageName = (key: StageKey) => t(`stage.${key}.name`);
+export const stageShort = (key: StageKey) => t(`stage.${key}.short`);
+export const stageTimes = (key: StageKey) => t(`stage.${key}.times`);
 
 /** Seconds, independent of physics time: browser uses real time, CLI fixed steps. */
 export type Race = {

@@ -93,9 +93,7 @@ function progress(s: State) {
 function splits(s: State) {
   const out: Record<string, number> = {};
   s.race?.splits.forEach((at, i) => {
-    out[`split_${STAGES[i].short.toLowerCase()}_s`] = round(
-      at - (s.race.splits[i - 1] ?? 0),
-    );
+    out[`split_${STAGES[i].key}_s`] = round(at - (s.race.splits[i - 1] ?? 0));
   });
   return out;
 }
@@ -152,7 +150,8 @@ export function trackAction(
     | "section_board_opened"
     | "score_saved"
     | "visitor_dispatched"
-    | "feedback_sent",
+    | "feedback_sent"
+    | "language_changed",
   s: State,
   props: Record<string, unknown> = {},
 ) {

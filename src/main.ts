@@ -54,9 +54,28 @@ import { execute } from "./game/commands";
 import { mountKiosk, type KioskController } from "./kiosk/view";
 import { mountDispatch, type DispatchController } from "./dispatch/view";
 import { clock, phoneHtml, smsBannerHtml } from "./sms";
+import { flags } from "./kiosk/icons";
+import {
+  DEFAULT_LANGUAGE,
+  LANGUAGES,
+  isLang,
+  language,
+  setLanguage,
+  t,
+  type Lang,
+  type StringKey,
+} from "./i18n";
 import { walkingJoystick } from "./walking-joystick";
 import { sendFeedback } from "./feedback";
-import { STAGES, formatTime, tickRace, type Race } from "./game/race";
+import {
+  STAGES,
+  formatTime,
+  stageName,
+  stageShort,
+  stageTimes,
+  tickRace,
+  type Race,
+} from "./game/race";
 import {
   createLeaderboard,
   resultFromRace,
@@ -78,8 +97,25 @@ const convexUrl: string | undefined = import.meta.env?.VITE_CONVEX_URL;
 const leaderboard = convexUrl
   ? createConvexLeaderboard(convexUrl)
   : createLeaderboard(() => localStorage);
-const BOARD = leaderboard.shared ? "GLOBAL" : "LOCAL";
-const boardLabel = leaderboard.shared ? "global" : "local";
+const shared = leaderboard.shared;
+/** Copy that differs between the shared (Convex) and the local board. */
+const board = (global: StringKey, local: StringKey) =>
+  t(shared ? global : local);
+// The game opens in English and stays there until the player picks another
+// language; the choice is remembered. Browser language is deliberately not
+// consulted. The kiosk keeps its own language step.
+const LANGUAGE_KEY = "yard-language";
+function savedLanguage(): Lang | undefined {
+  try {
+    const saved = localStorage.getItem(LANGUAGE_KEY);
+    return isLang(saved) ? saved : undefined;
+  } catch {
+    return undefined;
+  }
+}
+setLanguage(savedLanguage() ?? DEFAULT_LANGUAGE);
+document.documentElement.lang = language();
+let langMenuOpen = false;
 let leaderboardOpen = false;
 let feedbackOpen = false,
   feedbackSource: "topbar" | "results" = "topbar",
@@ -113,20 +149,20 @@ document.addEventListener(
 );
 app.innerHTML = `
 <div id="world"></div>
-<header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><button id="leaderboard-button" class="leaderboard-button" aria-label="View ${boardLabel} leaderboard">♛ <span>Leaderboard</span></button><button id="feedback" class="feedback-button" title="Send feedback">Feedback</button><button id="camera" class="icon-button" aria-label="Change camera view" title="Camera · C">◩</button><button id="help" class="icon-button" aria-label="Controls and settings" title="Controls · Escape">?</button></div></header>
-<section id="intro" class="intro panel"><div class="race-kicker">PERITRUCK · TIME TRIAL</div><h1>Big truck.<br/>Quick delivery.</h1><p>Park. Check in. Open the gate. Nail the dock. How fast can you finish?</p><div class="intro-stages">${STAGES.map((stage, i) => `<span><b>0${i + 1}</b>${stage.short}</span>`).join("")}</div><button id="start" class="primary" disabled>Loading… <span>↗</span></button><small class="race-intro-note">The clock starts when your truck moves.</small></section>
-<section id="race-hud" class="race-hud hidden" aria-label="Time trial progress"><div class="race-clock-row"><div><span class="race-kicker" id="race-status">READY WHEN YOU ARE</span><strong id="race-clock" role="timer" aria-label="Elapsed run time">00:00.00</strong></div></div><ol class="race-stages">${STAGES.map((stage, i) => `<li id="race-stage-${i}"><span class="stage-number">${i + 1}</span><span>${stage.short}</span><b id="race-split-${i}">—</b></li>`).join("")}</ol></section>
-<aside id="mission" class="mission panel hidden"><div class="eyebrow" id="step-label">01 / 04 · ARRIVAL</div><h1 id="objective-title"></h1><p id="objective-detail"></p><div class="mission-progress"><i></i><i></i><i></i><i></i></div><div class="delivery-note"><span id="note-label">YOUR DELIVERY</span><b id="delivery-reference">${BOOKING} <span>→</span> Ghent</b><small id="note-detail">Registration reference</small></div><div id="stage-hint" class="stage-hint"></div></aside>
-<button id="map-button" class="minimap panel hidden" aria-label="Show whole yard map"><div><span>YARD MAP</span><span>↗</span></div><canvas id="map" width="340" height="270" aria-label="Yard map showing the truck, destination, gate and docks"></canvas><span class="map-key"><i></i> You <b>◎</b> Destination <span>N ↑</span></span></button>
-<div id="target-label" class="target-label hidden"><span id="target-symbol" class="target-number">P</span><div><b id="target-name">HOLDING BAY P02</b><small id="target-distance"></small></div></div>
+<header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><div class="lang-control"><button id="language" class="lang-button" aria-haspopup="listbox" aria-expanded="false"></button><div id="language-menu" class="lang-menu" role="listbox" hidden></div></div><button id="leaderboard-button" class="leaderboard-button">♛ <span data-t="topbar.leaderboard"></span></button><button id="feedback" class="feedback-button" data-t="topbar.feedback" data-t-title="topbar.feedbackTitle"></button><button id="camera" class="icon-button">◩</button><button id="help" class="icon-button" data-t-aria="topbar.helpAria" data-t-title="topbar.helpTitle">?</button></div></header>
+<section id="intro" class="intro panel"><div id="intro-languages" class="intro-languages" role="radiogroup"></div><div class="race-kicker" data-t="intro.kicker"></div><h1 data-t-html="intro.title"></h1><p data-t="intro.tagline"></p><div class="intro-stages">${STAGES.map((stage, i) => `<span><b>0${i + 1}</b><span data-t="stage.${stage.key}.short"></span></span>`).join("")}</div><button id="start" class="primary" disabled></button><small class="race-intro-note" data-t="intro.note"></small></section>
+<section id="race-hud" class="race-hud hidden" data-t-aria="race.progressAria"><div class="race-clock-row"><div><span class="race-kicker" id="race-status"></span><strong id="race-clock" role="timer" data-t-aria="race.elapsedAria">00:00.00</strong></div></div><ol class="race-stages">${STAGES.map((stage, i) => `<li id="race-stage-${i}"><span class="stage-number">${i + 1}</span><span data-t="stage.${stage.key}.short"></span><b id="race-split-${i}">—</b></li>`).join("")}</ol></section>
+<aside id="mission" class="mission panel hidden"><div class="eyebrow" id="step-label"></div><h1 id="objective-title"></h1><p id="objective-detail"></p><div class="mission-progress"><i></i><i></i><i></i><i></i></div><div class="delivery-note"><span id="note-label"></span><b id="delivery-reference">${BOOKING} <span>→</span> ${t("mission.city")}</b><small id="note-detail"></small></div><div id="stage-hint" class="stage-hint"></div></aside>
+<button id="map-button" class="minimap panel hidden" data-t-aria="map.showAria"><div><span data-t="map.title"></span><span>↗</span></div><canvas id="map" width="340" height="270" data-t-aria="map.canvasAria"></canvas><span class="map-key"><i></i> <small data-t="map.you"></small> <b>◎</b> <small data-t="map.destination"></small> <span class="map-north">N ↑</span></span></button>
+<div id="target-label" class="target-label hidden"><span id="target-symbol" class="target-number">P</span><div><b id="target-name"></b><small id="target-distance"></small></div></div>
 <div id="action-wrap" class="action-wrap hidden"><button id="interact" class="action"><kbd id="interact-key">E</kbd><span id="action-text"></span><span>↗</span></button></div>
 <div id="toast" role="status" aria-live="polite" class="toast hidden"></div>
-<div id="sms-banner" role="status" aria-live="polite" class="sms-banner hidden" title="Dismiss"></div>
+<div id="sms-banner" role="status" aria-live="polite" class="sms-banner hidden" data-t-title="sms.dismiss"></div>
 <button id="cli-resume" class="cli-resume hidden">CLI control · Resume ↗</button>
 <footer class="bottom-bar"><div class="controls-hint" id="controls-hint"></div></footer>
-<div id="dock-guide" class="dock-guide panel hidden"><div class="eyebrow">03 · DOCKING GUIDE</div><strong id="dock-coach">Trailer first.</strong><div class="dock-measure"><span>Side offset</span><b id="dock-offset"></b></div><div class="dock-meter"><i id="dock-needle"></i><span></span></div><div class="dock-measure"><span>Trailer angle</span><b id="dock-angle"></b></div><div class="dock-measure"><span>To bumper</span><b id="dock-gap"></b></div><p id="dock-tip"></p></div>
-<div id="telemetry" class="telemetry panel hidden"><div class="gear"><b id="gear">N</b><span>AUTO</span></div><div class="speed"><b id="speed">00</b><span>KM/H</span></div><div id="assist-tag" class="assist-tag"><span class="live-dot"></span> REVERSE ASSIST</div><div class="articulation"><span>TRAILER</span><div><i id="articulation-bar"></i></div><b id="articulation-value">0°</b></div></div>
-<div id="touch-controls" aria-label="Touch driving controls"><div class="touch-group"><button data-touch="left" aria-label="Steer left">←</button><button data-touch="right" aria-label="Steer right">→</button></div><div class="touch-group pedals"><button data-touch="reverse" aria-label="Brake then reverse">↓<small>REVERSE</small></button><button data-touch="forward" aria-label="Drive forward">↑<small>DRIVE</small></button><button data-touch="brake" aria-label="Brake">■</button></div><div id="walk-joystick" class="walking-joystick" role="group" aria-label="Walking joystick: drag to move" hidden><span class="joystick-knob"></span></div></div>
+<div id="dock-guide" class="dock-guide panel hidden"><div class="eyebrow" data-t="dock.eyebrow"></div><strong id="dock-coach"></strong><div class="dock-measure"><span data-t="dock.offset"></span><b id="dock-offset"></b></div><div class="dock-meter"><i id="dock-needle"></i><span></span></div><div class="dock-measure"><span data-t="dock.angle"></span><b id="dock-angle"></b></div><div class="dock-measure"><span data-t="dock.gap"></span><b id="dock-gap"></b></div><p id="dock-tip"></p></div>
+<div id="telemetry" class="telemetry panel hidden"><div class="gear"><b id="gear">N</b><span data-t="tele.auto"></span></div><div class="speed"><b id="speed">00</b><span data-t="tele.kmh"></span></div><div id="assist-tag" class="assist-tag"></div><div class="articulation"><span data-t="tele.trailer"></span><div><i id="articulation-bar"></i></div><b id="articulation-value">0°</b></div></div>
+<div id="touch-controls"><div class="touch-group"><button data-touch="left" data-t-aria="touch.left">←</button><button data-touch="right" data-t-aria="touch.right">→</button></div><div class="touch-group pedals"><button data-touch="reverse" data-t-aria="touch.reverseAria">↓<small data-t="touch.reverse"></small></button><button data-touch="forward" data-t-aria="touch.forwardAria">↑<small data-t="touch.drive"></small></button><button data-touch="brake" data-t-aria="touch.brake">■</button></div><div id="walk-joystick" class="walking-joystick" role="group" data-t-aria="touch.joystick" hidden><span class="joystick-knob"></span></div></div>
 <div class="letterbox" aria-hidden="true"><i></i><i></i></div>
 <div id="dispatch-root"></div>
 <div id="modal-root"></div>
@@ -171,8 +207,7 @@ let scene: YardScene;
 try {
   scene = new YardScene($("world"));
 } catch {
-  app.innerHTML =
-    '<div class="fallback"><h1>Your browser needs WebGL.</h1><p>Try a current Chrome, Edge, Firefox or Safari browser to drive in the yard.</p><button onclick="location.reload()">Try again</button></div>';
+  app.innerHTML = `<div class="fallback"><h1>${t("webgl.title")}</h1><p>${t("webgl.body")}</p><button onclick="location.reload()">${t("webgl.retry")}</button></div>`;
   throw new Error("WebGL unavailable");
 }
 scene.reducedMotion = reducedMotion;
@@ -195,13 +230,18 @@ function keyLabel(key: string) {
         ? key.toUpperCase()
         : key;
 }
+/** Bound key labels for copy that names them. */
+const keyVars = () =>
+  Object.fromEntries(
+    Object.entries(bindings).map(([action, key]) => [action, keyLabel(key)]),
+  );
 function updateKeyHints() {
   $("controls-hint").replaceChildren();
   for (const [actions, label] of [
-    [["forward", "reverse"], "Drive / reverse"],
-    [["left", "right"], "Steer"],
-    [["brake"], "Brake"],
-    [["precision"], "Precision"],
+    [["forward", "reverse"], t("controls.drive")],
+    [["left", "right"], t("controls.steer")],
+    [["brake"], t("controls.brake")],
+    [["precision"], t("controls.precision")],
   ] as [string[], string][]) {
     const span = document.createElement("span");
     for (const a of actions) {
@@ -213,6 +253,9 @@ function updateKeyHints() {
     $("controls-hint").append(span);
   }
   $("interact-key").textContent = keyLabel(bindings.interact);
+  $("camera").title = t("topbar.cameraTitle", {
+    key: keyLabel(bindings.camera),
+  });
 }
 updateKeyHints();
 let audio: AudioContext | undefined,
@@ -243,6 +286,15 @@ function beep(freq = 660) {
   g.connect(audio.destination);
   osc.start();
   osc.stop(audio.currentTime + 0.17);
+}
+let loadState: "loading" | "ready" | "failed" = "loading";
+function syncStartButton() {
+  const button = $("start");
+  button.innerHTML =
+    loadState === "failed"
+      ? t("intro.loadFailed")
+      : `${t(loadState === "ready" ? "intro.start" : "intro.loading")} <span>↗</span>`;
+  button.toggleAttribute("disabled", loadState !== "ready");
 }
 function start() {
   if (!scene.loaded) return;
@@ -297,6 +349,19 @@ $("leaderboard-button").onclick = () => {
   trackAction("leaderboard_opened", state, { started });
   syncDialog();
 };
+const cameraName = () =>
+  t(
+    scene.mode === "follow"
+      ? "camera.follow"
+      : scene.mode === "yard"
+        ? "camera.yard"
+        : "camera.overhead",
+  );
+const syncCameraButton = () =>
+  $("camera").setAttribute(
+    "aria-label",
+    t("camera.aria", { camera: cameraName() }),
+  );
 $("camera").onclick = () => {
   scene.mode =
     scene.mode === "follow"
@@ -304,11 +369,8 @@ $("camera").onclick = () => {
       : scene.mode === "yard"
         ? "overhead"
         : "follow";
-  $("camera").setAttribute("aria-label", `Camera: ${scene.mode}. Change view`);
-  note(
-    state,
-    `${scene.mode === "follow" ? "Follow" : scene.mode === "yard" ? "Whole yard" : "Overhead"} camera`,
-  );
+  syncCameraButton();
+  note(state, cameraName());
 };
 $("map-button").onclick = () => {
   scene.mode = scene.mode === "yard" ? "follow" : "yard";
@@ -329,6 +391,80 @@ function openFeedback(source: "topbar" | "results") {
   syncDialog();
 }
 $("feedback").onclick = () => openFeedback("topbar");
+// Language: a flag button in the top bar opens a list; the start screen shows
+// the same six languages as chips so nobody has to hunt for it.
+const flag = (code: string) => flags[code].replace("kiosk-flag", "lang-flag");
+function renderLanguageControls() {
+  const lang = language();
+  const current = LANGUAGES.find((l) => l.code === lang)!;
+  const button = $("language");
+  button.innerHTML = `${flag(current.flag)}<span class="lang-code">${lang.toUpperCase()}</span>`;
+  button.setAttribute(
+    "aria-label",
+    t("language.current", { language: current.native }),
+  );
+  button.setAttribute("aria-expanded", String(langMenuOpen));
+  const menu = $("language-menu");
+  menu.hidden = !langMenuOpen;
+  // The top bar sits below the race HUD; lift it while the list is open.
+  document.body.classList.toggle("lang-open", langMenuOpen);
+  menu.setAttribute("aria-label", t("language.label"));
+  menu.innerHTML = LANGUAGES.map(
+    (l) =>
+      `<button type="button" role="option" data-lang="${l.code}" lang="${l.code}" aria-selected="${l.code === lang}">${flag(l.flag)}<span>${l.native}</span></button>`,
+  ).join("");
+  const chips = $("intro-languages");
+  chips.setAttribute("aria-label", t("language.choose"));
+  // Narrow phones show flag + code; everywhere else the language's own name.
+  chips.innerHTML = LANGUAGES.map(
+    (l) =>
+      `<button type="button" class="lang-chip" role="radio" data-lang="${l.code}" lang="${l.code}" aria-label="${l.native}" aria-checked="${l.code === lang}">${flag(l.flag)}<span class="lang-chip-name">${l.native}</span><b class="lang-chip-code">${l.code.toUpperCase()}</b></button>`,
+  ).join("");
+}
+function closeLanguageMenu() {
+  if (!langMenuOpen) return;
+  langMenuOpen = false;
+  renderLanguageControls();
+}
+function chooseLanguage(code: string, source: "topbar" | "intro") {
+  if (!isLang(code)) return;
+  langMenuOpen = false;
+  if (code === language()) {
+    renderLanguageControls();
+    return;
+  }
+  setLanguage(code);
+  try {
+    localStorage.setItem(LANGUAGE_KEY, code);
+  } catch {
+    /* the choice still holds for this visit */
+  }
+  trackAction("language_changed", state, { language: code, source });
+  applyLanguage();
+}
+$("language").onclick = () => {
+  langMenuOpen = !langMenuOpen;
+  renderLanguageControls();
+  if (langMenuOpen)
+    $("language-menu")
+      .querySelector<HTMLElement>('[aria-selected="true"]')
+      ?.focus();
+};
+$("language-menu").onclick = (e) => {
+  const option = (e.target as Element).closest<HTMLElement>("[data-lang]");
+  if (option) {
+    chooseLanguage(option.dataset.lang!, "topbar");
+    $("language").focus();
+  }
+};
+$("intro-languages").onclick = (e) => {
+  const chip = (e.target as Element).closest<HTMLElement>("[data-lang]");
+  if (chip) chooseLanguage(chip.dataset.lang!, "intro");
+};
+document.addEventListener("pointerdown", (e) => {
+  if (langMenuOpen && !(e.target as Element).closest?.(".lang-control"))
+    closeLanguageMenu();
+});
 $("cli-resume").onclick = () => {
   cliPaused = false;
   accumulator = 0;
@@ -386,6 +522,14 @@ window.addEventListener("keydown", (e) => {
     updateKeyHints();
     lastDialog = "";
     syncDialog();
+    return;
+  }
+  if (langMenuOpen) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeLanguageMenu();
+      $("language").focus();
+    }
     return;
   }
   if (e.key === "Escape") {
@@ -470,7 +614,7 @@ function syncTouchControls() {
   $("touch-controls").hidden = !enabled;
   $("touch-controls").setAttribute(
     "aria-label",
-    isWalking ? "Touch walking controls" : "Touch driving controls",
+    t(isWalking ? "touch.walking" : "touch.driving"),
   );
   $("walk-joystick").hidden = !isWalking;
   document.querySelectorAll<HTMLElement>(".touch-group").forEach((group) => {
@@ -486,7 +630,7 @@ document.addEventListener("visibilitychange", () => {
 function modal(title: string, body: string, cls = "") {
   modalReturnFocus = document.activeElement as HTMLElement;
   $("modal-root").innerHTML =
-    `<div class="modal-scrim"><section class="dialog ${cls}" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabindex="-1"><button class="dialog-close" id="close-dialog" aria-label="Close dialog">×</button><div class="eyebrow">PERIPASS${state.race.started && state.phase !== "complete" ? `<span id="dialog-race-clock" class="dialog-race-clock" role="timer" aria-label="Elapsed run time">${formatTime(state.race.elapsed)}</span>` : ""}</div><h2 id="dialog-title">${title}</h2>${body}</section></div>`;
+    `<div class="modal-scrim"><section class="dialog ${cls}" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabindex="-1"><button class="dialog-close" id="close-dialog" aria-label="${t("dialog.close")}">×</button><div class="eyebrow">PERIPASS${state.race.started && state.phase !== "complete" ? `<span id="dialog-race-clock" class="dialog-race-clock" role="timer" aria-label="${t("race.elapsedAria")}">${formatTime(state.race.elapsed)}</span>` : ""}</div><h2 id="dialog-title">${title}</h2>${body}</section></div>`;
   $("close-dialog").onclick = closeDialog;
   clearInput();
   // Move focus onto the dialog itself, not its first control, so nothing
@@ -516,8 +660,8 @@ function syncDialog() {
   }
   if (kind === "feedback") {
     modal(
-      "Tell us what you think",
-      `<p class="dialog-description">Found a bug, got stuck, or have an idea? A few words help us make Peritruck better.</p><form id="feedback-form" class="feedback-form"><label class="field">Your feedback<textarea id="feedback-message" rows="5" maxlength="2000" placeholder="What happened, or what would you change?" required></textarea></label><label class="field"><span>Email <small>optional, if you'd like a reply</small></span><input id="feedback-email" type="email" autocomplete="email" placeholder="you@example.com" maxlength="120"/></label><div id="form-error" class="form-error" role="alert"></div><div class="dialog-buttons"><button class="primary" type="submit">Send feedback <span>↗</span></button><button type="button" id="feedback-cancel" class="text-button">Cancel</button></div></form><p id="feedback-thanks" class="feedback-thanks hidden" role="status"><b>Thanks for the feedback!</b>We read every message.</p>`,
+      t("fb.title"),
+      `<p class="dialog-description">${t("fb.description")}</p><form id="feedback-form" class="feedback-form"><label class="field">${t("fb.label")}<textarea id="feedback-message" rows="5" maxlength="2000" placeholder="${t("fb.placeholder")}" required></textarea></label><label class="field"><span>${t("fb.email")} <small>${t("fb.emailHint")}</small></span><input id="feedback-email" type="email" autocomplete="email" placeholder="you@example.com" maxlength="120"/></label><div id="form-error" class="form-error" role="alert"></div><div class="dialog-buttons"><button class="primary" type="submit">${t("fb.send")} <span>↗</span></button><button type="button" id="feedback-cancel" class="text-button">${t("fb.cancel")}</button></div></form><p id="feedback-thanks" class="feedback-thanks hidden" role="status"><b>${t("fb.thanksTitle")}</b>${t("fb.thanksBody")}</p>`,
       "feedback-dialog",
     );
     $("feedback-cancel").onclick = closeDialog;
@@ -530,7 +674,7 @@ function syncDialog() {
       const message = ($("feedback-message") as HTMLTextAreaElement).value;
       const email = ($("feedback-email") as HTMLInputElement).value;
       if (!message.trim()) {
-        error.textContent = "Write a few words first.";
+        error.textContent = t("fb.empty");
         return;
       }
       button.disabled = true;
@@ -544,8 +688,7 @@ function syncDialog() {
         });
       } catch (e) {
         button.disabled = false;
-        error.textContent =
-          "Could not send your feedback. Check your connection and try again.";
+        error.textContent = t("fb.failed");
         console.error(e);
         return;
       }
@@ -559,8 +702,8 @@ function syncDialog() {
     };
   } else if (kind === "leaderboard") {
     modal(
-      "Yard legends",
-      `<p class="dialog-description">${leaderboard.shared ? "Fastest deliveries worldwide." : "Fastest deliveries on this browser."} Your next run could take the top spot.</p><div id="time-to-beat" class="time-to-beat"></div><div id="leaderboard-list"></div><p class="local-note">${leaderboard.shared ? "Global" : "Local"} leaderboard · Top 100 · Lower is better</p><button id="back-to-yard" class="primary">Back to the yard <span>↗</span></button>`,
+      t("lb.title"),
+      `<p class="dialog-description">${board("lb.descGlobal", "lb.descLocal")}</p><div id="time-to-beat" class="time-to-beat"></div><div id="leaderboard-list"></div><p class="local-note">${board("lb.noteGlobal", "lb.noteLocal")}</p><button id="back-to-yard" class="primary">${t("lb.back")} <span>↗</span></button>`,
       "leaderboard-dialog",
     );
     refreshBest();
@@ -568,39 +711,31 @@ function syncDialog() {
     $("back-to-yard").onclick = closeDialog;
   } else if (kind === "settings") {
     modal(
-      "Controls",
-      `<p class="dialog-description">Driving is paused. Once started, your race clock keeps running.</p>
-      <label class="setting-row"><span><b>Trailer reverse assist</b><small>Steer where you want the trailer to go. Release to straighten.</small></span><input id="assist-setting" type="checkbox" ${state.assisted ? "checked" : ""}/></label>
-      <label class="setting-row"><span><b>Sound</b><small>Engine hum and gentle reversing cues.</small></span><input id="sound-setting" type="checkbox" ${soundEnabled ? "checked" : ""}/></label>
-      <label class="setting-row"><span><b>Reduced motion</b><small>Instant camera changes; no pulsing markers.</small></span><input id="motion-setting" type="checkbox" ${reducedMotion ? "checked" : ""}/></label>
-      <div class="controls-title">YOUR CONTROLS <span>Click a key to change it</span></div><div class="keybindings" id="keybindings"></div>
-      <p class="settings-tip">Hold S to brake, then reverse. A / D steer the cab forward and aim the trailer in reverse. Shift keeps things slow. Space stops the truck. Arrow keys also work.</p>
-      <div class="dialog-buttons"><button id="resume" class="primary">Resume <span>↗</span></button><button id="recover" class="secondary">Recover to safe stop</button><button id="restart" class="text-button">Restart run</button></div>`,
+      t("set.title"),
+      `<p class="dialog-description">${t("set.description")}</p>
+      <label class="setting-row"><span><b>${t("set.assist")}</b><small>${t("set.assistHint")}</small></span><input id="assist-setting" type="checkbox" ${state.assisted ? "checked" : ""}/></label>
+      <label class="setting-row"><span><b>${t("set.sound")}</b><small>${t("set.soundHint")}</small></span><input id="sound-setting" type="checkbox" ${soundEnabled ? "checked" : ""}/></label>
+      <label class="setting-row"><span><b>${t("set.motion")}</b><small>${t("set.motionHint")}</small></span><input id="motion-setting" type="checkbox" ${reducedMotion ? "checked" : ""}/></label>
+      <div class="controls-title">${t("set.controlsTitle")} <span>${t("set.controlsHint")}</span></div><div class="keybindings" id="keybindings"></div>
+      <p class="settings-tip">${t("set.tip", keyVars())}</p>
+      <div class="dialog-buttons"><button id="resume" class="primary">${t("set.resume")} <span>↗</span></button><button id="recover" class="secondary">${t("set.recover")}</button><button id="restart" class="text-button">${t("set.restart")}</button></div>`,
       "settings-dialog",
     );
     for (const [action, key] of Object.entries(bindings)) {
       const label = document.createElement("span");
-      label.textContent = (
-        {
-          forward: "Drive",
-          reverse: "Brake / reverse",
-          left: "Left",
-          right: "Right",
-          brake: "Brake",
-          precision: "Precision",
-          interact: "Interact",
-          camera: "Camera",
-          recover: "Recover",
-        } as Record<string, string>
-      )[action];
+      const name = t(`action.${action}` as StringKey);
+      label.textContent = name;
       const button = document.createElement("button");
       button.className = "keybind";
       button.textContent =
-        remapping === action ? "Press a key…" : keyLabel(key);
-      button.setAttribute("aria-label", `Remap ${action}: ${keyLabel(key)}`);
+        remapping === action ? t("set.pressKey") : keyLabel(key);
+      button.setAttribute(
+        "aria-label",
+        t("set.remapAria", { action: name, key: keyLabel(key) }),
+      );
       button.onclick = () => {
         remapping = action;
-        button.textContent = "Press a key…";
+        button.textContent = t("set.pressKey");
       };
       label.append(button);
       $("keybindings").append(label);
@@ -649,14 +784,14 @@ function syncDialog() {
       kioskStage.classList.add("timed-kiosk");
       const strip = document.createElement("div");
       strip.className = "kiosk-race-strip";
-      strip.innerHTML = `<span>TIME TRIAL · CHECK-IN</span><b id="dialog-race-clock" role="timer" aria-label="Elapsed run time">${formatTime(state.race.elapsed)}</b>`;
+      strip.innerHTML = `<span data-t="kiosk.strip">${t("kiosk.strip")}</span><b id="dialog-race-clock" role="timer" aria-label="${t("race.elapsedAria")}">${formatTime(state.race.elapsed)}</b>`;
       kioskStage.append(strip);
     }
   } else if (kind === "pin") {
     // The driver reads the SMS on their phone and types the PIN into the gate terminal.
     modal(
-      "Automated gate access",
-      `<p class="dialog-description">Read the PIN in the SMS on your phone and enter it at the gate terminal.</p><div class="gate-layout"><div class="phone-peek">${phoneHtml(state.booking, state.pin, smsClock || clock(), state.dock)}</div><form id="pin-form" class="gate-terminal"><div class="eyebrow"><span class="live-dot"></span> GATE TERMINAL</div><label class="field">Gate PIN<input id="pin-input" inputmode="none" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="Four digit gate PIN" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? "Delete digit" : k}">${k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">Open the gate <span>↗</span></button></form></div>`,
+      t("pin.title"),
+      `<p class="dialog-description">${t("pin.description")}</p><div class="gate-layout"><div class="phone-peek">${phoneHtml(state.booking, state.pin, smsClock || clock(), state.dock)}</div><form id="pin-form" class="gate-terminal"><div class="eyebrow"><span class="live-dot"></span> ${t("pin.terminal")}</div><label class="field">${t("pin.label")}<input id="pin-input" inputmode="none" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="${t("pin.aria")}" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? t("pin.delete") : k === "Clear" ? t("pin.clear") : k}">${k === "Clear" ? t("pin.clear") : k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">${t("pin.open")} <span>↗</span></button></form></div>`,
       "pin-dialog",
     );
     for (const b of document.querySelectorAll<HTMLButtonElement>("[data-pin]"))
@@ -696,11 +831,11 @@ function syncDialog() {
     const saved = savedResultId === result.id;
     modal(
       newBest
-        ? "That's a quick delivery!"
+        ? t("res.titleBest")
         : eligible
-          ? "Delivery nailed!"
-          : "Practice complete!",
-      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? "↻ PRACTICE RUN" : newBest ? `★ ${BOARD} BEST` : "✓ RUN COMPLETE"}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? "Ready to try the full delivery?" : !best ? "First run on the board. Set the pace!" : newBest ? `${formatTime(best.seconds - result.seconds)} faster than the ${boardLabel} best` : `${formatTime(result.seconds - best.seconds)} off the ${boardLabel} best. Go again?`}</p><div id="result-splits"></div><div class="result-stats"><span>${result.contacts} contacts</span><span>${result.recoveries} recoveries</span><span>${result.assisted ? "Assist on" : "Classic steering"}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">Put your name on the board</label><div><input id="player-name" maxlength="24" placeholder="Your driver name" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">Save run <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? "Skipped stages make this a practice run. Complete all four stages to join the leaderboard." : saved ? "Your run is on the board." : leaderboard.shared ? "Save your run to the global board. No account needed." : "Save your run on this browser. No account needed."}</p><div class="result-board-title"><b>♛ Yard legends</b><span>${BOARD} TOP 20</span></div><div id="leaderboard-list" class="board-scroll"></div><button id="play-again" class="primary play-again">Beat your time <span>↻</span></button><button id="results-feedback" class="secondary results-feedback">✎ Something off? Send feedback</button>`,
+          ? t("res.titleDone")
+          : t("res.titlePractice"),
+      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? t("res.badgePractice") : newBest ? board("res.badgeBestGlobal", "res.badgeBestLocal") : t("res.badgeComplete")}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? t("res.tryFull") : !best ? t("res.firstRun") : newBest ? t(shared ? "res.fasterGlobal" : "res.fasterLocal", { time: formatTime(best.seconds - result.seconds) }) : t(shared ? "res.offGlobal" : "res.offLocal", { time: formatTime(result.seconds - best.seconds) })}</p><div id="result-splits"></div><div class="result-stats"><span>${t("res.contacts", { n: result.contacts })}</span><span>${t("res.recoveries", { n: result.recoveries })}</span><span>${t(result.assisted ? "res.assistOn" : "res.classic")}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">${t("res.nameLabel")}</label><div><input id="player-name" maxlength="24" placeholder="${t("res.namePlaceholder")}" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">${t("res.save")} <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? t("res.practiceNote") : saved ? t("res.onBoard") : board("res.saveGlobal", "res.saveLocal")}</p><div class="result-board-title"><b>${t("res.legends")}</b><span>${board("res.top20Global", "res.top20Local")}</span></div><div id="leaderboard-list" class="board-scroll"></div><button id="play-again" class="primary play-again">${t("res.again")} <span>↻</span></button><button id="results-feedback" class="secondary results-feedback">${t("res.feedback")}</button>`,
       "complete-dialog race-results",
     );
     $("results-feedback").onclick = () => openFeedback("results");
@@ -713,7 +848,7 @@ function syncDialog() {
       const input = $("player-name") as HTMLInputElement;
       const name = cleanName(input.value);
       if (!name) {
-        input.setCustomValidity("Enter your driver name.");
+        input.setCustomValidity(t("res.enterName"));
         input.reportValidity();
         return;
       }
@@ -721,7 +856,7 @@ function syncDialog() {
       const form = $("score-form"),
         status = $("save-status");
       form.querySelector("button")!.disabled = true;
-      status.textContent = "Saving your run…";
+      status.textContent = t("res.saving");
       try {
         const saved = await leaderboard.save({ ...result, name });
         trackAction("score_saved", state, {
@@ -731,16 +866,20 @@ function syncDialog() {
         });
         identifyBest(leaderboard.list()[0]?.seconds ?? result.seconds);
         form.classList.add("hidden");
-        status.textContent = saved.persisted
-          ? `You're #${saved.rank}! ${saved.rank > 100 ? "Only the fastest 100 runs stay on the board." : leaderboard.shared ? "Run saved to the global board." : "Run saved on this browser."}`
-          : `You're #${saved.rank}! Browser storage is unavailable; this run stays for this visit only.`;
+        status.textContent = `${t("res.rank", { rank: saved.rank })} ${
+          !saved.persisted
+            ? t("res.noStorage")
+            : saved.rank > 100
+              ? t("res.only100")
+              : board("res.savedGlobal", "res.savedLocal")
+        }`;
       } catch (error) {
         savedResultId = "";
         form.querySelector("button")!.disabled = false;
         status.textContent =
           error instanceof Error && !/Server Error/i.test(error.message)
             ? error.message
-            : "Could not reach the leaderboard. Check your connection and try again.";
+            : t("res.saveFailed");
         return;
       }
       if (document.getElementById("leaderboard-list"))
@@ -768,7 +907,7 @@ function refreshBest() {
   if (!root) return;
   const best = leaderboard.list()[0];
   root.textContent = best
-    ? `♛ Time to beat  ${formatTime(best.seconds)} · ${best.name}`
+    ? t("intro.timeToBeat", { time: formatTime(best.seconds), name: best.name })
     : "";
 }
 function renderLeaderboard(highlight = "", limit = 100) {
@@ -778,7 +917,7 @@ function renderLeaderboard(highlight = "", limit = 100) {
   if (!rows.length) {
     const empty = document.createElement("p");
     empty.className = "leaderboard-empty";
-    empty.textContent = "No legends yet. Make the first delivery count.";
+    empty.textContent = t("lb.empty");
     root.append(empty);
     return;
   }
@@ -798,7 +937,7 @@ function renderLeaderboard(highlight = "", limit = 100) {
     name.className = "leaderboard-name";
     name.textContent = row.name;
     const meta = document.createElement("small");
-    meta.textContent = `${row.contacts} contacts · ${row.recoveries} recoveries · ${row.assisted ? "Assist" : "Classic"}${row.id === highlight ? " · You" : ""}`;
+    meta.textContent = `${t("lb.meta", { contacts: row.contacts, recoveries: row.recoveries, mode: t(row.assisted ? "lb.assist" : "lb.classic") })}${row.id === highlight ? ` · ${t("lb.you")}` : ""}`;
     name.append(meta);
     const time = document.createElement("b");
     time.textContent = formatTime(row.seconds);
@@ -818,11 +957,12 @@ function renderSplits() {
   const ol = document.createElement("ol");
   ol.className = "result-splits";
   STAGES.forEach((stage, i) => {
-    const board = sectionBoard(rows, i, eligible ? result : undefined);
-    const own = board.find((entry) => entry.result.id === result.id);
+    const entries = sectionBoard(rows, i, eligible ? result : undefined);
+    const own = entries.find((entry) => entry.result.id === result.id);
     const seconds = sectionSeconds(result, i);
     const open = openSplit === i;
-    const label = `${stage.short.toLowerCase()} times`;
+    const label = stageTimes(stage.key);
+    const name = stageName(stage.key);
     const li = document.createElement("li");
     li.classList.toggle("split-open", open);
     const toggle = document.createElement("button");
@@ -832,23 +972,30 @@ function renderSplits() {
     toggle.setAttribute("aria-expanded", String(open));
     toggle.setAttribute("aria-controls", `split-board-${i}`);
     // Rank only means something once there is someone to compare with.
-    const ranked = own && board.length > 1 ? own : undefined;
+    const ranked = own && entries.length > 1 ? own : undefined;
     const time = seconds === undefined ? "—" : formatTime(seconds);
     const rank = ranked
       ? `<span class="${["split-rank", ranked.rank === 1 ? "rank-first" : ranked.rank <= 3 ? "rank-podium" : ""].join(" ").trim()}">#${ranked.rank}</span>`
       : "";
-    toggle.innerHTML = `<span class="stage-number">✓</span><span class="split-name">${stage.name}</span>${rank}<b>${time}</b><span class="split-chevron" aria-hidden="true"></span>`;
+    toggle.innerHTML = `<span class="stage-number">✓</span><span class="split-name">${name}</span>${rank}<b>${time}</b><span class="split-chevron" aria-hidden="true"></span>`;
     toggle.setAttribute(
       "aria-label",
-      `${stage.name}: ${time}${ranked ? `, ranked ${ranked.rank} of ${board.length}` : ""}`,
+      ranked
+        ? t("res.rankedAria", {
+            stage: name,
+            time,
+            rank: ranked.rank,
+            total: entries.length,
+          })
+        : t("res.splitAria", { stage: name, time }),
     );
     toggle.onclick = () => {
       openSplit = open ? -1 : i;
       if (!open)
         trackAction("section_board_opened", state, {
-          stage: stage.short,
+          stage: stage.key,
           rank: own?.rank ?? null,
-          entries: board.length,
+          entries: entries.length,
         });
       renderSplits();
       $(`split-toggle-${i}`).focus({ preventScroll: true });
@@ -862,24 +1009,24 @@ function renderSplits() {
     panel.className = "split-board";
     panel.id = `split-board-${i}`;
     panel.setAttribute("role", "region");
-    panel.setAttribute("aria-label", `Fastest ${label}`);
+    panel.setAttribute("aria-label", t("res.fastest", { label }));
     panel.hidden = !open;
     if (open) {
       const title = document.createElement("div");
       title.className = "split-board-title";
-      title.innerHTML = `<b>Fastest ${label}</b><span>${BOARD} TOP 20</span>`;
+      title.innerHTML = `<b>${t("res.fastest", { label })}</b><span>${board("res.top20Global", "res.top20Local")}</span>`;
       panel.append(title);
-      if (!board.length) {
+      if (!entries.length) {
         const empty = document.createElement("p");
         empty.className = "split-board-empty";
-        empty.textContent = `No ${label} on the board yet.`;
+        empty.textContent = t("res.noneYet", { label });
         panel.append(empty);
       } else {
         const list = document.createElement("ol");
         list.className = "leaderboard-rows board-scroll";
-        const visible = board.slice(0, 20);
+        const visible = entries.slice(0, 20);
         if (own && !visible.includes(own)) visible.push(own);
-        const best = board[0].seconds;
+        const best = entries[0].seconds;
         for (const entry of visible) {
           const row = document.createElement("li");
           row.classList.toggle("your-result", entry === own);
@@ -889,9 +1036,9 @@ function renderSplits() {
             entry.rank === 1 ? "♛" : String(entry.rank).padStart(2, "0");
           const name = document.createElement("span");
           name.className = "leaderboard-name";
-          name.textContent = entry.result.name || "You";
+          name.textContent = entry.result.name || t("lb.you");
           const meta = document.createElement("small");
-          meta.textContent = `${entry.rank === 1 ? "Section best" : `+${formatTime(entry.seconds - best)}`}${entry === own && entry.result.name ? " · You" : ""}`;
+          meta.textContent = `${entry.rank === 1 ? t("res.sectionBest") : `+${formatTime(entry.seconds - best)}`}${entry === own && entry.result.name ? ` · ${t("lb.you")}` : ""}`;
           name.append(meta);
           const time = document.createElement("b");
           time.textContent = formatTime(entry.seconds);
@@ -1196,6 +1343,38 @@ const style = (id: string, property: string, value: string) =>
     $(id).style.setProperty(property, value),
   );
 const progress = [...document.querySelectorAll(".mission-progress i")];
+/** Rewrite every piece of static copy; dynamic HUD text follows on the next tick. */
+function applyLanguage() {
+  document.documentElement.lang = language();
+  for (const el of document.querySelectorAll<HTMLElement>("[data-t]"))
+    el.textContent = t(el.dataset.t as StringKey);
+  for (const el of document.querySelectorAll<HTMLElement>("[data-t-html]"))
+    el.innerHTML = t(el.dataset.tHtml as StringKey);
+  for (const el of document.querySelectorAll<HTMLElement>("[data-t-aria]"))
+    el.setAttribute("aria-label", t(el.dataset.tAria as StringKey));
+  for (const el of document.querySelectorAll<HTMLElement>("[data-t-title]"))
+    el.title = t(el.dataset.tTitle as StringKey);
+  $("leaderboard-button").setAttribute(
+    "aria-label",
+    board("topbar.leaderboardGlobalAria", "topbar.leaderboardLocalAria"),
+  );
+  $("touch-controls").setAttribute(
+    "aria-label",
+    t(touchWalking ? "touch.walking" : "touch.driving"),
+  );
+  syncCameraButton();
+  renderLanguageControls();
+  updateKeyHints();
+  syncStartButton();
+  refreshBest();
+  shown.clear();
+  // Open dialogs re-render in the new language; the kiosk keeps its own language step.
+  if (lastDialog && lastDialog !== "kiosk") {
+    lastDialog = "";
+    syncDialog();
+  }
+}
+applyLanguage();
 function updateUI() {
   syncOperator();
   syncTouchControls();
@@ -1204,13 +1383,15 @@ function updateUI() {
   $("race-clock").textContent = formatTime(race.elapsed);
   const dialogClock = document.getElementById("dialog-race-clock");
   if (dialogClock) dialogClock.textContent = formatTime(race.elapsed);
-  $("race-status").textContent = race.practice
-    ? "PRACTICE RUN"
-    : !race.started
-      ? "MOVE TO START"
-      : state.phase === "complete"
-        ? "DELIVERY COMPLETE"
-        : "ON THE CLOCK";
+  $("race-status").textContent = t(
+    race.practice
+      ? "race.practice"
+      : !race.started
+        ? "race.moveToStart"
+        : state.phase === "complete"
+          ? "race.complete"
+          : "race.onClock",
+  );
   $("race-hud").classList.toggle(
     "clock-running",
     race.started && state.phase !== "complete",
@@ -1223,7 +1404,16 @@ function updateUI() {
     row.classList.toggle("stage-active", active);
     row.setAttribute(
       "aria-label",
-      `${STAGES[i].short}: ${done ? "complete" : active ? "current stage" : "up next"}`,
+      t("race.stageAria", {
+        stage: stageShort(STAGES[i].key),
+        status: t(
+          done
+            ? "race.stageDone"
+            : active
+              ? "race.stageCurrent"
+              : "race.stageNext",
+        ),
+      }),
     );
     row.querySelector(".stage-number")!.textContent = done
       ? "✓"
@@ -1243,7 +1433,20 @@ function updateUI() {
   text("objective-detail", o.detail);
   text(
     "step-label",
-    `0${Math.min(o.step + 1, 4)} / 04 · ${["ARRIVAL", "CHECK-IN", "ACCESS", "DELIVERY", "COMPLETE"][o.step]}`,
+    t("mission.step", {
+      n: `0${Math.min(o.step + 1, 4)}`,
+      name: t(
+        (
+          [
+            "mission.arrival",
+            "mission.checkin",
+            "mission.access",
+            "mission.delivery",
+            "mission.done",
+          ] as const
+        )[o.step],
+      ),
+    }),
   );
   progress.forEach((el, i) => el.classList.toggle("active", i <= o.step));
   text(
@@ -1263,8 +1466,8 @@ function updateUI() {
   html(
     "assist-tag",
     state.assisted
-      ? '<span class="live-dot"></span> REVERSE ASSIST'
-      : "CLASSIC STEERING",
+      ? `<span class="live-dot"></span> ${t("tele.assist")}`
+      : t("tele.classic"),
   );
   const beta =
     (angle(state.truck.heading - state.truck.trailerHeading) * 180) / Math.PI;
@@ -1289,13 +1492,13 @@ function updateUI() {
   text(
     "target-name",
     state.phase === "walk-truck" || state.phase === "dispatch"
-      ? "YOUR TRUCK"
+      ? t("target.truck")
       : [
-          "HOLDING BAY P02",
-          "DRIVER CHECK-IN",
-          "ENTRY GATE",
-          `DOCK ${dockLabel(state.dock)}`,
-          "DELIVERED",
+          t("target.bay"),
+          t("target.checkin"),
+          t("target.gate"),
+          t("target.dock", { dock: dockLabel(state.dock) }),
+          t("target.delivered"),
         ][o.step],
   );
   const slow = slowDown(state);
@@ -1303,8 +1506,12 @@ function updateUI() {
   text(
     "target-distance",
     slow
-      ? "Slow down"
-      : `${Math.round(distance(isWalking ? state.driver : state.truck, o.target))} m away`,
+      ? t("target.slow")
+      : t("target.away", {
+          m: Math.round(
+            distance(isWalking ? state.driver : state.truck, o.target),
+          ),
+        }),
   );
   text("toast", state.message);
   $("toast").classList.toggle(
@@ -1314,29 +1521,33 @@ function updateUI() {
   $("cli-resume").classList.toggle("hidden", !cliPaused);
   syncSms();
   const sms = smsReceived(state);
-  text("note-label", sms ? "SMS FROM PERIPASS" : "YOUR DELIVERY");
+  text("note-label", t(sms ? "mission.smsFrom" : "mission.yourDelivery"));
   text(
     "delivery-reference",
     sms
-      ? `PIN ${state.pin} → Dock ${dockLabel(state.dock)}`
-      : `${state.booking} → Ghent`,
+      ? t("mission.pinDock", { pin: state.pin, dock: dockLabel(state.dock) })
+      : `${state.booking} → ${t("mission.city")}`,
   );
-  text("note-detail", sms ? "Gate access code" : "Registration reference");
+  text("note-detail", t(sms ? "mission.gateCode" : "mission.reference"));
+  const kv = keyVars();
   text(
     "stage-hint",
     state.phase === "arrive"
       ? p.ready
-        ? "Parked. Press E to exit."
+        ? t("hint.parked", { key: kv.interact })
         : p.inside
-          ? "Release the accelerator to stop."
-          : "Start with W / ↑. Release to slow down."
+          ? t("hint.release")
+          : t("hint.start", { key: kv.forward })
       : state.phase === "dock"
-        ? "Reverse assist: aim the trailer with A / D."
+        ? t("hint.dock", { left: kv.left, right: kv.right })
         : state.phase === "dispatch"
-          ? "Hold on: the yard operator is assigning your dock."
+          ? t("hint.dispatch")
           : isWalking
-            ? "WASD / arrows to walk. E to interact."
-            : "Follow the marked lane to the gate.",
+            ? t("hint.walk", {
+                keys: [kv.forward, kv.left, kv.reverse, kv.right].join(""),
+                key: kv.interact,
+              })
+            : t("hint.lane"),
   );
   $("dock-guide").classList.toggle(
     "hidden",
@@ -1344,7 +1555,7 @@ function updateUI() {
   );
   text("dock-offset", `${d.lateral.toFixed(1)} m`);
   text("dock-angle", `${d.angleDegrees.toFixed(0)}°`);
-  text("dock-gap", d.gap > 0 ? `${d.gap.toFixed(1)} m` : "At bumper");
+  text("dock-gap", d.gap > 0 ? `${d.gap.toFixed(1)} m` : t("dock.atBumper"));
   style(
     "dock-needle",
     "left",
@@ -1352,23 +1563,25 @@ function updateUI() {
   );
   text(
     "dock-coach",
-    d.angleDegrees > 90
-      ? "Turn the cab away."
-      : d.ready
-        ? "Hold position."
-        : d.lateral >= DOCK_TOLERANCE.lateral
-          ? "Line up your trailer."
-          : d.headingError >= DOCK_TOLERANCE.heading
-            ? "Straighten the trailer."
-            : d.gap < 2
-              ? "Brake at the bumper."
-              : "Reverse slowly.",
+    t(
+      d.angleDegrees > 90
+        ? "dock.coachTurnAway"
+        : d.ready
+          ? "dock.coachHold"
+          : d.lateral >= DOCK_TOLERANCE.lateral
+            ? "dock.coachLineUp"
+            : d.headingError >= DOCK_TOLERANCE.heading
+              ? "dock.coachStraighten"
+              : d.gap < 2
+                ? "dock.coachBrake"
+                : "dock.coachReverse",
+    ),
   );
   text(
     "dock-tip",
     d.angleDegrees > 90
-      ? "The back of the trailer goes against the dock. Use the open apron to turn around."
-      : "Hold Shift for a slow approach. Release steering to let the trailer straighten.",
+      ? t("dock.tipTurn")
+      : t("dock.tipSlow", { key: kv.precision }),
   );
   drawMap();
   syncDialog();
@@ -1618,12 +1831,13 @@ import.meta.hot?.dispose(() => toolLifecycle.abort());
 scene
   .load()
   .then(() => {
-    $("start").innerHTML = "Let’s drive <span>↗</span>";
-    $("start").removeAttribute("disabled");
+    loadState = "ready";
+    syncStartButton();
     import.meta.hot?.send("yard:ready", {});
   })
   .catch((error) => {
-    $("start").textContent = "Loading failed · reload to retry";
+    loadState = "failed";
+    syncStartButton();
     console.error(error);
   });
 requestAnimationFrame(frame);
