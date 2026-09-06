@@ -46,6 +46,8 @@ export type DispatchController = {
 };
 /** Logical width the screens are designed at; the phone zooms from here. */
 export const SCREEN_WIDTH = 390;
+/** Bezel around the screen when the handset fills a phone viewport (matches dispatch.css). */
+const FRAME_BEZEL = 10;
 /** The lock screen settles before the notification drops. */
 const NOTIFY_MS = 900;
 /** The app closes the picker half a second after a choice, as production does. */
@@ -104,10 +106,25 @@ export function mountDispatch(
   const applyMode = () => {
     const full = isFullScreen();
     stage.dataset.mode = phone.dataset.mode = full ? "full" : "handset";
-    const zoom = full
-      ? Math.min(1, window.innerWidth / SCREEN_WIDTH)
-      : Math.max(0.42, Math.min(1, (window.innerHeight - 40) / 900));
-    phone.style.setProperty("--op-zoom", zoom.toFixed(3));
+    if (full) {
+      // The frame fills the stage's padded box; the screen keeps its 390 px design width.
+      const pad = getComputedStyle(stage);
+      const width =
+        stage.clientWidth -
+        parseFloat(pad.paddingLeft) -
+        parseFloat(pad.paddingRight);
+      const height =
+        stage.clientHeight -
+        parseFloat(pad.paddingTop) -
+        parseFloat(pad.paddingBottom);
+      const zoom = Math.min(1, width / (SCREEN_WIDTH + 2 * FRAME_BEZEL));
+      phone.style.setProperty("--op-zoom", zoom.toFixed(3));
+      phone.style.setProperty("--op-h", `${(height / zoom).toFixed(1)}px`);
+    } else {
+      const zoom = Math.max(0.42, Math.min(1, (window.innerHeight - 40) / 900));
+      phone.style.setProperty("--op-zoom", zoom.toFixed(3));
+      phone.style.removeProperty("--op-h");
+    }
   };
   applyMode();
   window.addEventListener("resize", applyMode);

@@ -28,10 +28,14 @@
   color: #111;
   -webkit-font-smoothing: antialiased;
 }
+/* Phones: a slim handset frame fills the viewport, inset past the notch and
+   home indicator so the frame itself stays visible. */
 .op-stage[data-mode="full"] {
-  padding: 0;
+  padding: max(8px, env(safe-area-inset-top))
+    max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+    max(8px, env(safe-area-inset-left));
   justify-content: center;
-  align-items: flex-end;
+  align-items: center;
 }
 .op-stage *,
 .op-stage *::before,
@@ -130,19 +134,21 @@
   font-size: 16px;
   line-height: 1.5;
 }
-/* Full screen: the viewport is the phone. */
+/* Full screen: the handset is the viewport minus a slim bezel. --op-h is the
+   frame's height in screen pixels, set by the view alongside --op-zoom. */
 .op-phone[data-mode="full"] {
-  width: 390px;
-  height: calc(100dvh / var(--op-zoom, 1));
-  transform-origin: bottom center;
+  height: var(--op-h, 845px);
+  transform-origin: center;
 }
 .op-phone[data-mode="full"] .op-phone__body {
-  width: 100%;
+  width: 410px;
   height: 100%;
-  padding: 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
+  padding: 10px;
+  border-radius: 46px;
+  box-shadow:
+    0 12px 40px rgb(0 0 0 / 45%),
+    0 0 0 2px #2b2e34,
+    0 0 0 3.5px #0d0e11;
 }
 .op-phone[data-mode="full"] .op-phone__body::before,
 .op-phone[data-mode="full"] .op-phone__body::after {
@@ -151,14 +157,7 @@
 .op-phone[data-mode="full"] .op-screen {
   width: 100%;
   height: 100%;
-  border-radius: 0;
-}
-.op-phone[data-mode="full"] .op-status {
-  padding-top: env(safe-area-inset-top);
-  height: calc(54px + env(safe-area-inset-top));
-}
-.op-phone[data-mode="full"] .op-status__island {
-  display: none;
+  border-radius: 36px;
 }
 /* Status bar and home indicator, shared by every screen. */
 .op-status {
