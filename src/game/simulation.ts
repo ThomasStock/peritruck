@@ -2,6 +2,7 @@
  * Heading 0 = +Z. Positive steering turns left from the driver's seat.
  * All entry points (keyboard, touch, CLI, WebMCP) use these transitions.
  */
+import { createRace, finishStage, tickRace, type Race } from "./race";
 export type Point = { x: number; z: number };
 export type Truck = Point & {
   heading: number;
@@ -14,6 +15,7 @@ export type Phase =
   | "walk-kiosk"
   | "kiosk"
   | "walk-truck"
+  | "dispatch"
   | "gate"
   | "pin"
   | "dock"
@@ -36,9 +38,16 @@ export type State = {
   registered: boolean;
   /** Simulation time at which the check-in SMS reaches the driver's phone. */
   smsAt: number;
+  /** Simulation time at which the yard operator's phone buzzes with the new visitor. */
+  dispatchAt: number;
+  /** The yard operator has called the visitor off to a dock; the SMS follows. */
+  dispatched: boolean;
+  /** Assigned dock number, 1–5. Meaningful once dispatched; 3 until then. */
+  dock: number;
   pin: string;
   booking: string;
   elapsed: number;
+  race: Race;
   distance: number;
   contacts: number;
   recoveries: number;
@@ -63,15 +72,49 @@ export const YARD = {
   park: { x: -24, z: 43.5, w: 6, d: 23 },
   kiosk: { x: -33.7, z: 28.2 },
   gate: { x: 18, z: 21.5 },
+  /** Dock face line; dock 03 sits at x 0. Use dockPoint for the assigned dock. */
   dock: { x: 0, z: -44 },
   gateZ: 12,
+  /** Where the yard operator stands: beside the cab of the rig at dock 05. */
+  operator: { x: 39.2, z: -29.5 },
 };
+/** Five dock doors, 18 m apart along the warehouse front. */
+export const DOCKS = [1, 2, 3, 4, 5].map((number) => ({
+  number,
+  x: (number - 3) * 18,
+}));
+export type DockStatus = "free" | "occupied" | "outOfService";
+/** Dock 05 holds the parked rig being unloaded; dock 04's leveller is out of service. */
+export function dockStatus(dock: number): DockStatus {
+  return dock === 5 ? "occupied" : dock === 4 ? "outOfService" : "free";
+}
+/** "03", as painted on the dock panel. */
+export const dockLabel = (dock: number) => String(dock).padStart(2, "0");
+export const dockX = (dock: number) =>
+  DOCKS.find((d) => d.number === dock)?.x ?? YARD.dock.x;
+/** Centre of the assigned dock's face. */
+export const dockPoint = (s: State): Point => ({
+  x: dockX(s.dock),
+  z: YARD.dock.z,
+});
 /** Speeds (m/s) below which a driving step can complete. */
-export const STOP_SPEED = { park: 0.18, gate: 0.3, dock: 0.18 };
+export const STOP_SPEED = { park: 0.18, gate: 0.3, dock: 0.3 };
+/** Docking acceptance window for the trailer rear: metres, radians and seconds.
+ * The dock 03 apron marking is 5 m wide, so a 2.55 m trailer offset by up to
+ * 1.2 m still sits inside the marking. */
+export const DOCK_TOLERANCE = {
+  lateral: 1.2,
+  gapMin: -0.45,
+  gapMax: 1.5,
+  heading: 0.16,
+  hold: 0.5,
+};
 /** Radius (m) around a driving target inside which excess speed warns the driver. */
 export const SLOW_ZONE = 4;
-/** Seconds between leaving the kiosk and the gate PIN landing on the driver's phone. */
+/** Seconds between the dock assignment and the gate PIN landing on the driver's phone. */
 export const SMS_DELAY = 2;
+/** Seconds between leaving the kiosk and the yard operator's phone buzzing. */
+export const DISPATCH_DELAY = 2;
 /** The booking reference printed on the delivery note: fixed prefix, six-character body. */
 export const BOOKING = "PP-K4M7Q2";
 /** A fresh four-digit gate PIN for every session; leading zeros are kept. */
@@ -122,10 +165,11 @@ export const blendTruck = (a: Truck, b: Truck, t: number): Truck => ({
   steer: lerp(a.steer, b.steer, t),
 });
 export const walking = (s: State) =>
-  ["walk-kiosk", "walk-truck", "kiosk"].includes(s.phase);
-/** The check-in SMS with the gate PIN has arrived. Sessions saved before the delay existed count as delivered. */
+  ["walk-kiosk", "walk-truck", "kiosk", "dispatch"].includes(s.phase);
+/** The check-in SMS with the gate PIN has arrived. It follows the dock assignment;
+ * sessions saved before dispatching existed count as assigned and delivered. */
 export const smsReceived = (s: State) =>
-  s.registered && s.elapsed >= (s.smsAt ?? 0);
+  s.registered && (s.dispatched ?? true) && s.elapsed >= (s.smsAt ?? 0);
 export function createState(): State {
   const truck = {
     x: -24,
@@ -144,9 +188,13 @@ export function createState(): State {
     gateOpen: false,
     registered: false,
     smsAt: 0,
+    dispatchAt: 0,
+    dispatched: false,
+    dock: 3,
     pin: randomPin(),
     booking: BOOKING,
     elapsed: 0,
+    race: createRace(),
     distance: 0,
     contacts: 0,
     recoveries: 0,
@@ -347,9 +395,10 @@ export function parking(s: State) {
   return { inside, straight, stopped, ready: inside && straight && stopped };
 }
 export function docking(s: State) {
-  const tail = rear(s.truck),
-    lateral = Math.abs(tail.x - YARD.dock.x),
-    gap = tail.z - YARD.dock.z;
+  const dock = dockPoint(s),
+    tail = rear(s.truck),
+    lateral = Math.abs(tail.x - dock.x),
+    gap = tail.z - dock.z;
   const headingError = Math.abs(angle(s.truck.trailerHeading));
   return {
     lateral,
@@ -357,10 +406,10 @@ export function docking(s: State) {
     headingError,
     angleDegrees: (headingError * 180) / Math.PI,
     ready:
-      lateral < 0.85 &&
-      gap > -0.45 &&
-      gap < 1.05 &&
-      headingError < 0.105 &&
+      lateral < DOCK_TOLERANCE.lateral &&
+      gap > DOCK_TOLERANCE.gapMin &&
+      gap < DOCK_TOLERANCE.gapMax &&
+      headingError < DOCK_TOLERANCE.heading &&
       Math.abs(s.truck.speed) < STOP_SPEED.dock,
   };
 }
@@ -389,9 +438,18 @@ export function objective(s: State): {
     case "walk-truck":
       return {
         title: "Driver instructions",
-        detail: smsReceived(s)
-          ? "Your gate PIN arrived by SMS. Walk back to the cab."
-          : "Checked in. Your gate PIN is on its way by SMS.",
+        detail: !s.dispatched
+          ? "Checked in. The yard operator is assigning your dock."
+          : smsReceived(s)
+            ? "Your gate PIN arrived by SMS. Walk back to the cab."
+            : "Dock assigned. Your gate PIN is on its way by SMS.",
+        target: offset(s.truck, s.truck.heading + Math.PI / 2, 2.5),
+        step: 1,
+      };
+    case "dispatch":
+      return {
+        title: "Yard dispatch",
+        detail: "The yard operator picks your dock in the Peripass app.",
         target: offset(s.truck, s.truck.heading + Math.PI / 2, 2.5),
         step: 1,
       };
@@ -405,16 +463,16 @@ export function objective(s: State): {
       };
     case "dock":
       return {
-        title: "Assigned dock: 03",
-        detail: "Turn in the apron. Reverse your trailer into dock 03.",
-        target: { x: 0, z: -32.5 },
+        title: `Assigned dock: ${dockLabel(s.dock)}`,
+        detail: `Turn in the apron. Reverse your trailer into dock ${dockLabel(s.dock)}.`,
+        target: { x: dockX(s.dock), z: -32.5 },
         step: 3,
       };
     case "complete":
       return {
         title: "Ready for unloading",
-        detail: "Trailer positioned at dock 03.",
-        target: YARD.dock,
+        detail: `Trailer positioned at dock ${dockLabel(s.dock)}.`,
+        target: dockPoint(s),
         step: 4,
       };
   }
@@ -450,6 +508,10 @@ export function slowDown(s: State): boolean {
   );
 }
 export function interact(s: State): boolean {
+  if (s.phase === "dispatch") {
+    note(s, "Waiting for the yard operator to assign your dock.");
+    return false;
+  }
   if (!prompt(s)) {
     note(
       s,
@@ -461,6 +523,7 @@ export function interact(s: State): boolean {
   }
   s.truck.speed = 0;
   if (s.phase === "arrive") {
+    finishStage((s.race ??= createRace()), 0);
     s.phase = "walk-kiosk";
     s.driver = offset(s.truck, s.truck.heading + Math.PI / 2, 2.5);
     s.driver.z -= 2;
@@ -470,7 +533,7 @@ export function interact(s: State): boolean {
   else if (s.phase === "walk-truck") {
     s.phase = "gate";
     s.checkpoint = { ...s.truck };
-    note(s, `Gate PIN ${s.pin} · Dock 03`, "entered-truck");
+    note(s, `Gate PIN ${s.pin} · Dock ${dockLabel(s.dock)}`, "entered-truck");
   } else if (s.phase === "gate") s.phase = "pin";
   return true;
 }
@@ -484,10 +547,48 @@ export function register(s: State, booking: string): boolean {
     return false;
   }
   s.registered = true;
+  finishStage((s.race ??= createRace()), 1);
   s.phase = "walk-truck";
-  // The SMS lands a moment after the driver leaves the kiosk; the UI shows it then.
+  // The yard operator's phone buzzes a moment after the driver leaves the kiosk.
+  s.dispatchAt = s.elapsed + DISPATCH_DELAY;
+  log(
+    s,
+    "registered",
+    `Checked in with ${s.booking}. Waiting for a dock assignment.`,
+  );
+  return true;
+}
+/** The yard operator calls the visitor off to a dock from the Peripass app.
+ * Only free docks are accepted; the gate PIN SMS follows the assignment. */
+export function dispatch(s: State, dock: number): boolean {
+  if (s.phase !== "dispatch") {
+    note(s, "Nobody is waiting to be called off.");
+    return false;
+  }
+  if (!DOCKS.some((d) => d.number === dock)) {
+    note(s, "Choose one of docks 01 to 05.");
+    return false;
+  }
+  const status = dockStatus(dock);
+  if (status !== "free") {
+    note(
+      s,
+      status === "occupied"
+        ? `Dock ${dockLabel(dock)} is occupied.`
+        : `Dock ${dockLabel(dock)} is out of service.`,
+    );
+    return false;
+  }
+  s.dispatched = true;
+  s.dock = dock;
+  s.phase = "walk-truck";
+  // The SMS lands a moment after the call-off; the UI shows it then.
   s.smsAt = s.elapsed + SMS_DELAY;
-  log(s, "registered", `Checked in with ${s.booking}. Gate PIN sent by SMS.`);
+  log(
+    s,
+    "dispatched",
+    `Called off to dock ${dockLabel(dock)}. Gate PIN sent by SMS.`,
+  );
   return true;
 }
 /** Safe stop just inside the barrier once the gate has opened. */
@@ -509,8 +610,13 @@ export function enterPin(s: State, pin: string): boolean {
     return false;
   }
   s.gateOpen = true;
+  finishStage((s.race ??= createRace()), 2);
   s.phase = "dock";
-  note(s, "Access granted. Proceed to dock 03.", "gate-opened");
+  note(
+    s,
+    `Access granted. Proceed to dock ${dockLabel(s.dock)}.`,
+    "gate-opened",
+  );
   s.checkpoint = { ...insideGate };
   return true;
 }
@@ -532,19 +638,21 @@ const atGateLine: Truck = {
   speed: 0,
   steer: 0,
 };
-/** Trailer rear squared up 0.45 m from dock 03; docking accepts this at once. */
-const docked: Truck = {
-  x: YARD.dock.x,
+/** Trailer rear squared up 0.45 m from the assigned dock; docking accepts this at once. */
+const docked = (s: State): Truck => ({
+  x: dockX(s.dock),
   z: YARD.dock.z + RIG.rear + 0.45,
   heading: 0,
   trailerHeading: 0,
   speed: 0,
   steer: 0,
-};
-/** A skipped kiosk still hands the driver the PIN; a pending SMS lands now. */
+});
+/** A skipped kiosk or call-off still hands the driver the PIN; a pending SMS lands now. */
 function deliverPin(s: State) {
-  if (!s.registered || s.smsAt > s.elapsed) s.smsAt = s.elapsed;
+  if (!s.registered || !s.dispatched || s.smsAt > s.elapsed)
+    s.smsAt = s.elapsed;
   s.registered = true;
+  s.dispatched = true;
 }
 function skipToGateLine(s: State) {
   deliverPin(s);
@@ -555,7 +663,7 @@ function skipToGateLine(s: State) {
 }
 function skipToDock(s: State) {
   deliverPin(s);
-  s.truck = { ...docked };
+  s.truck = docked(s);
   s.gateOpen = true;
   s.phase = "dock";
   s.dockHold = 0;
@@ -567,6 +675,8 @@ function skipToDock(s: State) {
  * back → checked in, stopped at the gate line. Stopped at the line, or past the
  * gate → docked, so the delivery completes on the next hold. Silent: no toast. */
 export function skipAhead(s: State): boolean {
+  if (s.phase === "complete") return false;
+  (s.race ??= createRace()).practice = true;
   switch (s.phase) {
     case "arrive":
     case "walk-kiosk":
@@ -578,6 +688,7 @@ export function skipAhead(s: State): boolean {
       return true;
     case "kiosk":
     case "walk-truck":
+    case "dispatch":
       return skipToGateLine(s);
     case "gate":
       return prompt(s) ? skipToDock(s) : skipToGateLine(s);
@@ -647,13 +758,25 @@ export function integrate(
         dt,
   );
 }
-export function step(s: State, input = idleInput(), dt = DT) {
-  if (s.phase === "complete" || s.phase === "kiosk" || s.phase === "pin")
-    return;
-  // Fixed step only; callers subdivide durations, avoiding tunnelling/frame-rate dependence.
+export function step(s: State, input = idleInput(), dt = DT, timed = true) {
+  // Older persisted CLI sessions predate race tracking.
+  s.race ??= createRace();
+  if (s.phase === "complete") return;
   dt = clamp(dt, 0, DT);
+  if (timed) tickRace(s.race, dt);
+  if (["kiosk", "pin", "dispatch"].includes(s.phase)) return;
+  // Fixed step only; callers subdivide durations, avoiding tunnelling/frame-rate dependence.
   s.elapsed += dt;
   s.collisionCooldown = Math.max(0, s.collisionCooldown - dt);
+  // The operator's phone buzzes: the driver waits while the dock is assigned.
+  if (
+    s.phase === "walk-truck" &&
+    !s.dispatched &&
+    s.elapsed + 1e-9 >= (s.dispatchAt ?? 0)
+  ) {
+    s.phase = "dispatch";
+    return;
+  }
   if (walking(s)) {
     const len = Math.max(1, Math.hypot(input.walkX, input.walkZ));
     const p = {
@@ -687,13 +810,22 @@ export function step(s: State, input = idleInput(), dt = DT) {
       );
       s.collisionCooldown = 1.5;
     }
-  } else s.distance += distance(before, s.truck);
+  } else {
+    const moved = distance(before, s.truck);
+    s.distance += moved;
+    if (moved > 0 && !s.race.started) {
+      s.race.started = true;
+      tickRace(s.race, dt);
+    }
+  }
   if (s.phase === "dock") {
     s.dockHold = docking(s).ready ? s.dockHold + dt : 0;
-    if (s.dockHold > 0.7) {
+    if (s.dockHold > DOCK_TOLERANCE.hold) {
       s.phase = "complete";
+      finishStage(s.race, 3);
+      s.race.finished = true;
       s.truck.speed = 0;
-      note(s, "Delivered to dock 03.", "completed");
+      note(s, `Delivered to dock ${dockLabel(s.dock)}.`, "completed");
     }
   }
 }
@@ -734,6 +866,9 @@ export function snapshot(s: State) {
     assisted: s.assisted,
     gateOpen: s.gateOpen,
     registered: s.registered,
+    dispatched: s.dispatched,
+    dock: s.dock,
+    docks: DOCKS.map((d) => ({ ...d, status: dockStatus(d.number) })),
     smsReceived: smsReceived(s),
     objective: objective(s),
     interaction: prompt(s),
@@ -742,6 +877,7 @@ export function snapshot(s: State) {
     docking: docking(s),
     pin: s.registered ? s.pin : null,
     elapsed: round(s.elapsed),
+    race: s.race,
     distance: round(s.distance),
     contacts: s.contacts,
     recoveries: s.recoveries,

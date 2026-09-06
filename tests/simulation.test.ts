@@ -29,6 +29,9 @@ import {
   staticRigs,
   smsReceived,
   SMS_DELAY,
+  DISPATCH_DELAY,
+  dispatch,
+  walking,
   objective,
   snapshot,
 } from "../src/game/simulation";
@@ -45,7 +48,14 @@ test("complete delivery through real controls: park, walk, register, PIN, revers
   assert.ok(docking(s).ready);
   assert.deepEqual(
     s.events.map((e) => e.type),
-    ["parked", "registered", "entered-truck", "gate-opened", "completed"],
+    [
+      "parked",
+      "registered",
+      "dispatched",
+      "entered-truck",
+      "gate-opened",
+      "completed",
+    ],
   );
 });
 
@@ -138,10 +148,21 @@ test("dock success requires rear-first alignment, lateral position and stationar
     steer: 0,
   };
   assert.ok(docking(s).ready);
-  advance(s, idleInput(), 0.5);
+  advance(s, idleInput(), 0.3);
   assert.equal(s.phase, "dock");
   advance(s, idleInput(), 0.3);
   assert.equal(s.phase, "complete");
+  // Inside the loosened window: 1 m off centre, 8° skewed, 1.3 m from the bumper.
+  const loose = createState();
+  loose.phase = "dock";
+  loose.truck = {
+    ...s.truck,
+    x: 1,
+    z: -44 + 11.5 + 1.3,
+    heading: 0.14,
+    trailerHeading: 0.14,
+  };
+  assert.ok(docking(loose).ready);
   const wrong = createState();
   wrong.phase = "dock";
   wrong.truck = { ...s.truck, heading: Math.PI, trailerHeading: Math.PI };
@@ -266,14 +287,35 @@ test("kiosk and gate cannot be skipped, wrong booking/PIN preserve progress", ()
   assert.equal(s.phase, "dock");
 });
 
-test("the gate PIN lands on the driver's phone shortly after leaving the kiosk", () => {
+test("the yard operator is called shortly after leaving the kiosk; the gate PIN follows the call-off", () => {
   const s = createState();
   assert.equal(smsReceived(s), false);
   s.phase = "kiosk";
   assert.ok(register(s, s.booking));
   assert.equal(s.registered, true);
+  assert.equal(s.dispatched, false);
   assert.equal(smsReceived(s), false);
   assert.equal(s.message, "");
+  assert.match(objective(s).detail, /assigning your dock/);
+  advance(s, idleInput(), DISPATCH_DELAY / 2);
+  assert.equal(s.phase, "walk-truck");
+  advance(s, idleInput(), DISPATCH_DELAY);
+  assert.equal(s.phase, "dispatch");
+  assert.equal(walking(s), true);
+  const frozen = s.elapsed;
+  advance(s, { ...idleInput(), walkX: 1 }, 2);
+  assert.equal(s.elapsed, frozen, "the driver waits for the dock assignment");
+  assert.equal(interact(s), false);
+  assert.equal(dispatch(s, 5), false);
+  assert.match(s.message, /Dock 05 is occupied/);
+  assert.equal(dispatch(s, 4), false);
+  assert.match(s.message, /out of service/);
+  assert.equal(dispatch(s, 9), false);
+  assert.equal(s.phase, "dispatch");
+  assert.ok(dispatch(s, 2));
+  assert.equal(s.phase, "walk-truck");
+  assert.equal(s.dock, 2);
+  assert.equal(smsReceived(s), false);
   assert.match(objective(s).detail, /on its way by SMS/);
   advance(s, idleInput(), SMS_DELAY / 2);
   assert.equal(smsReceived(s), false);
@@ -281,13 +323,16 @@ test("the gate PIN lands on the driver's phone shortly after leaving the kiosk",
   assert.equal(smsReceived(s), true);
   assert.match(objective(s).detail, /arrived by SMS/);
   assert.equal(snapshot(s).smsReceived, true);
-  assert.equal(s.events.at(-1)?.type, "registered");
+  assert.equal(snapshot(s).dock, 2);
+  assert.equal(s.events.at(-1)?.type, "dispatched");
+  assert.equal(dispatch(s, 2), false, "one call-off per visit");
   const skipped = createState();
   skipped.phase = "walk-truck";
   skipped.registered = true;
   skipped.smsAt = 99;
   skipAhead(skipped);
   assert.equal(smsReceived(skipped), true);
+  assert.equal(skipped.dispatched, true);
 });
 
 test("recovery restores the last safe checkpoint without clearing visit progress", () => {

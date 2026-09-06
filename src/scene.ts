@@ -5,6 +5,8 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import {
   type State,
   type Input,
+  DOCKS,
+  dockX,
   objective,
   walking,
   rear,
@@ -15,6 +17,12 @@ import { DriverRig } from "./rig";
 import { PredictionPath } from "./prediction";
 import { RouteDots } from "./route";
 export type CameraMode = "follow" | "yard" | "overhead";
+/** Who the camera follows: the driver, or the yard operator by dock 05. */
+export type Attention = "driver" | "operator";
+/** Seconds for the camera to travel between the driver and the operator. */
+export const CUT_SECONDS = 1.7;
+/** Where the operator stands, facing along the cab towards the apron. */
+const OPERATOR_HEADING = 0.3;
 export function createYardCamera() {
   // Cameras stay metres from the actors. A 1 m near plane preserves enough
   // depth precision to keep the thin yard slabs from shimmering at a distance.
@@ -70,6 +78,13 @@ export class YardScene {
   mode: CameraMode = "follow";
   loaded = false;
   reducedMotion = false;
+  /** The yard operator: a second hi-vis figure who never leaves dock 05. */
+  operator = new THREE.Group();
+  /** Raised while the operator works the dispatch app. */
+  operatorPhone = false;
+  attention: Attention = "driver";
+  /** In-flight camera move between subjects, or null when settled. */
+  private cut: { from: THREE.Vector3; t: number } | null = null;
   private focus = new THREE.Vector3(-13, 0, 26);
   private look = new THREE.Vector3();
   private nextFocus = new THREE.Vector3();
@@ -78,9 +93,24 @@ export class YardScene {
   private gateAngle = 0;
   private env: THREE.WebGLRenderTarget;
   private rig = new DriverRig(this.driver);
+  private operatorRig = new DriverRig(this.operator);
   private steering: THREE.Object3D[] = [];
   private parkingHighlight: THREE.Mesh;
   private dockHighlight: THREE.Mesh;
+  /** Number panel and signal lamp per dock; the assigned dock lights up teal and green. */
+  private dockPanels: THREE.Mesh[] = [];
+  private dockLamps: THREE.Mesh[] = [];
+  private panelDark = new THREE.MeshStandardMaterial({
+    color: "#3b5255",
+    roughness: 0.9,
+    metalness: 0.1,
+  });
+  private panelTeal = new THREE.MeshStandardMaterial({
+    color: "#00a990",
+    emissive: "#00a990",
+    emissiveIntensity: 0.3,
+    roughness: 0.5,
+  });
   constructor(private container: HTMLElement) {
     // The drawing buffer is not preserved: keeping it costs a full-screen copy
     // every frame. Screenshots render synchronously right before reading pixels.
@@ -134,11 +164,33 @@ export class YardScene {
       this.tractor,
       this.trailer,
       this.driver,
+      this.operator,
       this.gate,
       this.target,
       this.prediction,
       this.route,
     );
+    // Dock number panels sit just proud of the baked ones, behind the painted
+    // digits, so the assigned dock can light up. A green lamp joins the red one.
+    const panelGeometry = new THREE.BoxGeometry(2.55, 1.38, 0.02);
+    const lampGeometry = new THREE.CylinderGeometry(0.085, 0.085, 0.02, 16);
+    const lampGreen = new THREE.MeshStandardMaterial({
+      color: "#35d27a",
+      emissive: "#35d27a",
+      emissiveIntensity: 0.9,
+    });
+    for (const dock of DOCKS) {
+      const panel = new THREE.Mesh(panelGeometry, this.panelDark);
+      panel.position.set(dock.x, 6.22, -44.64);
+      panel.name = `dock-panel-${dock.number}`;
+      const lamp = new THREE.Mesh(lampGeometry, lampGreen);
+      lamp.rotation.x = Math.PI / 2;
+      lamp.position.set(dock.x + 3.18, 4, -44.115);
+      lamp.visible = false;
+      this.dockPanels.push(panel);
+      this.dockLamps.push(lamp);
+      this.scene.add(panel, lamp);
+    }
     this.gate.position.set(12, 1.5, 12);
     // The arms swing as one piece: two colours, two draw calls.
     const arms = new THREE.Group();
@@ -215,6 +267,28 @@ export class YardScene {
     this.trailer.add(trailer.scene);
     this.driver.add(driver.scene);
     this.rig.bind();
+    // The operator wears the same rig in a yellow-green vest and a white hat.
+    const operator = driver.scene.clone(true);
+    const recolour: Record<string, string> = {
+      "Safety amber": "#c9e33a",
+      "Safety yellow": "#eef1ea",
+    };
+    const retinted = new Map<THREE.Material, THREE.Material>();
+    operator.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const mat = o.material as THREE.MeshStandardMaterial;
+      const colour = recolour[mat.name];
+      if (!colour) return;
+      let tint = retinted.get(mat);
+      if (!tint) {
+        tint = mat.clone();
+        (tint as THREE.MeshStandardMaterial).color.set(colour);
+        retinted.set(mat, tint);
+      }
+      o.material = tint;
+    });
+    this.operator.add(operator);
+    this.operatorRig.bind();
     this.steering = ["steering-left", "steering-right"].flatMap((name) => {
       const wheel = this.tractor.getObjectByName(name);
       return wheel ? [wheel] : [];
@@ -267,6 +341,15 @@ export class YardScene {
     }
     this.loaded = true;
   }
+  /** Move the camera to the other subject with a pull-back and push-in. */
+  cutTo(target: Attention) {
+    if (this.attention === target) return;
+    this.attention = target;
+    this.cut = this.reducedMotion ? null : { from: this.focus.clone(), t: 0 };
+  }
+  get cutting() {
+    return this.cut !== null;
+  }
   render(s: State, input: Input, dt: number, started: boolean) {
     this.tractor.position.set(s.truck.x, 0, s.truck.z);
     this.tractor.rotation.y = s.truck.heading;
@@ -274,6 +357,20 @@ export class YardScene {
     this.trailer.position.copy(this.tractor.position);
     this.trailer.rotation.y = s.truck.trailerHeading;
     this.rig.update(s, input, dt, this.reducedMotion);
+    this.operatorRig.stand(
+      YARD.operator.x,
+      YARD.operator.z,
+      OPERATOR_HEADING + (this.operatorPhone ? 0.25 : 0),
+      this.operatorPhone,
+      dt,
+      this.reducedMotion,
+    );
+    for (const [i, dock] of DOCKS.entries()) {
+      const assigned = s.dispatched && dock.number === s.dock;
+      this.dockPanels[i].material = assigned ? this.panelTeal : this.panelDark;
+      this.dockLamps[i].visible = assigned;
+    }
+    this.dockHighlight.position.x = dockX(s.dock);
     this.gateAngle = THREE.MathUtils.damp(
       this.gateAngle,
       s.gateOpen ? Math.PI * 0.48 : 0,
@@ -299,6 +396,11 @@ export class YardScene {
     }
     const offset = this.offset.set(24, 34, 33);
     if (walking(s)) offset.set(14, 20, 19);
+    if (this.attention === "operator") {
+      // Over the operator's shoulder: close and low, the rig at dock 05 behind.
+      focus.set(YARD.operator.x - 1.2, 0.9, YARD.operator.z - 1.5);
+      offset.set(8.5, 7.5, 11.5);
+    }
     if (!started || this.mode === "yard" || s.phase === "complete") {
       focus.set(0, 0, 13);
       offset.set(109, 113, 128);
@@ -308,10 +410,29 @@ export class YardScene {
     }
     if (started && this.mode === "follow" && this.camera.aspect < 0.85)
       offset.multiplyScalar(1.3);
-    const blend = this.reducedMotion ? 1 : 1 - Math.exp(-dt * 3.5);
-    this.focus.lerp(focus, blend);
-    this.look.copy(this.focus).add(offset);
-    this.camera.position.lerp(this.look, blend);
+    if (this.cut) {
+      // The focus travels between the two subjects while the camera pulls up
+      // and away through the middle of the move, then drops back in on arrival.
+      const t = Math.min(1, this.cut.t + dt / CUT_SECONDS);
+      this.cut.t = t;
+      const ease = t * t * (3 - 2 * t);
+      const rise = Math.sin(Math.PI * t);
+      this.focus.lerpVectors(this.cut.from, focus, ease);
+      this.look.copy(this.focus).addScaledVector(offset, 1 + 2.6 * rise);
+      this.camera.position.copy(this.look);
+      this.camera.fov = 40 + 18 * rise;
+      this.camera.updateProjectionMatrix();
+      if (t >= 1) this.cut = null;
+    } else {
+      const blend = this.reducedMotion ? 1 : 1 - Math.exp(-dt * 3.5);
+      this.focus.lerp(focus, blend);
+      this.look.copy(this.focus).add(offset);
+      this.camera.position.lerp(this.look, blend);
+      if (this.camera.fov !== 40) {
+        this.camera.fov = 40;
+        this.camera.updateProjectionMatrix();
+      }
+    }
     this.camera.lookAt(this.focus);
     this.renderer.render(this.scene, this.camera);
   }
