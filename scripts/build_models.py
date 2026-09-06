@@ -131,7 +131,10 @@ box('Roof cap',(0,4.03,-5.1),(2.61,.09,12.87),'metal',.025)
 for side in [-1,1]:
     box('Side rail',(side*1.3,1.36,-5.1),(.055,.12,12.7),'metal')
     box('Brand stripe',(side*1.283,1.64,-5.1),(.025,.32,12.45),'teal')
-    box('Side underrun',(side*1.1,.65,-3.2),(.1,.28,4.7),'metal',.03)
+    # Side underrun bar: front edge at -2.25 so it stays clear of the tractor's
+    # rear tandem through the full jackknife range; rear edge at -5.55 keeps it
+    # ahead of the trailer bogie.
+    box('Side underrun',(side*1.1,.65,-3.9),(.1,.28,3.3),'metal',.03)
     for z in [-10.8,-8.85,-6.9,-4.95,-3,-1.05,.9]:
         box('Reflector',(side*1.317,1.39,z),(.027,.06,.15),'orange')
     for z in [-9.1,-7.85,-6.6]:wheel(side*1.1,z)
