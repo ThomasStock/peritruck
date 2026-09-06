@@ -10,7 +10,8 @@ import {
 /** Procedural driver animation. Legs, arms, head and body hang from the named
  * empties authored in scripts/build_models.py. The gait is driven by the
  * simulation's actual displacement, so blocked or paused walking settles to
- * idle instead of marching in place. */
+ * idle instead of marching in place. The same rig also poses the yard
+ * operator: standing still, phone raised while dispatching. */
 const CYCLE = 1.6; // metres per full gait cycle (two steps)
 const LEG = 0.45,
   ARM = 0.55; // swing amplitudes, radians
@@ -22,6 +23,7 @@ export class DriverRig {
   private roll = 0;
   private clock = 0;
   private lastMove = -1;
+  private phone = 0;
   private last: { x: number; z: number } | null = null;
   constructor(private root: THREE.Object3D) {}
   bind() {
@@ -66,6 +68,34 @@ export class DriverRig {
     // Fixed-step simulation moves in quanta; a short window hides empty frames.
     const moving = this.clock - this.lastMove < 0.07;
     this.gait = THREE.MathUtils.damp(this.gait, moving ? 1 : 0, 10, dt);
+    this.turn(facing, dt);
+    // While the dock is being assigned the driver checks their own phone.
+    this.phone = THREE.MathUtils.damp(
+      this.phone,
+      s.phase === "dispatch" ? 1 : 0,
+      6,
+      dt,
+    );
+    this.pose(d.x, d.z, reducedMotion);
+  }
+  /** Stand at a spot, facing `heading`; `phone` (0–1) raises the right hand
+   * to eye level and drops the gaze onto it. For the yard operator. */
+  stand(
+    x: number,
+    z: number,
+    heading: number,
+    phone: boolean,
+    dt: number,
+    reducedMotion: boolean,
+  ) {
+    this.root.visible = true;
+    this.clock += dt;
+    this.gait = THREE.MathUtils.damp(this.gait, 0, 10, dt);
+    this.turn(heading, dt);
+    this.phone = THREE.MathUtils.damp(this.phone, phone ? 1 : 0, 6, dt);
+    this.pose(x, z, reducedMotion);
+  }
+  private turn(facing: number, dt: number) {
     const turn = angle(facing - this.heading) * (1 - Math.exp(-dt * 12));
     this.heading = angle(this.heading + turn);
     // Bank into turns, then recover upright.
@@ -75,16 +105,15 @@ export class DriverRig {
       8,
       dt,
     );
+  }
+  private pose(x: number, z: number, reducedMotion: boolean) {
     const g = this.gait,
       motion = reducedMotion ? 0 : 1,
       idle = (1 - g) * motion,
       swing = Math.sin(this.phase),
-      t = this.clock;
-    this.root.position.set(
-      d.x,
-      motion * g * (0.035 - 0.075 * swing * swing),
-      d.z,
-    );
+      t = this.clock,
+      phone = this.phone;
+    this.root.position.set(x, motion * g * (0.035 - 0.075 * swing * swing), z);
     this.root.rotation.y = this.heading;
     const { body, head } = this.part;
     const legL = this.part["leg-left"],
@@ -94,9 +123,16 @@ export class DriverRig {
     if (legL) legL.rotation.x = LEG * g * swing;
     if (legR) legR.rotation.x = -LEG * g * swing;
     if (armL)
-      armL.rotation.x = -ARM * g * swing + idle * 0.04 * Math.sin(t * 1.1);
-    if (armR)
-      armR.rotation.x = ARM * g * swing + idle * 0.04 * Math.sin(t * 1.1 + 1);
+      armL.rotation.x =
+        (-ARM * g * swing + idle * 0.04 * Math.sin(t * 1.1)) * (1 - phone) -
+        phone * 0.35;
+    if (armR) {
+      // Forearm forward and up, the hand at chest height; a small thumb tremor.
+      armR.rotation.x =
+        (ARM * g * swing + idle * 0.04 * Math.sin(t * 1.1 + 1)) * (1 - phone) -
+        phone * (1.55 + idle * 0.03 * Math.sin(t * 5.3));
+      armR.rotation.z = -phone * 0.35;
+    }
     if (body) {
       body.rotation.x = motion * 0.1 * g + idle * 0.012 * Math.sin(t * 2.1);
       body.rotation.y = -motion * 0.12 * g * swing; // shoulders follow the opposite arm
@@ -105,8 +141,12 @@ export class DriverRig {
     if (head) {
       head.rotation.y =
         -0.6 * (body?.rotation.y ?? 0) +
-        idle * (0.3 * Math.sin(t * 0.7) + 0.12 * Math.sin(t * 1.9));
-      head.rotation.x = motion * 0.04 * g * Math.cos(2 * this.phase);
+        idle *
+          (1 - phone) *
+          (0.3 * Math.sin(t * 0.7) + 0.12 * Math.sin(t * 1.9));
+      // Looking down at the screen while the phone is up.
+      head.rotation.x =
+        motion * 0.04 * g * Math.cos(2 * this.phase) + phone * 0.5;
     }
   }
 }

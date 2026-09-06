@@ -11,6 +11,7 @@ import "@fontsource/open-sans/800.css";
 import "./style.css";
 import "./kiosk/kiosk.css";
 import "./sms.css";
+import "./dispatch/dispatch.css";
 import { YardScene } from "./scene";
 import {
   BOOKING,
@@ -28,6 +29,9 @@ import {
   docking,
   angle,
   register,
+  dispatch,
+  dockLabel,
+  dockX,
   enterPin,
   recover,
   skipAhead,
@@ -47,6 +51,7 @@ import {
 } from "./game/simulation";
 import { execute } from "./game/commands";
 import { mountKiosk, type KioskController } from "./kiosk/view";
+import { mountDispatch, type DispatchController } from "./dispatch/view";
 import { clock, phoneHtml, smsBannerHtml } from "./sms";
 import { walkingJoystick } from "./walking-joystick";
 import { STAGES, formatTime, tickRace, type Race } from "./game/race";
@@ -108,6 +113,8 @@ app.innerHTML = `
 <div id="dock-guide" class="dock-guide panel hidden"><div class="eyebrow">03 · DOCKING GUIDE</div><strong id="dock-coach">Trailer first.</strong><div class="dock-measure"><span>Side offset</span><b id="dock-offset"></b></div><div class="dock-meter"><i id="dock-needle"></i><span></span></div><div class="dock-measure"><span>Trailer angle</span><b id="dock-angle"></b></div><div class="dock-measure"><span>To bumper</span><b id="dock-gap"></b></div><p id="dock-tip"></p></div>
 <div id="telemetry" class="telemetry panel hidden"><div class="gear"><b id="gear">N</b><span>AUTO</span></div><div class="speed"><b id="speed">00</b><span>KM/H</span></div><div id="assist-tag" class="assist-tag"><span class="live-dot"></span> REVERSE ASSIST</div><div class="articulation"><span>TRAILER</span><div><i id="articulation-bar"></i></div><b id="articulation-value">0°</b></div></div>
 <div id="touch-controls" aria-label="Touch driving controls"><div class="touch-group"><button data-touch="left" aria-label="Steer left">←</button><button data-touch="right" aria-label="Steer right">→</button></div><div class="touch-group pedals"><button data-touch="reverse" aria-label="Brake then reverse">↓<small>REVERSE</small></button><button data-touch="forward" aria-label="Drive forward">↑<small>DRIVE</small></button><button data-touch="brake" aria-label="Brake">■</button></div><div id="walk-joystick" class="walking-joystick" role="group" aria-label="Walking joystick: drag to move" hidden><span class="joystick-knob"></span></div></div>
+<div class="letterbox" aria-hidden="true"><i></i><i></i></div>
+<div id="dispatch-root"></div>
 <div id="modal-root"></div>
 `;
 const $ = (id: string) => document.getElementById(id)!;
@@ -421,6 +428,8 @@ const clearInput = () => {
     button.classList.remove("pressed");
   });
 };
+/** The camera is with the yard operator, or on its way there or back. */
+const operatorBusy = () => scene.attention === "operator" || scene.cutting;
 function syncTouchControls() {
   const isWalking = walking(state);
   const enabled =
@@ -429,7 +438,8 @@ function syncTouchControls() {
     !leaderboardOpen &&
     !cliPaused &&
     !document.hidden &&
-    !["kiosk", "pin", "complete"].includes(state.phase);
+    !operatorBusy() &&
+    !["kiosk", "pin", "dispatch", "complete"].includes(state.phase);
   if (isWalking === touchWalking && enabled === touchEnabled) return;
   clearInput();
   touchWalking = isWalking;
@@ -577,7 +587,7 @@ function syncDialog() {
     // The driver reads the SMS on their phone and types the PIN into the gate terminal.
     modal(
       "Automated gate access",
-      `<p class="dialog-description">Read the PIN in the SMS on your phone and enter it at the gate terminal.</p><div class="gate-layout"><div class="phone-peek">${phoneHtml(state.booking, state.pin, smsClock || clock())}</div><form id="pin-form" class="gate-terminal"><div class="eyebrow"><span class="live-dot"></span> GATE TERMINAL</div><label class="field">Gate PIN<input id="pin-input" inputmode="none" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="Four digit gate PIN" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? "Delete digit" : k}">${k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">Open the gate <span>↗</span></button></form></div>`,
+      `<p class="dialog-description">Read the PIN in the SMS on your phone and enter it at the gate terminal.</p><div class="gate-layout"><div class="phone-peek">${phoneHtml(state.booking, state.pin, smsClock || clock(), state.dock)}</div><form id="pin-form" class="gate-terminal"><div class="eyebrow"><span class="live-dot"></span> GATE TERMINAL</div><label class="field">Gate PIN<input id="pin-input" inputmode="none" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="Four digit gate PIN" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? "Delete digit" : k}">${k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">Open the gate <span>↗</span></button></form></div>`,
       "pin-dialog",
     );
     for (const b of document.querySelectorAll<HTMLButtonElement>("[data-pin]"))
@@ -811,7 +821,7 @@ let smsSeen = false,
 function showSmsBanner() {
   const banner = $("sms-banner");
   clearTimeout(smsBannerTimer);
-  banner.innerHTML = smsBannerHtml(state.booking, state.pin);
+  banner.innerHTML = smsBannerHtml(state.booking, state.pin, state.dock);
   banner.classList.remove("hidden");
   void banner.offsetWidth; // commit display before the slide-in transition
   banner.classList.add("is-in");
@@ -852,6 +862,61 @@ function syncSms() {
     hideSmsBanner();
   }
 }
+// The yard operator's turn. Two seconds after the driver leaves the kiosk the
+// simulation holds the "dispatch" phase; the camera then cuts to the operator
+// by dock 05, their phone comes up once it lands, and the camera cuts back
+// when the phone is pocketed. Presentation only: the call-off itself is the
+// simulation's dispatch(), which CLI sessions reach directly.
+let dispatchUi: DispatchController | null = null,
+  dispatchFor: State | null = null,
+  operatorDone = false;
+function pocketPhone(animated: boolean) {
+  const ui = dispatchUi;
+  dispatchUi = null;
+  if (!ui) return;
+  if (animated) void ui.dismiss();
+  else ui.destroy();
+}
+function syncOperator() {
+  const operatorTurn = state.phase === "dispatch";
+  // A restart, a skip or a CLI call-off moved on without the phone: put it away.
+  if (dispatchUi && (state !== dispatchFor || (!operatorTurn && !operatorDone)))
+    pocketPhone(false);
+  if (operatorTurn && scene.attention === "driver") scene.cutTo("operator");
+  if (
+    operatorTurn &&
+    scene.attention === "operator" &&
+    !scene.cutting &&
+    !dispatchUi
+  ) {
+    dispatchFor = state;
+    operatorDone = false;
+    dispatchUi = mountDispatch($("dispatch-root"), {
+      booking: state.booking,
+      onDispatch: (dock) => {
+        if (!dispatch(state, dock)) return state.message;
+        operatorDone = true;
+        trackAction("visitor_dispatched", state, { dock });
+        return true;
+      },
+      onNotify: () => {
+        beep(988);
+        setTimeout(() => beep(1319), 120);
+        try {
+          navigator.vibrate?.([70, 50, 70]);
+        } catch {
+          /* no haptics */
+        }
+      },
+      onClose: () => pocketPhone(true),
+    });
+  }
+  if (!operatorTurn && scene.attention === "operator" && !dispatchUi)
+    scene.cutTo("driver");
+  scene.operatorPhone = dispatchUi !== null;
+  document.body.classList.toggle("operator", operatorBusy());
+  document.body.classList.toggle("cinematic", scene.cutting);
+}
 // Writing an unchanged string still replaces the text node and dirties style
 // and layout for the panel, so the HUD only touches the DOM when a value moves.
 const shown = new Map<string, string>();
@@ -870,6 +935,7 @@ const style = (id: string, property: string, value: string) =>
   );
 const progress = [...document.querySelectorAll(".mission-progress i")];
 function updateUI() {
+  syncOperator();
   syncTouchControls();
   document.body.dataset.phase = state.phase;
   const race = state.race;
@@ -954,19 +1020,19 @@ function updateUI() {
   const action = prompt(state);
   $("action-wrap").classList.toggle(
     "hidden",
-    !action || !started || settingsOpen,
+    !action || !started || settingsOpen || operatorBusy(),
   );
   text("action-text", action);
-  text("target-symbol", ["P", "↟", "↗", "03", "✓"][o.step]);
+  text("target-symbol", ["P", "↟", "↗", dockLabel(state.dock), "✓"][o.step]);
   text(
     "target-name",
-    state.phase === "walk-truck"
+    state.phase === "walk-truck" || state.phase === "dispatch"
       ? "YOUR TRUCK"
       : [
           "HOLDING BAY P02",
           "DRIVER CHECK-IN",
           "ENTRY GATE",
-          "DOCK 03",
+          `DOCK ${dockLabel(state.dock)}`,
           "DELIVERED",
         ][o.step],
   );
@@ -989,7 +1055,9 @@ function updateUI() {
   text("note-label", sms ? "SMS FROM PERIPASS" : "YOUR DELIVERY");
   text(
     "delivery-reference",
-    sms ? `PIN ${state.pin} → Dock 03` : `${state.booking} → Ghent`,
+    sms
+      ? `PIN ${state.pin} → Dock ${dockLabel(state.dock)}`
+      : `${state.booking} → Ghent`,
   );
   text("note-detail", sms ? "Gate access code" : "Registration reference");
   text(
@@ -1002,9 +1070,11 @@ function updateUI() {
           : "Start with W / ↑. Release to slow down."
       : state.phase === "dock"
         ? "Reverse assist: aim the trailer with A / D."
-        : isWalking
-          ? "WASD / arrows to walk. E to interact."
-          : "Follow the marked lane to the gate.",
+        : state.phase === "dispatch"
+          ? "Hold on: the yard operator is assigning your dock."
+          : isWalking
+            ? "WASD / arrows to walk. E to interact."
+            : "Follow the marked lane to the gate.",
   );
   $("dock-guide").classList.toggle(
     "hidden",
@@ -1016,7 +1086,7 @@ function updateUI() {
   style(
     "dock-needle",
     "left",
-    `${50 + Math.max(-47, Math.min(47, rear(state.truck).x * 10))}%`,
+    `${50 + Math.max(-47, Math.min(47, (rear(state.truck).x - dockX(state.dock)) * 10))}%`,
   );
   text(
     "dock-coach",
@@ -1056,7 +1126,8 @@ function placeTargetLabel() {
       !screen.visible ||
       !!prompt(state) ||
       state.phase === "complete" ||
-      settingsOpen,
+      settingsOpen ||
+      operatorBusy(),
   );
   label.style.transform = `translate(${x}px,${y}px) translate(-50%,-115%)`;
 }
@@ -1082,7 +1153,10 @@ function frame(now: number) {
   last = now;
   const pad = navigator.getGamepads?.().find((g) => g?.connected) ?? undefined;
   const input = currentInput(pad),
-    paused = settingsOpen || leaderboardOpen || cliPaused || document.hidden;
+    dialogPaused =
+      settingsOpen || leaderboardOpen || cliPaused || document.hidden,
+    // The driver also waits while the camera is with the yard operator.
+    paused = dialogPaused || operatorBusy();
   const pressed = !!pad?.buttons[0]?.pressed;
   if (pressed && !lastGamepadAction && started && !paused) {
     interact(state);
@@ -1090,10 +1164,10 @@ function frame(now: number) {
   }
   lastGamepadAction = pressed;
   // Holding X for a second jumps to the next place to act: kiosk, gate line, dock.
-  // Playtest aid, deliberately unlisted.
+  // Playtest aid, deliberately unlisted. It also skips the operator's call-off.
   const holdingSkip =
     started &&
-    !paused &&
+    !dialogPaused &&
     keys.has("x") &&
     !Object.values(bindings).includes("x");
   if (!holdingSkip) skipHeldSince = 0;
@@ -1227,7 +1301,7 @@ if (context?.registerTool) {
     {
       name: "yard_control",
       description:
-        "Drive or walk in the Peripass yard through the same controls as the visitor. Commands: reset, input, interact, register, pin, recover, assist, drive-to, walk-to, demo. Input durations are seconds. Does not contact a real logistics system.",
+        "Drive or walk in the Peripass yard through the same controls as the visitor. Commands: reset, input, interact, register, dispatch, pin, recover, assist, drive-to, walk-to, demo. Input durations are seconds. Does not contact a real logistics system.",
       inputSchema: {
         type: "object",
         properties: {
@@ -1238,6 +1312,7 @@ if (context?.registerTool) {
               "input",
               "interact",
               "register",
+              "dispatch",
               "pin",
               "recover",
               "assist",
@@ -1256,6 +1331,7 @@ if (context?.registerTool) {
           x: { type: "number" },
           z: { type: "number" },
           booking: { type: "string" },
+          dock: { type: "number", minimum: 1, maximum: 5 },
           pin: { type: "string" },
           enabled: { type: "boolean" },
           reverse: { type: "boolean" },

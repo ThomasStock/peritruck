@@ -1741,33 +1741,79 @@ body:not(.playing) #touch-controls {
   .leaderboard-button span {
     display: none;
   }
+  /* Portrait phones keep the yard visible: the race HUD is one slim strip of
+     clock and stage chips (splits wait for the results screen), the mission
+     card a short strip beneath it, and the docking guide a single bar above a
+     speed pill at the bottom. */
   .race-hud {
-    top: 73px;
-    width: calc(100% - 32px);
-    border-radius: 13px;
+    top: 66px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    transform: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px 6px 12px;
+    border-radius: 12px;
   }
   .race-clock-row {
-    padding: 10px 14px;
+    padding: 0;
+  }
+  .race-hud .race-kicker,
+  .race-best {
+    display: none;
   }
   #race-clock {
-    font-size: 28px;
+    font-size: 22px;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+  }
+  .race-stages {
+    display: flex;
+    gap: 4px;
+    border: 0;
   }
   .race-stages li {
-    padding: 6px 5px;
-    font-size: 12px;
+    display: block;
+    padding: 0;
   }
+  .race-stages li > span:not(.stage-number),
   .race-stages b {
-    font-size: 12px;
+    display: none;
+  }
+  .race-stages .stage-number {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+  .race-stages .stage-active {
+    background: none;
+  }
+  .race-stages .stage-active .stage-number {
+    background: #c6f389;
+    color: #163e38;
+  }
+  .race-stages .stage-done .stage-number {
+    background: #c6f38926;
   }
   .mission {
-    top: 223px;
-    left: 16px;
-    width: min(255px, calc(100% - 32px));
-    padding: 14px 16px;
+    top: 108px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    padding: 8px 12px 9px;
+    border-radius: 12px;
+  }
+  .mission .eyebrow {
+    font-size: 7px;
+    letter-spacing: 1.2px;
   }
   .mission h1 {
-    font-size: 20px;
-    margin: 10px 0 6px;
+    font-size: 15px;
+    letter-spacing: -0.3px;
+    margin: 3px 0 2px;
   }
   .mission .delivery-note,
   .mission .stage-hint,
@@ -1775,8 +1821,63 @@ body:not(.playing) #touch-controls {
     display: none;
   }
   .mission p {
+    font-size: 11px;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .telemetry {
+    gap: 4px 10px;
+    padding: 7px 12px;
+  }
+  .telemetry .articulation {
+    display: none;
+  }
+  .dock-guide {
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 150px;
+    width: auto;
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    grid-auto-flow: dense;
+    gap: 3px 14px;
+    align-items: center;
+    padding: 8px 12px 10px;
+    border-radius: 12px;
+  }
+  .dock-guide .eyebrow,
+  .dock-guide p {
+    display: none;
+  }
+  .dock-guide > strong {
+    grid-column: 1;
+    grid-row: 1;
     font-size: 12px;
-    line-height: 1.5;
+    margin: 0;
+  }
+  .dock-measure {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 0;
+    border: 0;
+    font-size: 7px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: #728975;
+  }
+  .dock-measure b {
+    font-size: 12px;
+  }
+  .dock-meter {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 4px 0 0;
   }
   .intro {
     width: calc(100% - 40px);
@@ -1792,7 +1893,7 @@ body:not(.playing) #touch-controls {
     gap: 10px;
   }
   .toast {
-    top: 375px;
+    top: 196px;
   }
   .race-results {
     padding: 24px 20px;
@@ -1813,7 +1914,7 @@ body:not(.playing) #touch-controls {
     padding: 10px 5px;
   }
   .cli-resume {
-    top: 205px;
+    top: 196px;
   }
 }
 @media (max-height: 510px) and (orientation: landscape) {
@@ -1950,6 +2051,50 @@ body:not(.playing) #touch-controls {
     top: 60px;
   }
   .leaderboard-button span {
+    display: none;
+  }
+}
+
+/* The yard operator's turn: letterbox bars during the camera cut, the driver's
+   HUD out of the way while the camera is by dock 05. */
+.letterbox {
+  position: fixed;
+  inset: 0;
+  z-index: 34;
+  pointer-events: none;
+}
+.letterbox i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: #06110f;
+  transition: height 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.letterbox i:first-child {
+  top: 0;
+}
+.letterbox i:last-child {
+  bottom: 0;
+}
+body.cinematic .letterbox i {
+  height: 9vh;
+}
+body.operator .mission,
+body.operator .minimap,
+body.operator .telemetry,
+body.operator .dock-guide,
+body.operator .action-wrap,
+body.operator .target-label,
+body.operator .toast,
+body.operator .sms-banner {
+  display: none !important;
+}
+body.operator .race-hud {
+  z-index: 36;
+}
+@media (max-width: 600px) {
+  body.operator .race-hud {
     display: none;
   }
 }

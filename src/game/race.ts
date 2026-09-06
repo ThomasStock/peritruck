@@ -2,7 +2,7 @@ export const STAGES = [
   { name: "Park the truck", short: "Parking", icon: "P" },
   { name: "Complete check-in", short: "Kiosk", icon: "↟" },
   { name: "Open the gate", short: "Gate", icon: "↗" },
-  { name: "Park at dock 03", short: "Dock", icon: "03" },
+  { name: "Park at your dock", short: "Dock", icon: "03" },
 ] as const;
 
 /** Seconds, independent of physics time: browser uses real time, CLI fixed steps. */

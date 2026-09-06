@@ -2,7 +2,7 @@
 
 Version 2 of [ThomasStock/peritruck](https://github.com/ThomasStock/peritruck), the game originally served at [truck.placeholder.app](https://truck.placeholder.app/).
 
-A small 3D logistics yard: arrive in your articulated truck, park in holding bay P02, check in at a self-service kiosk, receive a gate PIN by SMS, enter the site, and reverse into dock 03.
+A small 3D logistics yard: arrive in your articulated truck, park in holding bay P02, check in at a self-service kiosk, get called off to a dock by the yard operator on the Peripass Yard app, receive a gate PIN by SMS, enter the site, and reverse into your dock.
 
 ## Play locally
 
@@ -47,13 +47,19 @@ The kiosk is a replica of the Peripass kiosk app. On a desktop viewport it rende
 
 **Scan document** opens the kiosk camera: the screen dims around a clear frame and the delivery note lies half outside it. Drag the note until the green reference box sits inside the frame; the kiosk outlines it, asks you to hold still, captures, shows the real kiosk's “We're scanning your document” page for a second and continues to the phone step with the reference filled in. Arrow keys move the note too. The states, colours and copy follow the production kiosk's Document Capture; the frame itself is the game's teaching aid.
 
-Two seconds after leaving the kiosk the SMS lands on the driver's phone: a lock-screen banner drops over the yard (tap it to dismiss; it leaves by itself). At the gate the same message is open on a rendered handset beside the terminal keypad. Both come from `src/sms.ts`; the delay lives in the simulation as `smsAt`, so CLI sessions and the browser agree on when the PIN is known.
-
 Production strings are reused where the real kiosk has them; demo-only copy (visit types, phone note, endscreen) is written in `src/kiosk/i18n.ts`. The flow itself is a pure step machine in `src/kiosk/flow.ts`, covered by `tests/kiosk.test.ts`. The CLI `register` command still completes the kiosk in one call.
+
+## Yard dispatch
+
+Two seconds after leaving the kiosk the game changes hands. The camera pulls up and away from the driver, letterbox bars close in, and it drops down beside the yard operator standing by the rig at dock 05. Their phone comes up: a lock screen with a Peripass Yard push notification, "Driver waiting for call-off". Tap it and the Yard Operator App's dispatch module opens as in production: the **Call-off drivers** queue with the driver's card, the driver's details (carrier, licence plate, reference, time slot, phone) with **Select yard location** and **Call off driver**, the location sheet with search, the _Hide invalid locations_ filter and the **Occupied** / **Out of service** tags, then **Call-off completed**. Dock 05 holds a trailer being unloaded, dock 04 is out of service; pick one of docks 01–03. Choosing an invalid dock shows the app's own message ("Location is already occupied."); leaving it empty shows "Required".
+
+The chosen dock is real: its number panel lights up teal and its lamp turns green, the guide dots, the docking guide and the gate SMS ("Then proceed to dock 02.") all follow it, and delivery completes at that door. After **Call off another driver** the queue is empty ("You're all done!"), the phone goes away and the camera flies back to the driver; the gate PIN SMS lands two seconds later as a lock-screen banner over the yard (tap it to dismiss). At the gate the same message is open on a rendered handset beside the terminal keypad. Both come from `src/sms.ts`.
+
+On desktop the phone is a handset beside the 3D view; on phone-sized viewports the app fills the screen. The screens are laid out at a phone's 390 logical pixels and zoomed. The flow is a pure step machine in `src/dispatch/flow.ts`, covered by `tests/dispatch.test.ts`; the simulation holds a `dispatch` phase in which the driver waits, and the CLI `dispatch --dock N` command performs the same call-off. Hold X during the operator's turn to skip it.
 
 ## Time trial and local leaderboard
 
-Finish the delivery as fast as possible. The race starts on the truck’s first actual movement, with four timed sections: parking in P02 and stepping out, completing kiosk check-in, opening the gate, and parking at dock 03. Each section includes travel from the preceding milestone.
+Finish the delivery as fast as possible. The race starts on the truck’s first actual movement, with four timed sections: parking in P02 and stepping out, completing kiosk check-in, opening the gate (including the yard operator's call-off), and parking at your dock. Each section includes travel from the preceding milestone.
 
 The browser uses real elapsed time, including kiosk/PIN entry, settings, and hidden-tab time. Recovery preserves the clock and splits. The existing hold-X playtest shortcut marks the run as practice; skipped runs cannot enter the leaderboard. The final docking hold stops the clock. The results screen shows total time, stage durations, contacts, recoveries and steering mode; enter a driver name to save the run, or immediately race again.
 
@@ -75,9 +81,11 @@ npm run truck -- walk-to --x -28 --z 29
 npm run truck -- walk-to --x -33.7 --z 28.2
 npm run truck -- interact
 npm run truck -- register --booking PP-K4M7Q2
+npm run truck -- input --seconds 3
+npm run truck -- dispatch --dock 3
 ```
 
-`drive-to` is a feedback controller using ordinary pedals and steering. It does not plan around obstacles: provide clear intermediate waypoints. Forward targets track the fifth-wheel position; `--reverse` targets track the trailer rear. A route blocked by an obstacle exits with an error. `walk-to` uses the same walking and collision code as human play.
+`drive-to` is a feedback controller using ordinary pedals and steering. It does not plan around obstacles: provide clear intermediate waypoints. Forward targets track the fifth-wheel position; `--reverse` targets track the trailer rear. A route blocked by an obstacle exits with an error. `walk-to` uses the same walking and collision code as human play. Two seconds after `register` the session enters the `dispatch` phase and waits for the yard operator; `status` lists the docks and their availability, and `dispatch --dock N` calls the driver off to a free one before walking continues.
 
 ### Complete an automated delivery
 
@@ -85,7 +93,7 @@ npm run truck -- register --booking PP-K4M7Q2
 npm run truck -- demo --session acceptance
 ```
 
-The demo resets the named session, parks, walks, registers, enters the PIN, loops through the apron and reverses into dock 03. It succeeds only if normal docking conditions are met. No teleports, phase overrides, disabled collisions, or recovery calls. The committed acceptance test completes with 0 contacts, 0 recoveries and approximately 0.15° trailer alignment error.
+The demo resets the named session, parks, walks, registers, waits for the yard operator and is called off to dock 03, enters the PIN, loops through the apron and reverses into the dock. It succeeds only if normal docking conditions are met. No teleports, phase overrides, disabled collisions, or recovery calls. The committed acceptance test completes with 0 contacts, 0 recoveries and approximately 0.15° trailer alignment error.
 
 Headless sessions persist independently under `.yard-sessions/NAME.json`. Use `--session NAME` to isolate scenarios. Commands emit JSON and exit nonzero on failure. `npx tsx scripts/truck.ts ...` omits npm's script banner when a consumer needs JSON-only output.
 
@@ -127,14 +135,15 @@ npm run models       # Rebuild original GLB assets with installed Blender
 | `src/rig.ts`              | Driver rig: displacement-driven gait, turning, idle motion                                        |
 | `src/main.ts`             | Input adapters, accessible overlays, HUD, sound and agent tool registration                       |
 | `src/kiosk/`              | Kiosk replica: step flow, six-language copy, DOM view and stylesheet                              |
+| `src/dispatch/`           | Yard operator's phone: call-off flow, Yard Operator App replica, icons and stylesheet             |
 | `src/sms.ts`              | The driver's phone: SMS banner and handset with the Messages thread                               |
 | `vite.config.ts`          | Local-only CLI/browser bridge                                                                     |
 | `scripts/truck.ts`        | JSON command-line client and session persistence                                                  |
 | `scripts/build_models.py` | Reproducible Blender asset authoring                                                              |
 
-The renderer does not own physics. `State` is plain serializable data; `step` is the sole timed simulation transition. Explicit actions handle kiosk/PIN interaction. `predict` runs the same truck integrator for the visible path guide.
+The renderer does not own physics. `State` is plain serializable data; `step` is the sole timed simulation transition. Explicit actions handle kiosk, call-off and PIN interaction. `predict` runs the same truck integrator for the visible path guide. The camera cut between the driver and the yard operator is presentation in `src/scene.ts`; the simulation only knows the `dispatch` phase.
 
-Collision uses oriented rectangles for both tractor and trailer. A closed gate and its side fences are real obstacles. Docking checks the trailer's rear, lateral error (<0.85 m), heading (<6°), bumper gap (−0.45…1.05 m), stopped speed and a 0.7 s hold. All measurements are in metres, seconds and radians; heading zero is +Z.
+Collision uses oriented rectangles for both tractor and trailer. A closed gate and its side fences are real obstacles. Docking checks the trailer's rear against the assigned dock, lateral error (<0.85 m), heading (<6°), bumper gap (−0.45…1.05 m), stopped speed and a 0.7 s hold. All measurements are in metres, seconds and radians; heading zero is +Z.
 
 ## Assets and design research
 

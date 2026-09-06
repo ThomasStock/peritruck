@@ -59,11 +59,25 @@ async function game() {
         };
       if (id === "./kiosk/view")
         return { mountKiosk: () => ({ destroy() {} }) };
+      if (id === "./dispatch/view")
+        return {
+          mountDispatch: () => ({
+            flow: { screen: "home" },
+            dismiss: () => Promise.resolve(),
+            destroy() {},
+          }),
+        };
       if (id === "./scene")
         return {
           YardScene: class {
             loaded = true;
             mode = "follow";
+            attention = "driver";
+            cutting = false;
+            operatorPhone = false;
+            cutTo(target: string) {
+              this.attention = target;
+            }
             renderer = { domElement: window.document.createElement("canvas") };
             load() {
               return Promise.resolve();
@@ -238,6 +252,18 @@ test("kiosk hides controls; return walk restores joystick; entering truck restor
     );
     assert.equal(run("state.phase"), "walk-truck");
     assert.equal(document.getElementById("walk-joystick")!.hidden, false);
+    assert.equal(document.getElementById("touch-controls")!.hidden, false);
+    // Two seconds later the yard operator's phone buzzes: the camera leaves
+    // the driver, the controls go, and they return once the dock is assigned.
+    run('execute(state, { op: "input", seconds: 3 }); updateUI()');
+    assert.equal(run("state.phase"), "dispatch");
+    assert.equal(run("scene.attention"), "operator");
+    assert.ok(document.getElementById("touch-controls")!.hidden);
+    assert.ok(document.body.classList.contains("operator"));
+    run('execute(state, { op: "dispatch", dock: 2 }); updateUI()');
+    assert.equal(run("state.phase"), "walk-truck");
+    assert.equal(run("scene.attention"), "driver");
+    assert.equal(document.body.classList.contains("operator"), false);
     assert.equal(document.getElementById("touch-controls")!.hidden, false);
     run(
       'execute(state, { op: "walk-to", x: -28, z: 29 }); execute(state, { op: "walk-to", x: -26.5, z: state.truck.z - 2 }); interact(state); updateUI()',

@@ -1,6 +1,21 @@
 import * as THREE from "three";
-import { type Phase, type State, walking } from "./game/simulation";
+import {
+  type Phase,
+  type State,
+  DOCKS,
+  dockX,
+  walking,
+} from "./game/simulation";
 
+/** Into the apron along the gate lane, U-turn to face out, then reverse
+ * straight into the assigned dock at `x`. Dock 03 is the route below. */
+export const dockRoute = (x: number): number[][] => [
+  [18, 6],
+  [18, -24],
+  [x + 9, -33],
+  [x, -24],
+  [x, 5],
+];
 /** Guide dots along each phase's suggested path, 1.6 m apart. */
 export const ROUTES: Partial<Record<Phase, number[][]>> = {
   arrive: [
@@ -24,13 +39,7 @@ export const ROUTES: Partial<Record<Phase, number[][]>> = {
     [18, 47],
     [18, 21.5],
   ],
-  dock: [
-    [18, 6],
-    [18, -24],
-    [9, -33],
-    [0, -24],
-    [0, 5],
-  ],
+  dock: dockRoute(0),
 };
 ROUTES.kiosk = ROUTES["walk-kiosk"];
 ROUTES.pin = ROUTES.gate;
@@ -46,6 +55,7 @@ export function routeDotCount(points: number[][]): number {
 /** Enough instances for the longest route, so no phase change reallocates. */
 export const ROUTE_CAPACITY = Math.max(
   ...Object.values(ROUTES).map((points) => routeDotCount(points ?? [])),
+  ...DOCKS.map((d) => routeDotCount(dockRoute(d.x))),
 );
 const transform = new THREE.Object3D();
 transform.rotation.x = -Math.PI / 2;
@@ -77,10 +87,11 @@ export class RouteDots {
   }
   /** Lay the dots out for the current phase. Returns true when they changed. */
   update(s: State): boolean {
-    if (this.phase === s.phase) return false;
-    this.phase = s.phase;
+    const key = s.phase === "dock" ? `dock:${s.dock}` : s.phase;
+    if (this.phase === key) return false;
+    this.phase = key;
     const dots = this.mesh,
-      points = ROUTES[s.phase];
+      points = s.phase === "dock" ? dockRoute(dockX(s.dock)) : ROUTES[s.phase];
     if (!points || points.length < 2) {
       dots.count = 0;
       dots.visible = false;
