@@ -51,6 +51,7 @@ async function game() {
       if (id === "./sentry") return {};
       if (id === "./analytics")
         return {
+          identifyBest() {},
           initAnalytics() {},
           observe() {},
           setControls() {},

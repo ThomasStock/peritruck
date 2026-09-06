@@ -56,7 +56,13 @@ import {
   cleanName,
   type Result,
 } from "./game/leaderboard";
-import { initAnalytics, observe, setControls, trackAction } from "./analytics";
+import {
+  identifyBest,
+  initAnalytics,
+  observe,
+  setControls,
+  trackAction,
+} from "./analytics";
 initAnalytics();
 const leaderboard = createLeaderboard(() => localStorage);
 let leaderboardOpen = false;
@@ -267,6 +273,7 @@ function currentInput(gamepad?: Gamepad): Input {
 $("start").onclick = start;
 $("leaderboard-button").onclick = () => {
   leaderboardOpen = true;
+  trackAction("leaderboard_opened", state, { started });
   syncDialog();
 };
 $("camera").onclick = () => {
@@ -629,6 +636,12 @@ function syncDialog() {
       }
       const saved = leaderboard.save({ ...result, name });
       savedResultId = result.id;
+      trackAction("score_saved", state, {
+        rank: saved.rank,
+        persisted: saved.persisted,
+        best: saved.rank === 1,
+      });
+      identifyBest(leaderboard.list()[0]?.seconds ?? result.seconds);
       $("score-form").classList.add("hidden");
       $("save-status").textContent = saved.persisted
         ? `You're #${saved.rank}! ${saved.rank > 100 ? "Only the fastest 100 runs stay on the board." : "Run saved on this browser."}`
