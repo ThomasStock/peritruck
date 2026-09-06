@@ -16,6 +16,7 @@ import {
 import { DriverRig } from "./rig";
 import { PredictionPath } from "./prediction";
 import { RouteDots } from "./route";
+import { RigLamps, lampState } from "./lights";
 export type CameraMode = "follow" | "yard" | "overhead";
 /** Who the camera follows: the driver, or the yard operator by dock 05. */
 export type Attention = "driver" | "operator";
@@ -93,6 +94,7 @@ export class YardScene {
   private gateAngle = 0;
   private env: THREE.WebGLRenderTarget;
   private rig = new DriverRig(this.driver);
+  private lamps = new RigLamps();
   private operatorRig = new DriverRig(this.operator);
   private steering: THREE.Object3D[] = [];
   private parkingHighlight: THREE.Mesh;
@@ -328,6 +330,8 @@ export class YardScene {
       parked.add(cab, box);
     }
     this.scene.add(...mergeByMaterial(parked));
+    // Only the player's lamps work; the parked rigs above keep the paint.
+    this.lamps.bind(this.tractor, this.trailer);
     // Compile every shader before play starts, including the ones for objects
     // that only appear later, so the first drive and phase changes do not stall.
     const hidden = [this.prediction, this.route].filter((o) => !o.visible);
@@ -357,6 +361,9 @@ export class YardScene {
     this.trailer.position.copy(this.tractor.position);
     this.trailer.rotation.y = s.truck.trailerHeading;
     this.rig.update(s, input, dt, this.reducedMotion);
+    this.lamps.update(
+      lampState(s.truck, input, s.elapsed, started && !walking(s)),
+    );
     this.operatorRig.stand(
       YARD.operator.x,
       YARD.operator.z,
