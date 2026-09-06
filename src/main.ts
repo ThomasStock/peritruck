@@ -54,7 +54,7 @@ import { execute } from "./game/commands";
 import { mountKiosk, type KioskController } from "./kiosk/view";
 import { mountDispatch, type DispatchController } from "./dispatch/view";
 import { clock, phoneHtml, smsBannerHtml } from "./sms";
-import { flags } from "./kiosk/icons";
+import { flags, icons } from "./kiosk/icons";
 import {
   DEFAULT_LANGUAGE,
   LANGUAGES,
@@ -168,6 +168,7 @@ app.innerHTML = `
 <div id="modal-root"></div>
 `;
 const $ = (id: string) => document.getElementById(id)!;
+let registrationUsedScanning = false;
 let state = createState(),
   started = false,
   last = performance.now(),
@@ -763,6 +764,7 @@ function syncDialog() {
     $("restart").onclick = () => {
       const assisted = state.assisted;
       state = createState();
+      registrationUsedScanning = false;
       state.assisted = assisted;
       settingsOpen = false;
       closeDialog();
@@ -775,8 +777,11 @@ function syncDialog() {
     kiosk = mountKiosk($("modal-root"), {
       booking: state.booking,
       onQuit: closeDialog,
-      onComplete: (reference) => {
-        if (register(state, reference)) syncDialog();
+      onComplete: (reference, usedDocumentScanning) => {
+        if (register(state, reference)) {
+          registrationUsedScanning = usedDocumentScanning;
+          syncDialog();
+        }
       },
     });
     const kioskStage = $("modal-root").querySelector(".kiosk-stage");
@@ -835,7 +840,7 @@ function syncDialog() {
         : eligible
           ? t("res.titleDone")
           : t("res.titlePractice"),
-      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? t("res.badgePractice") : newBest ? board("res.badgeBestGlobal", "res.badgeBestLocal") : t("res.badgeComplete")}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? t("res.tryFull") : !best ? t("res.firstRun") : newBest ? t(shared ? "res.fasterGlobal" : "res.fasterLocal", { time: formatTime(best.seconds - result.seconds) }) : t(shared ? "res.offGlobal" : "res.offLocal", { time: formatTime(result.seconds - best.seconds) })}</p><div id="result-splits"></div><div class="result-stats"><span>${t("res.contacts", { n: result.contacts })}</span><span>${t("res.recoveries", { n: result.recoveries })}</span><span>${t(result.assisted ? "res.assistOn" : "res.classic")}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">${t("res.nameLabel")}</label><div><input id="player-name" maxlength="24" placeholder="${t("res.namePlaceholder")}" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">${t("res.save")} <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? t("res.practiceNote") : saved ? t("res.onBoard") : board("res.saveGlobal", "res.saveLocal")}</p><div class="result-board-title"><b>${t("res.legends")}</b><span>${board("res.top20Global", "res.top20Local")}</span></div><div id="leaderboard-list" class="board-scroll"></div><button id="play-again" class="primary play-again">${t("res.again")} <span>↻</span></button><button id="results-feedback" class="secondary results-feedback">${t("res.feedback")}</button>`,
+      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? t("res.badgePractice") : newBest ? board("res.badgeBestGlobal", "res.badgeBestLocal") : t("res.badgeComplete")}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? t("res.tryFull") : !best ? t("res.firstRun") : newBest ? t(shared ? "res.fasterGlobal" : "res.fasterLocal", { time: formatTime(best.seconds - result.seconds) }) : t(shared ? "res.offGlobal" : "res.offLocal", { time: formatTime(result.seconds - best.seconds) })}</p><div id="result-splits"></div><div class="result-stats"><span>${t("res.contacts", { n: result.contacts })}</span><span>${t("res.recoveries", { n: result.recoveries })}</span><span>${t(result.assisted ? "res.assistOn" : "res.classic")}</span></div>${registrationUsedScanning ? "" : `<aside class="result-pro-tip"><span class="result-pro-tip__icon">${icons.scan}</span><div><span class="result-pro-tip__label">${t("res.scanTipLabel")}</span><h3>${t("res.scanTipTitle")}</h3><p>${t("res.scanTipBody")}</p></div></aside>`}<form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">${t("res.nameLabel")}</label><div><input id="player-name" maxlength="24" placeholder="${t("res.namePlaceholder")}" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">${t("res.save")} <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? t("res.practiceNote") : saved ? t("res.onBoard") : board("res.saveGlobal", "res.saveLocal")}</p><div class="result-board-title"><b>${t("res.legends")}</b><span>${board("res.top20Global", "res.top20Local")}</span></div><div id="leaderboard-list" class="board-scroll"></div><button id="play-again" class="primary play-again">${t("res.again")} <span>↻</span></button><button id="results-feedback" class="secondary results-feedback">${t("res.feedback")}</button>`,
       "complete-dialog race-results",
     );
     $("results-feedback").onclick = () => openFeedback("results");
@@ -893,6 +898,7 @@ function syncDialog() {
     $("play-again").onclick = () => {
       const assisted = state.assisted;
       state = createState();
+      registrationUsedScanning = false;
       state.assisted = assisted;
       syncDialog();
       start();

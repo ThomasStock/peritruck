@@ -1097,6 +1097,24 @@ export const STRINGS = {
     fr: "Essai terminé !",
     de: "Übung abgeschlossen!",
   },
+  "res.scanTipLabel": {
+    en: "Pro tip",
+    nl: "Pro-tip",
+    fr: "Astuce",
+    de: "Profi-Tipp",
+  },
+  "res.scanTipTitle": {
+    en: "Scan your way to a faster check-in",
+    nl: "Scan je document en meld je sneller aan",
+    fr: "Scannez pour vous enregistrer plus vite",
+    de: "Scannen und schneller anmelden",
+  },
+  "res.scanTipBody": {
+    en: "Next run, choose Scan document during registration. Scan your delivery note to skip typing the reference.",
+    nl: "Kies bij je volgende rit voor Document scannen tijdens de registratie. Scan je vrachtbrief en sla het typen van de referentie over.",
+    fr: "Au prochain essai, choisissez Scanner le document lors de l’enregistrement. Scannez votre bon de livraison pour éviter de saisir la référence.",
+    de: "Wähle beim nächsten Mal Dokument scannen bei der Anmeldung. Scanne deinen Lieferschein, um die Referenz nicht eintippen zu müssen.",
+  },
   "res.badgePractice": {
     en: "↻ PRACTICE RUN",
     nl: "↻ OEFENRIT",
