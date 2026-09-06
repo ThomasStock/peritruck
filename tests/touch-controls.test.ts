@@ -298,7 +298,7 @@ test("kiosk hides controls; return walk restores joystick; entering truck restor
   }
 });
 
-test("race HUD waits for movement and keeps real time while controls or leaderboard are open", async () => {
+test("race HUD waits for movement, holds under the controls dialog and keeps real time while the leaderboard is open", async () => {
   const { dom, run, document } = await game();
   try {
     run("frame(last + 5000)");
@@ -312,8 +312,7 @@ test("race HUD waits for movement and keeps real time while controls or leaderbo
     const elapsed = run("state.race.elapsed");
     const z = run("state.truck.z");
     run("frame(last + 5000)");
-    // Wall time is a float difference of performance.now() values.
-    assert.ok(Math.abs(run("state.race.elapsed") - (elapsed + 5)) < 1e-9);
+    assert.equal(run("state.race.elapsed"), elapsed);
     assert.equal(run("state.truck.z"), z);
     assert.equal(
       document.getElementById("dialog-race-clock")!.textContent,
@@ -324,7 +323,8 @@ test("race HUD waits for movement and keeps real time while controls or leaderbo
     run("updateUI()");
     assert.ok(document.getElementById("touch-controls")!.hidden);
     run("frame(last + 3000)");
-    assert.ok(Math.abs(run("state.race.elapsed") - (elapsed + 8)) < 1e-9);
+    // Wall time is a float difference of performance.now() values.
+    assert.ok(Math.abs(run("state.race.elapsed") - (elapsed + 3)) < 1e-9);
   } finally {
     dom.window.close();
   }

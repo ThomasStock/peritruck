@@ -879,10 +879,10 @@ export const STRINGS = {
     de: "Steuerung",
   },
   "set.description": {
-    en: "Driving is paused. Once started, your race clock keeps running.",
-    nl: "Het rijden is gepauzeerd. Eenmaal gestart, loopt je raceklok door.",
-    fr: "La conduite est en pause. Une fois lancé, le chrono continue de tourner.",
-    de: "Das Fahren ist pausiert. Einmal gestartet, läuft deine Rennuhr weiter.",
+    en: "Everything is paused while this is open, your race clock included.",
+    nl: "Alles staat stil zolang dit openstaat, ook je raceklok.",
+    fr: "Tout est en pause tant que ceci est ouvert, y compris votre chrono.",
+    de: "Alles pausiert, solange dies offen ist — auch deine Rennuhr.",
   },
   "set.assist": {
     en: "Trailer reverse assist",

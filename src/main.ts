@@ -1623,7 +1623,10 @@ function viewState(): State {
 }
 function frame(now: number) {
   const wallDelta = Math.max(0, (now - last) / 1000);
-  if (started && !cliPaused) tickRace(state.race, wallDelta);
+  // The controls dialog stops the clock: it is the one place a driver opens to
+  // read the keys, and a timer ticking behind a modal that says "paused" reads
+  // as a bug. The leaderboard and a hidden tab still count.
+  if (started && !cliPaused && !settingsOpen) tickRace(state.race, wallDelta);
   const dt = Math.min(wallDelta, 0.05);
   last = now;
   const pad = navigator.getGamepads?.().find((g) => g?.connected) ?? undefined;
