@@ -114,8 +114,8 @@ document.addEventListener(
 app.innerHTML = `
 <div id="world"></div>
 <header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><button id="leaderboard-button" class="leaderboard-button" aria-label="View ${boardLabel} leaderboard">♛ <span>Leaderboard</span></button><button id="feedback" class="feedback-button" title="Send feedback">Feedback</button><button id="camera" class="icon-button" aria-label="Change camera view" title="Camera · C">◩</button><button id="help" class="icon-button" aria-label="Controls and settings" title="Controls · Escape">?</button></div></header>
-<section id="intro" class="intro panel"><div class="race-kicker">PERITRUCK · TIME TRIAL</div><h1>Big truck.<br/>Quick delivery.</h1><p>Park. Check in. Open the gate. Nail the dock. How fast can you finish?</p><div class="intro-stages">${STAGES.map((stage, i) => `<span><b>0${i + 1}</b>${stage.short}</span>`).join("")}</div><button id="start" class="primary" disabled>Loading… <span>↗</span></button><small class="race-intro-note">The clock starts when your truck moves.</small><div id="intro-best" class="intro-best"></div></section>
-<section id="race-hud" class="race-hud hidden" aria-label="Time trial progress"><div class="race-clock-row"><div><span class="race-kicker" id="race-status">READY WHEN YOU ARE</span><strong id="race-clock" role="timer" aria-label="Elapsed run time">00:00.00</strong></div><div class="race-best"><span>${BOARD} BEST</span><b id="race-best">—</b></div></div><ol class="race-stages">${STAGES.map((stage, i) => `<li id="race-stage-${i}"><span class="stage-number">${i + 1}</span><span>${stage.short}</span><b id="race-split-${i}">—</b></li>`).join("")}</ol></section>
+<section id="intro" class="intro panel"><div class="race-kicker">PERITRUCK · TIME TRIAL</div><h1>Big truck.<br/>Quick delivery.</h1><p>Park. Check in. Open the gate. Nail the dock. How fast can you finish?</p><div class="intro-stages">${STAGES.map((stage, i) => `<span><b>0${i + 1}</b>${stage.short}</span>`).join("")}</div><button id="start" class="primary" disabled>Loading… <span>↗</span></button><small class="race-intro-note">The clock starts when your truck moves.</small></section>
+<section id="race-hud" class="race-hud hidden" aria-label="Time trial progress"><div class="race-clock-row"><div><span class="race-kicker" id="race-status">READY WHEN YOU ARE</span><strong id="race-clock" role="timer" aria-label="Elapsed run time">00:00.00</strong></div></div><ol class="race-stages">${STAGES.map((stage, i) => `<li id="race-stage-${i}"><span class="stage-number">${i + 1}</span><span>${stage.short}</span><b id="race-split-${i}">—</b></li>`).join("")}</ol></section>
 <aside id="mission" class="mission panel hidden"><div class="eyebrow" id="step-label">01 / 04 · ARRIVAL</div><h1 id="objective-title"></h1><p id="objective-detail"></p><div class="mission-progress"><i></i><i></i><i></i><i></i></div><div class="delivery-note"><span id="note-label">YOUR DELIVERY</span><b id="delivery-reference">${BOOKING} <span>→</span> Ghent</b><small id="note-detail">Registration reference</small></div><div id="stage-hint" class="stage-hint"></div></aside>
 <button id="map-button" class="minimap panel hidden" aria-label="Show whole yard map"><div><span>YARD MAP</span><span>↗</span></div><canvas id="map" width="340" height="270" aria-label="Yard map showing the truck, destination, gate and docks"></canvas><span class="map-key"><i></i> You <b>◎</b> Destination <span>N ↑</span></span></button>
 <div id="target-label" class="target-label hidden"><span id="target-symbol" class="target-number">P</span><div><b id="target-name">HOLDING BAY P02</b><small id="target-distance"></small></div></div>
@@ -560,9 +560,10 @@ function syncDialog() {
   } else if (kind === "leaderboard") {
     modal(
       "Yard legends",
-      `<p class="dialog-description">${leaderboard.shared ? "Fastest deliveries worldwide." : "Fastest deliveries on this browser."} Your next run could take the top spot.</p><div id="leaderboard-list"></div><p class="local-note">${leaderboard.shared ? "Global" : "Local"} leaderboard · Top 100 · Lower is better</p><button id="back-to-yard" class="primary">Back to the yard <span>↗</span></button>`,
+      `<p class="dialog-description">${leaderboard.shared ? "Fastest deliveries worldwide." : "Fastest deliveries on this browser."} Your next run could take the top spot.</p><div id="time-to-beat" class="time-to-beat"></div><div id="leaderboard-list"></div><p class="local-note">${leaderboard.shared ? "Global" : "Local"} leaderboard · Top 100 · Lower is better</p><button id="back-to-yard" class="primary">Back to the yard <span>↗</span></button>`,
       "leaderboard-dialog",
     );
+    refreshBest();
     renderLeaderboard();
     $("back-to-yard").onclick = closeDialog;
   } else if (kind === "settings") {
@@ -759,12 +760,16 @@ function syncDialog() {
     };
   }
 }
+/** "Time to beat" lives only in the leaderboard dialog and on the results
+ * screen, never on the start screen or the in-race HUD, so nobody drives
+ * against a ticking target. */
 function refreshBest() {
+  const root = document.getElementById("time-to-beat");
+  if (!root) return;
   const best = leaderboard.list()[0];
-  $("race-best").textContent = best ? formatTime(best.seconds) : "—";
-  $("intro-best").textContent = best
+  root.textContent = best
     ? `♛ Time to beat  ${formatTime(best.seconds)} · ${best.name}`
-    : "Fresh leaderboard. Set the first record.";
+    : "";
 }
 function renderLeaderboard(highlight = "", limit = 100) {
   const rows = leaderboard.list();

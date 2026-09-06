@@ -373,7 +373,16 @@ test("a completed delivery renders splits, saves a literal driver name once, and
     assert.equal(run("state.race.elapsed"), 0);
     assert.equal(run("state.race.started"), false);
     assert.equal(document.querySelector(".race-results"), null);
-    assert.notEqual(document.getElementById("race-best")!.textContent, "—");
+    // "Time to beat" never appears on the start screen or the in-race HUD.
+    assert.equal(document.getElementById("race-best"), null);
+    assert.equal(document.getElementById("intro-best"), null);
+    assert.equal(document.body.textContent!.includes("Time to beat"), false);
+    // It shows in the leaderboard menu.
+    document.getElementById("leaderboard-button")!.click();
+    assert.match(
+      document.getElementById("time-to-beat")!.textContent!,
+      new RegExp(`Time to beat.*${name.value}`),
+    );
   } finally {
     dom.window.close();
   }

@@ -1426,14 +1426,6 @@ body:not(.playing) #touch-controls {
   margin-top: 14px;
   color: #d0e0d7;
 }
-.intro-best {
-  border-top: 1px solid #ffffff25;
-  padding-top: 18px;
-  margin-top: 22px;
-  font-size: 12px;
-  line-height: 1.7;
-  overflow-wrap: anywhere;
-}
 .leaderboard-button {
   border: 1px solid #8da59977;
   border-radius: 24px;
@@ -1473,20 +1465,6 @@ body:not(.playing) #touch-controls {
   font-size: 36px;
   line-height: 1.25;
   letter-spacing: -1px;
-  font-variant-numeric: tabular-nums;
-}
-.race-best {
-  text-align: right;
-}
-.race-best span {
-  display: block;
-  font-size: 12px;
-  letter-spacing: 1px;
-  color: #bdcec2;
-  margin-bottom: 7px;
-}
-.race-best b {
-  font-size: 16px;
   font-variant-numeric: tabular-nums;
 }
 .race-stages {
@@ -1834,6 +1812,23 @@ body:not(.playing) #touch-controls {
   font-size: 14px;
   flex-shrink: 0;
 }
+.time-to-beat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 14px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  background: #101a15;
+  color: #f3f7f4;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.time-to-beat:empty {
+  display: none;
+}
 .leaderboard-empty {
   padding: 18px;
   border: 1px dashed #abc8b3;
@@ -1891,8 +1886,7 @@ body:not(.playing) #touch-controls {
   .race-clock-row {
     padding: 0;
   }
-  .race-hud .race-kicker,
-  .race-best {
+  .race-hud .race-kicker {
     display: none;
   }
   #race-clock {
@@ -2080,7 +2074,6 @@ body:not(.playing) #touch-controls {
     font-size: 27px;
   }
   .intro-stages,
-  .intro-best,
   .race-intro-note {
     display: none;
   }
@@ -2175,12 +2168,8 @@ body:not(.playing) #touch-controls {
     padding: 5px 12px;
   }
   .race-hud .race-kicker,
-  .race-stages,
-  .race-best span {
+  .race-stages {
     display: none;
-  }
-  .race-best b {
-    font-size: 12px;
   }
   .dock-guide {
     top: 56px;
