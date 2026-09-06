@@ -128,7 +128,9 @@ for side in [-1,1]:
     box('Mirror',(side*1.59,2.93,4.09),(.15,.5,.2),'dark',.045)
     box('Headlamp',(side*.98,1.16,4.95),(.37,.22,.08),'light',.04)
     box('Indicator',(side*1.13,1.4,4.95),(.12,.13,.08),'orange',.02)
-    box('Fuel tank',(side*1.04,.89,1.21),(.48,.64,1.55),'metal',.12)
+    # Tank between the cab step and the drive tyres: rear face at .64 clears the
+    # front tyre (radius .58 about z 0) and the front face stays behind the step.
+    box('Fuel tank',(side*1.04,.89,1.27),(.48,.64,1.26),'metal',.12)
     wheel(side*1.1,3.57,True)
     wheel(side*1.1,0)
     wheel(side*1.1,-1.23)
