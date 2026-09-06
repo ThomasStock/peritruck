@@ -260,6 +260,8 @@ export class YardScene {
     for (const o of hidden) o.visible = true;
     try {
       await this.renderer.compileAsync(this.scene, this.camera);
+    } catch {
+      /* the first frames compile lazily instead */
     } finally {
       for (const o of hidden) o.visible = false;
     }
