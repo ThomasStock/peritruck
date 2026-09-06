@@ -51,6 +51,14 @@ Two seconds after leaving the kiosk the SMS lands on the driver's phone: a lock-
 
 Production strings are reused where the real kiosk has them; demo-only copy (visit types, phone note, endscreen) is written in `src/kiosk/i18n.ts`. The flow itself is a pure step machine in `src/kiosk/flow.ts`, covered by `tests/kiosk.test.ts`. The CLI `register` command still completes the kiosk in one call.
 
+## Time trial and local leaderboard
+
+Finish the delivery as fast as possible. The race starts on the truck’s first actual movement, with four timed sections: parking in P02 and stepping out, completing kiosk check-in, opening the gate, and parking at dock 03. Each section includes travel from the preceding milestone.
+
+The browser uses real elapsed time, including kiosk/PIN entry, settings, and hidden-tab time. Recovery preserves the clock and splits. The existing hold-X playtest shortcut marks the run as practice; skipped runs cannot enter the leaderboard. The final docking hold stops the clock. The results screen shows total time, stage durations, contacts, recoveries and steering mode; enter a driver name to save the run, or immediately race again.
+
+The leaderboard keeps the fastest 100 runs in this browser’s local storage (`peritruck-leaderboard-v1`), ranked by total time. It is shared across visits on the same browser/origin, not across devices. Blocked/full storage falls back to this visit only and explains that after saving. `src/game/leaderboard.ts` owns the storage adapter so a future backend can replace it. CLI runs use deterministic simulation steps for race timing, including explicit waits at the kiosk/gate; live CLI control suspends the browser clock while commands advance it.
+
 ## Drive from the CLI
 
 The CLI runs the **same simulation and state transitions as the browser**, with a fixed 1/60-second timestep. It is suitable for agent play, reproducible bug reports and integration tests.
@@ -102,7 +110,7 @@ Supported browsers also discover `yard_status` and `yard_control` through WebMCP
 ## Develop
 
 ```sh
-npm test             # 15 meaningful simulation / journey tests
+npm test             # Simulation, journey, race timing and leaderboard tests
 npm run build        # TypeScript check + Vite production build
 npm run preview      # Serve production output locally
 npm run format:check

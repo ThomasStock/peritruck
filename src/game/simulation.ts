@@ -2,6 +2,7 @@
  * Heading 0 = +Z. Positive steering turns left from the driver's seat.
  * All entry points (keyboard, touch, CLI, WebMCP) use these transitions.
  */
+import { createRace, finishStage, tickRace, type Race } from "./race";
 export type Point = { x: number; z: number };
 export type Truck = Point & {
   heading: number;
@@ -39,6 +40,7 @@ export type State = {
   pin: string;
   booking: string;
   elapsed: number;
+  race: Race;
   distance: number;
   contacts: number;
   recoveries: number;
@@ -125,6 +127,7 @@ export function createState(): State {
     pin: randomPin(),
     booking: BOOKING,
     elapsed: 0,
+    race: createRace(),
     distance: 0,
     contacts: 0,
     recoveries: 0,
@@ -371,6 +374,7 @@ export function interact(s: State): boolean {
   }
   s.truck.speed = 0;
   if (s.phase === "arrive") {
+    finishStage((s.race ??= createRace()), 0);
     s.phase = "walk-kiosk";
     s.driver = offset(s.truck, s.truck.heading + Math.PI / 2, 2.5);
     s.driver.z -= 2;
@@ -394,6 +398,7 @@ export function register(s: State, booking: string): boolean {
     return false;
   }
   s.registered = true;
+  finishStage((s.race ??= createRace()), 1);
   s.phase = "walk-truck";
   // The SMS lands a moment after the driver leaves the kiosk; the UI shows it then.
   s.smsAt = s.elapsed + SMS_DELAY;
@@ -419,6 +424,7 @@ export function enterPin(s: State, pin: string): boolean {
     return false;
   }
   s.gateOpen = true;
+  finishStage((s.race ??= createRace()), 2);
   s.phase = "dock";
   note(s, "Access granted. Proceed to dock 03.", "gate-opened");
   s.checkpoint = { ...insideGate };
@@ -477,6 +483,8 @@ function skipToDock(s: State) {
  * back → checked in, stopped at the gate line. Stopped at the line, or past the
  * gate → docked, so the delivery completes on the next hold. Silent: no toast. */
 export function skipAhead(s: State): boolean {
+  if (s.phase === "complete") return false;
+  (s.race ??= createRace()).practice = true;
   switch (s.phase) {
     case "arrive":
     case "walk-kiosk":
@@ -557,11 +565,14 @@ export function integrate(
         dt,
   );
 }
-export function step(s: State, input = idleInput(), dt = DT) {
-  if (s.phase === "complete" || s.phase === "kiosk" || s.phase === "pin")
-    return;
-  // Fixed step only; callers subdivide durations, avoiding tunnelling/frame-rate dependence.
+export function step(s: State, input = idleInput(), dt = DT, timed = true) {
+  // Older persisted CLI sessions predate race tracking.
+  s.race ??= createRace();
+  if (s.phase === "complete") return;
   dt = clamp(dt, 0, DT);
+  if (timed) tickRace(s.race, dt);
+  if (s.phase === "kiosk" || s.phase === "pin") return;
+  // Fixed step only; callers subdivide durations, avoiding tunnelling/frame-rate dependence.
   s.elapsed += dt;
   s.collisionCooldown = Math.max(0, s.collisionCooldown - dt);
   if (walking(s)) {
@@ -597,11 +608,20 @@ export function step(s: State, input = idleInput(), dt = DT) {
       );
       s.collisionCooldown = 1.5;
     }
-  } else s.distance += distance(before, s.truck);
+  } else {
+    const moved = distance(before, s.truck);
+    s.distance += moved;
+    if (moved > 0 && !s.race.started) {
+      s.race.started = true;
+      tickRace(s.race, dt);
+    }
+  }
   if (s.phase === "dock") {
     s.dockHold = docking(s).ready ? s.dockHold + dt : 0;
     if (s.dockHold > 0.7) {
       s.phase = "complete";
+      finishStage(s.race, 3);
+      s.race.finished = true;
       s.truck.speed = 0;
       note(s, "Delivered to dock 03.", "completed");
     }
@@ -652,6 +672,7 @@ export function snapshot(s: State) {
     docking: docking(s),
     pin: s.registered ? s.pin : null,
     elapsed: round(s.elapsed),
+    race: s.race,
     distance: round(s.distance),
     contacts: s.contacts,
     recoveries: s.recoveries,

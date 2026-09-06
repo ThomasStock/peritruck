@@ -42,6 +42,7 @@ async function game() {
     console,
     execute: require("./game/commands").execute,
     interact: require("./game/simulation").interact,
+    skipAhead: require("./game/simulation").skipAhead,
     step: require("./game/simulation").step,
     exports: {},
     importMeta: {},
@@ -249,6 +250,107 @@ test("kiosk hides controls; return walk restores joystick; entering truck restor
     assert.equal(run("currentInput().throttle"), 1);
     pointer(pedal, "pointerup", 0, 0);
     assert.equal(run("currentInput().throttle"), 0);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("race HUD waits for movement and keeps real time while controls or leaderboard are open", async () => {
+  const { dom, run, document } = await game();
+  try {
+    run("frame(last + 5000)");
+    assert.equal(
+      document.getElementById("race-clock")!.textContent,
+      "00:00.00",
+    );
+    run('keys.add("w"); frame(last + 50); keys.clear()');
+    assert.equal(run("state.race.started"), true);
+    document.getElementById("help")!.click();
+    const elapsed = run("state.race.elapsed");
+    const z = run("state.truck.z");
+    run("frame(last + 5000)");
+    assert.equal(run("state.race.elapsed"), elapsed + 5);
+    assert.equal(run("state.truck.z"), z);
+    assert.equal(
+      document.getElementById("dialog-race-clock")!.textContent,
+      document.getElementById("race-clock")!.textContent,
+    );
+    run("closeDialog()");
+    document.getElementById("leaderboard-button")!.click();
+    run("updateUI()");
+    assert.ok(document.getElementById("touch-controls")!.hidden);
+    run("frame(last + 3000)");
+    assert.ok(Math.abs(run("state.race.elapsed") - (elapsed + 8)) < 1e-9);
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("a completed delivery renders splits, saves a literal driver name once, and replays from zero", async () => {
+  const { dom, run, document } = await game();
+  try {
+    run('execute(state, { op: "demo" }); updateUI()');
+    assert.equal(document.querySelectorAll(".result-splits li").length, 4);
+    assert.equal(
+      document.activeElement,
+      document.querySelector(".race-results"),
+    );
+    const name = document.getElementById("player-name") as HTMLInputElement;
+    name.value = "<b>Truck hero</b>";
+    const form = document.getElementById("score-form")!;
+    const submit = () =>
+      form.dispatchEvent(
+        new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+      );
+    submit();
+    submit();
+    assert.equal(document.querySelectorAll(".leaderboard-rows li").length, 1);
+    assert.equal(document.querySelector(".leaderboard-name b"), null);
+    assert.ok(
+      document
+        .querySelector(".leaderboard-name")!
+        .textContent!.startsWith(name.value),
+    );
+    assert.match(document.getElementById("save-status")!.textContent!, /#1/);
+    const stored = JSON.parse(
+      dom.window.localStorage.getItem("peritruck-leaderboard-v1")!,
+    );
+    assert.equal(stored.length, 1);
+    assert.equal("truck" in stored[0], false);
+    document.getElementById("play-again")!.click();
+    run("updateUI()");
+    assert.equal(run("state.phase"), "arrive");
+    assert.equal(run("state.race.elapsed"), 0);
+    assert.equal(run("state.race.started"), false);
+    assert.equal(document.querySelector(".race-results"), null);
+    assert.notEqual(document.getElementById("race-best")!.textContent, "—");
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("skipping to the dock displays a practice result with no leaderboard submission", async () => {
+  const { dom, run, document } = await game();
+  try {
+    run(
+      'skipAhead(state); skipAhead(state); skipAhead(state); execute(state, { op: "input", seconds: 1 }); updateUI()',
+    );
+    assert.match(
+      document.getElementById("dialog-title")!.textContent!,
+      /Practice/,
+    );
+    assert.ok(
+      document.getElementById("score-form")!.classList.contains("hidden"),
+    );
+    assert.equal(document.body.textContent!.includes("NaN"), false);
+    assert.match(
+      document.getElementById("save-status")!.textContent!,
+      /Skipped stages/,
+    );
+    assert.equal(
+      dom.window.localStorage.getItem("peritruck-leaderboard-v1"),
+      null,
+    );
   } finally {
     dom.window.close();
   }
