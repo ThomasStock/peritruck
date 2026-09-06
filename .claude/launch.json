@@ -3,9 +3,30 @@
   "configurations": [
     {
       "name": "peritruck",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173,
+      "autoPort": true
+    },
+    {
+      "name": "peritruck-static",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "4173"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4173"
+      ],
       "port": 4173
+    },
+    {
+      "name": "vite",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "npx vite --host 127.0.0.1 --port \"${PORT:-5173}\" --strictPort"
+      ],
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }

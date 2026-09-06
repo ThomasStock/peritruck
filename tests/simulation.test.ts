@@ -18,7 +18,16 @@ import {
   overlap,
   step,
   rear,
+  distance,
+  skipAhead,
+  slowDown,
+  prompt,
+  YARD,
   type State,
+  smsReceived,
+  SMS_DELAY,
+  objective,
+  snapshot,
 } from "../src/game/simulation";
 import { execute, demo, driveTo, walkTo } from "../src/game/commands";
 
@@ -40,6 +49,7 @@ test("complete delivery through real controls: park, walk, register, PIN, revers
 test("deterministic controls produce identical outcomes and replay split durations", () => {
   const a = createState(),
     b = createState();
+  b.pin = a.pin; // the PIN is the only random part of a fresh session
   const i = { ...idleInput(), throttle: 1, steer: 0.17 };
   advance(a, i, 3);
   advance(b, i, 1);
@@ -139,6 +149,38 @@ test("dock success requires rear-first alignment, lateral position and stationar
   assert.equal(docking(wrong).ready, false);
 });
 
+test("slow-down warning appears within 4 m of each driving target until the step can complete", () => {
+  const s = createState();
+  // Holding bay: target is 2 m ahead.
+  s.truck.z = 41;
+  s.truck.speed = 1;
+  assert.ok(slowDown(s));
+  s.truck.speed = 0.1;
+  assert.equal(slowDown(s), false);
+  s.truck.speed = 1;
+  s.truck.z = 50;
+  assert.equal(slowDown(s), false);
+  // Gate: prompt accepts anything under 0.3 m/s.
+  s.phase = "gate";
+  s.truck = { ...s.truck, x: YARD.gate.x, z: YARD.gate.z + 3, speed: 0.5 };
+  assert.ok(slowDown(s));
+  s.truck.speed = 0.25;
+  assert.equal(slowDown(s), false);
+  s.truck = { ...s.truck, z: YARD.gate.z + 4.5, speed: 0.5 };
+  assert.equal(slowDown(s), false);
+  // Dock: reversing at 2.5 m from the target.
+  s.phase = "dock";
+  s.truck = { ...s.truck, x: 0, z: -30, speed: -0.5 };
+  assert.ok(slowDown(s));
+  s.truck.speed = -0.1;
+  assert.equal(slowDown(s), false);
+  // Walking has no speed to shed.
+  s.phase = "walk-kiosk";
+  s.driver = { x: YARD.kiosk.x, z: YARD.kiosk.z + 3 };
+  s.truck.speed = 2;
+  assert.equal(slowDown(s), false);
+});
+
 test("gate blocks cab and trailer, including when cab has crossed it", () => {
   const s = createState();
   s.truck = {
@@ -206,18 +248,43 @@ test("rotated rectangle collision detects crossing edges even when no centre is 
 test("kiosk and gate cannot be skipped, wrong booking/PIN preserve progress", () => {
   const s = createState();
   assert.equal(interact(s), false);
-  assert.equal(register(s, "PP-2048"), false);
-  assert.equal(enterPin(s, "2048"), false);
+  assert.equal(register(s, s.booking), false);
+  assert.equal(enterPin(s, s.pin), false);
   s.phase = "kiosk";
   assert.equal(register(s, "WRONG"), false);
   assert.equal(s.registered, false);
-  assert.ok(register(s, "pp-2048"));
+  assert.ok(register(s, s.booking.toLowerCase()));
   assert.equal(s.phase, "walk-truck");
   s.phase = "pin";
-  assert.equal(enterPin(s, "0000"), false);
+  const wrongPin = s.pin === "0000" ? "1111" : "0000";
+  assert.equal(enterPin(s, wrongPin), false);
   assert.equal(s.gateOpen, false);
-  assert.ok(enterPin(s, "2048"));
+  assert.ok(enterPin(s, s.pin));
   assert.equal(s.phase, "dock");
+});
+
+test("the gate PIN lands on the driver's phone shortly after leaving the kiosk", () => {
+  const s = createState();
+  assert.equal(smsReceived(s), false);
+  s.phase = "kiosk";
+  assert.ok(register(s, s.booking));
+  assert.equal(s.registered, true);
+  assert.equal(smsReceived(s), false);
+  assert.equal(s.message, "");
+  assert.match(objective(s).detail, /on its way by SMS/);
+  advance(s, idleInput(), SMS_DELAY / 2);
+  assert.equal(smsReceived(s), false);
+  advance(s, idleInput(), SMS_DELAY);
+  assert.equal(smsReceived(s), true);
+  assert.match(objective(s).detail, /arrived by SMS/);
+  assert.equal(snapshot(s).smsReceived, true);
+  assert.equal(s.events.at(-1)?.type, "registered");
+  const skipped = createState();
+  skipped.phase = "walk-truck";
+  skipped.registered = true;
+  skipped.smsAt = 99;
+  skipAhead(skipped);
+  assert.equal(smsReceived(skipped), true);
 });
 
 test("recovery restores the last safe checkpoint without clearing visit progress", () => {
@@ -254,4 +321,54 @@ test("a paused interaction cannot advance simulation time", () => {
   advance(s, { ...idleInput(), throttle: 1 }, 3);
   assert.equal(s.elapsed, 0);
   assert.equal(s.truck.z, 62);
+});
+
+test("hold-to-skip advances one act at a time: kiosk, gate line, dock", () => {
+  const s = createState();
+  assert.ok(skipAhead(s));
+  assert.equal(s.phase, "walk-kiosk");
+  assert.ok(parking(s).ready);
+  assert.equal(prompt(s), "Check in at kiosk");
+  assert.equal(s.registered, false);
+  assert.ok(skipAhead(s));
+  assert.equal(s.phase, "gate");
+  assert.equal(s.registered, true);
+  assert.equal(smsReceived(s), true);
+  assert.equal(s.gateOpen, false);
+  assert.equal(prompt(s), "Enter gate PIN");
+  assert.equal(collision(s), undefined);
+  assert.ok(skipAhead(s));
+  assert.equal(s.phase, "dock");
+  assert.equal(s.gateOpen, true);
+  assert.ok(docking(s).ready);
+  assert.equal(collision(s), undefined);
+  advance(s, idleInput(), 1);
+  assert.equal(s.phase, "complete");
+  assert.equal(skipAhead(s), false);
+});
+
+test("skipping from the road or on foot snaps to the gate line first", () => {
+  const s = createState();
+  s.phase = "walk-truck";
+  s.registered = true;
+  assert.ok(skipAhead(s));
+  assert.equal(s.phase, "gate");
+  assert.ok(distance(s.truck, YARD.gate) < 6);
+  s.truck.z = 45;
+  assert.equal(prompt(s), "");
+  assert.ok(skipAhead(s));
+  assert.equal(s.phase, "gate");
+  assert.equal(prompt(s), "Enter gate PIN");
+  assert.ok(skipAhead(s));
+  assert.equal(s.phase, "dock");
+  assert.ok(s.truck.z < YARD.gateZ);
+});
+
+test("every session draws a fresh four-digit PIN and keeps the six-character booking", () => {
+  const pins = new Set(Array.from({ length: 50 }, () => createState().pin));
+  for (const pin of pins) assert.match(pin, /^\d{4}$/);
+  assert.ok(pins.size > 1);
+  const s = createState();
+  assert.equal(s.booking, "PP-K4M7Q2");
+  assert.equal(s.booking.slice(s.booking.indexOf("-") + 1).length, 6);
 });

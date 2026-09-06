@@ -2,15 +2,24 @@ import "@fontsource/montserrat/400.css";
 import "@fontsource/montserrat/500.css";
 import "@fontsource/montserrat/600.css";
 import "@fontsource/montserrat/700.css";
+import "@fontsource/open-sans/400.css";
+import "@fontsource/open-sans/500.css";
+import "@fontsource/open-sans/600.css";
+import "@fontsource/open-sans/700.css";
+import "@fontsource/open-sans/800.css";
 import "./style.css";
+import "./kiosk/kiosk.css";
+import "./sms.css";
 import { YardScene } from "./scene";
 import {
+  BOOKING,
   createState,
   idleInput,
   step,
   DT,
   objective,
   prompt,
+  slowDown,
   interact,
   walking,
   distance,
@@ -20,6 +29,8 @@ import {
   register,
   enterPin,
   recover,
+  skipAhead,
+  smsReceived,
   note,
   snapshot,
   rigRects,
@@ -29,6 +40,8 @@ import {
   type Input,
 } from "./game/simulation";
 import { execute } from "./game/commands";
+import { mountKiosk, type KioskController } from "./kiosk/view";
+import { clock, phoneHtml, smsBannerHtml } from "./sms";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const isEditable = (target: EventTarget | null) =>
   target instanceof Element &&
@@ -56,11 +69,12 @@ app.innerHTML = `
 <div id="world"></div>
 <header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><button id="camera" class="icon-button" aria-label="Change camera view" title="Camera · C">◩</button><button id="help" class="icon-button" aria-label="Controls and settings" title="Controls · Escape">?</button></div></header>
 <section id="intro" class="intro panel"><h1>Automate your yard.</h1><p>Self-service check-in. Automated access. Clear driver instructions.</p><button id="start" class="primary" disabled>Loading… <span>↗</span></button></section>
-<aside id="mission" class="mission panel hidden"><div class="eyebrow" id="step-label">01 / 04 · ARRIVAL</div><h1 id="objective-title"></h1><p id="objective-detail"></p><div class="mission-progress"><i></i><i></i><i></i><i></i></div><div class="delivery-note"><span id="note-label">YOUR DELIVERY</span><b id="delivery-reference">PP-2048 <span>→</span> Ghent</b><small id="note-detail">Registration reference</small></div><div id="stage-hint" class="stage-hint"></div></aside>
+<aside id="mission" class="mission panel hidden"><div class="eyebrow" id="step-label">01 / 04 · ARRIVAL</div><h1 id="objective-title"></h1><p id="objective-detail"></p><div class="mission-progress"><i></i><i></i><i></i><i></i></div><div class="delivery-note"><span id="note-label">YOUR DELIVERY</span><b id="delivery-reference">${BOOKING} <span>→</span> Ghent</b><small id="note-detail">Registration reference</small></div><div id="stage-hint" class="stage-hint"></div></aside>
 <button id="map-button" class="minimap panel hidden" aria-label="Show whole yard map"><div><span>YARD MAP</span><span>↗</span></div><canvas id="map" width="340" height="270" aria-label="Yard map showing the truck, destination, gate and docks"></canvas><span class="map-key"><i></i> You <b>◎</b> Destination <span>N ↑</span></span></button>
 <div id="target-label" class="target-label hidden"><span id="target-symbol" class="target-number">P</span><div><b id="target-name">HOLDING BAY P02</b><small id="target-distance"></small></div></div>
 <div id="action-wrap" class="action-wrap hidden"><button id="interact" class="action"><kbd id="interact-key">E</kbd><span id="action-text"></span><span>↗</span></button></div>
 <div id="toast" role="status" aria-live="polite" class="toast hidden"></div>
+<div id="sms-banner" role="status" aria-live="polite" class="sms-banner hidden" title="Dismiss"></div>
 <button id="cli-resume" class="cli-resume hidden">CLI control · Resume ↗</button>
 <footer class="bottom-bar"><div class="controls-hint" id="controls-hint"></div></footer>
 <div id="dock-guide" class="dock-guide panel hidden"><div class="eyebrow">03 · DOCKING GUIDE</div><strong id="dock-coach">Trailer first.</strong><div class="dock-measure"><span>Side offset</span><b id="dock-offset"></b></div><div class="dock-meter"><i id="dock-needle"></i><span></span></div><div class="dock-measure"><span>Trailer angle</span><b id="dock-angle"></b></div><div class="dock-measure"><span>To bumper</span><b id="dock-gap"></b></div><p id="dock-tip"></p></div>
@@ -266,7 +280,8 @@ for (const button of document.querySelectorAll<HTMLButtonElement>(
 }
 let remapping: string | null = null,
   lastDialog = "",
-  modalReturnFocus: HTMLElement | null = null;
+  modalReturnFocus: HTMLElement | null = null,
+  kiosk: KioskController | null = null;
 function closeDialog() {
   settingsOpen = false;
   if (state.phase === "kiosk") state.phase = "walk-kiosk";
@@ -315,11 +330,13 @@ window.addEventListener("keydown", (e) => {
         ),
       ].filter((node) => node.getClientRects().length > 0);
       const first = nodes[0],
-        last = nodes.at(-1);
-      if (e.shiftKey && document.activeElement === first) {
+        last = nodes.at(-1),
+        active = document.activeElement as HTMLElement | null,
+        inside = active ? nodes.includes(active) : false;
+      if (e.shiftKey && (!inside || active === first)) {
         e.preventDefault();
         last?.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
+      } else if (!e.shiftKey && (!inside || active === last)) {
         e.preventDefault();
         first?.focus();
       }
@@ -363,14 +380,14 @@ document.addEventListener("visibilitychange", () => {
 function modal(title: string, body: string, cls = "") {
   modalReturnFocus = document.activeElement as HTMLElement;
   $("modal-root").innerHTML =
-    `<div class="modal-scrim"><section class="dialog ${cls}" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><button class="dialog-close" id="close-dialog" aria-label="Close dialog">×</button><div class="eyebrow">PERIPASS</div><h2 id="dialog-title">${title}</h2>${body}</section></div>`;
+    `<div class="modal-scrim"><section class="dialog ${cls}" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabindex="-1"><button class="dialog-close" id="close-dialog" aria-label="Close dialog">×</button><div class="eyebrow">PERIPASS</div><h2 id="dialog-title">${title}</h2>${body}</section></div>`;
   $("close-dialog").onclick = closeDialog;
   clearInput();
-  requestAnimationFrame(() =>
-    $("modal-root")
-      .querySelector<HTMLElement>("[autofocus],.primary,input,button")
-      ?.focus(),
-  );
+  // Move focus onto the dialog itself, not its first control, so nothing
+  // lights up on open while Escape and the Tab trap keep working.
+  $("modal-root")
+    .querySelector<HTMLElement>(".dialog")
+    ?.focus({ preventScroll: true });
 }
 function syncDialog() {
   const kind = settingsOpen
@@ -380,6 +397,8 @@ function syncDialog() {
       : "";
   if (kind === lastDialog) return;
   lastDialog = kind;
+  kiosk?.destroy();
+  kiosk = null;
   if (!kind) {
     $("modal-root").replaceChildren();
     modalReturnFocus?.focus();
@@ -451,46 +470,22 @@ function syncDialog() {
       start();
     };
   } else if (kind === "kiosk") {
-    modal(
-      "Driver check-in",
-      `<div class="kiosk-site"><span class="live-dot"></span> SELF-SERVICE REGISTRATION</div><p class="dialog-description">Check in using your booking reference.</p><form id="registration"><label class="field">Language<select id="language"><option>English</option><option>Nederlands</option><option>Français</option><option>Deutsch</option></select></label><label class="field"><span id="booking-label">Booking reference</span><input id="booking" autofocus autocomplete="off" spellcheck="false" placeholder="e.g. PP-2048" value="PP-2048" maxlength="30" required /></label><div class="booking-card"><span>EXPECTED DELIVERY</span><b>PP-2048 · Ghent</b><small>General cargo · 1 trailer</small></div><div id="form-error" class="form-error" role="alert"></div><button id="register-button" class="primary" type="submit">Check in <span>↗</span></button></form><p class="privacy-note">Practice kiosk. No personal details or real registration.</p>`,
-      "kiosk-dialog",
-    );
-    $("language").onchange = () => {
-      const lang = ($("language") as HTMLSelectElement).value;
-      const copy: Record<string, [string, string, string]> = {
-        English: ["Driver check-in", "Booking reference", "Check in"],
-        Nederlands: [
-          "Chauffeursregistratie",
-          "Boekingsreferentie",
-          "Aanmelden",
-        ],
-        Français: [
-          "Enregistrement chauffeur",
-          "Référence de réservation",
-          "S’enregistrer",
-        ],
-        Deutsch: ["Fahrerregistrierung", "Buchungsreferenz", "Anmelden"],
-      };
-      const c = copy[lang];
-      $("dialog-title").textContent = c[0];
-      $("booking-label").textContent = c[1];
-      $("register-button").textContent = c[2];
-    };
-    $("registration").onsubmit = (e) => {
-      e.preventDefault();
-      if (register(state, ($("booking") as HTMLInputElement).value)) {
-        beep();
-        syncDialog();
-      } else {
-        $("form-error").textContent = state.message;
-        ($("booking") as HTMLInputElement).focus();
-      }
-    };
+    // The self-service kiosk: language, check-in method, reference, phone, endscreen.
+    modalReturnFocus = document.activeElement as HTMLElement;
+    keys.clear();
+    touch.clear();
+    kiosk = mountKiosk($("modal-root"), {
+      booking: state.booking,
+      onQuit: closeDialog,
+      onComplete: (reference) => {
+        if (register(state, reference)) syncDialog();
+      },
+    });
   } else if (kind === "pin") {
+    // The driver reads the SMS on their phone and types the PIN into the gate terminal.
     modal(
       "Automated gate access",
-      `<p class="dialog-description">Enter the gate PIN from your check-in message.</p><div class="message-ticket"><span>YOUR PERIPASS MESSAGE</span><b>Gate PIN <strong>2 0 4 8</strong></b><small>Proceed to dock 03 after entry.</small></div><form id="pin-form"><label class="field">Gate PIN<input id="pin-input" autofocus inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="Four digit gate PIN" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? "Delete digit" : k}">${k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">Open the gate <span>↗</span></button></form>`,
+      `<p class="dialog-description">Read the PIN in the SMS on your phone and enter it at the gate terminal.</p><div class="gate-layout"><div class="phone-peek">${phoneHtml(state.booking, state.pin, smsClock || clock())}</div><form id="pin-form" class="gate-terminal"><div class="eyebrow"><span class="live-dot"></span> GATE TERMINAL</div><label class="field">Gate PIN<input id="pin-input" inputmode="none" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="Four digit gate PIN" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? "Delete digit" : k}">${k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">Open the gate <span>↗</span></button></form></div>`,
       "pin-dialog",
     );
     for (const b of document.querySelectorAll<HTMLButtonElement>("[data-pin]"))
@@ -600,7 +595,58 @@ function drawMap() {
   }
 }
 let uiTick = 0,
-  lastGamepadAction = false;
+  lastGamepadAction = false,
+  skipHeldSince = 0;
+// The SMS lands SMS_DELAY seconds of simulation time after check-in. The banner
+// is presentation only: what the phone shows comes from the simulation state.
+let smsSeen = false,
+  smsClock = "",
+  smsBannerUntil = 0,
+  smsBannerTimer: ReturnType<typeof setTimeout> | undefined;
+function showSmsBanner() {
+  const banner = $("sms-banner");
+  clearTimeout(smsBannerTimer);
+  banner.innerHTML = smsBannerHtml(state.booking, state.pin);
+  banner.classList.remove("hidden");
+  void banner.offsetWidth; // commit display before the slide-in transition
+  banner.classList.add("is-in");
+  smsBannerUntil = state.elapsed + 9;
+  beep(880);
+  setTimeout(() => beep(1175), 130);
+  try {
+    navigator.vibrate?.([90, 60, 90]);
+  } catch {
+    /* no haptics */
+  }
+}
+function hideSmsBanner() {
+  const banner = $("sms-banner");
+  if (banner.classList.contains("hidden")) return;
+  banner.classList.remove("is-in");
+  clearTimeout(smsBannerTimer);
+  smsBannerTimer = setTimeout(() => banner.classList.add("hidden"), 600);
+}
+$("sms-banner").onclick = hideSmsBanner;
+function syncSms() {
+  const received = smsReceived(state);
+  if (!state.registered && smsSeen) {
+    // Restart or reset: the next check-in gets a fresh message.
+    smsSeen = false;
+    smsClock = "";
+    smsBannerUntil = 0;
+    hideSmsBanner();
+  }
+  if (received && !smsSeen) {
+    smsSeen = true;
+    smsClock = clock();
+    // Only a message received on foot or in the cab drops in; a skip straight to the dock is silent.
+    if (["walk-truck", "gate"].includes(state.phase)) showSmsBanner();
+  }
+  if (smsBannerUntil && state.elapsed > smsBannerUntil) {
+    smsBannerUntil = 0;
+    hideSmsBanner();
+  }
+}
 function updateUI() {
   const o = objective(state),
     p = parking(state),
@@ -639,17 +685,6 @@ function updateUI() {
     !action || !started || settingsOpen,
   );
   $("action-text").textContent = action;
-  const screen = scene.project(o.target);
-  $("target-label").classList.toggle(
-    "hidden",
-    !started ||
-      !screen.visible ||
-      !!action ||
-      state.phase === "complete" ||
-      settingsOpen,
-  );
-  $("target-label").style.transform =
-    `translate(${screen.x}px,${screen.y}px) translate(-50%,-115%)`;
   $("target-symbol").textContent = ["P", "↟", "↗", "03", "✓"][o.step];
   $("target-name").textContent =
     state.phase === "walk-truck"
@@ -661,21 +696,24 @@ function updateUI() {
           "DOCK 03",
           "DELIVERED",
         ][o.step];
-  $("target-distance").textContent =
-    `${Math.round(distance(isWalking ? state.driver : state.truck, o.target))} m away`;
+  const slow = slowDown(state);
+  $("target-label").classList.toggle("slow", slow);
+  $("target-distance").textContent = slow
+    ? "Slow down"
+    : `${Math.round(distance(isWalking ? state.driver : state.truck, o.target))} m away`;
   $("toast").textContent = state.message;
   $("toast").classList.toggle(
     "hidden",
     state.elapsed > state.messageUntil || !state.message || settingsOpen,
   );
   $("cli-resume").classList.toggle("hidden", !cliPaused);
-  $("note-label").textContent = state.registered
-    ? "CHECK-IN MESSAGE"
-    : "YOUR DELIVERY";
-  $("delivery-reference").textContent = state.registered
-    ? "PIN 2048 → Dock 03"
-    : "PP-2048 → Ghent";
-  $("note-detail").textContent = state.registered
+  syncSms();
+  const sms = smsReceived(state);
+  $("note-label").textContent = sms ? "SMS FROM PERIPASS" : "YOUR DELIVERY";
+  $("delivery-reference").textContent = sms
+    ? `PIN ${state.pin} → Dock 03`
+    : `${state.booking} → Ghent`;
+  $("note-detail").textContent = sms
     ? "Gate access code"
     : "Registration reference";
   $("stage-hint").textContent =
@@ -718,6 +756,25 @@ function updateUI() {
   drawMap();
   syncDialog();
 }
+// Runs every rendered frame, not on the throttled UI tick, so the label tracks
+// the camera as smoothly as the 3D marker. Positions snap to device pixels:
+// fractional offsets re-rasterise the text each frame and make it shimmer.
+function placeTargetLabel() {
+  const label = $("target-label"),
+    screen = scene.project(objective(state).target),
+    dpr = devicePixelRatio || 1,
+    x = Math.round(screen.x * dpr) / dpr,
+    y = Math.round(screen.y * dpr) / dpr;
+  label.classList.toggle(
+    "hidden",
+    !started ||
+      !screen.visible ||
+      !!prompt(state) ||
+      state.phase === "complete" ||
+      settingsOpen,
+  );
+  label.style.transform = `translate(${x}px,${y}px) translate(-50%,-115%)`;
+}
 function frame(now: number) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
@@ -730,6 +787,19 @@ function frame(now: number) {
     syncDialog();
   }
   lastGamepadAction = pressed;
+  // Holding X for a second jumps to the next place to act: kiosk, gate line, dock.
+  // Playtest aid, deliberately unlisted.
+  const holdingSkip =
+    started &&
+    !paused &&
+    keys.has("x") &&
+    !Object.values(bindings).includes("x");
+  if (!holdingSkip) skipHeldSince = 0;
+  else if (!skipHeldSince) skipHeldSince = now;
+  else if (now - skipHeldSince >= 1000) {
+    skipHeldSince = Infinity;
+    skipAhead(state);
+  }
   if (started && !paused) {
     accumulator += dt;
     while (accumulator >= DT) {
@@ -738,6 +808,7 @@ function frame(now: number) {
     }
   } else accumulator = 0;
   scene.render(state, input, dt, started);
+  placeTargetLabel();
   if (audio && engine && engineGain) {
     engine.frequency.setTargetAtTime(
       38 + Math.abs(state.truck.speed) * 10,

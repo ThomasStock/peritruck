@@ -1,0 +1,1711 @@
+/* Self-service kiosk, styled after the production Peripass kiosk app.
+ * Desktop: a physical kiosk device with navigation rails beside the driver's paperwork.
+ * Small viewports: the Mobile Driver Portal layout (inline top bar) filling the screen.
+ * Layout inside the screen follows the screen's own size via container queries.
+ */
+.kiosk-stage {
+  --kk-bg: #f4f6f9;
+  --kk-fg: #262626;
+  --kk-line: #d4d4d4;
+  --kk-paper: #ffffff;
+  --kk-paper-strong: rgb(255 255 255 / 96%);
+  --kk-primary: #00a88c;
+  --kk-primary-fg: #fafafa;
+  --kk-primary-active: rgb(0 168 140 / 80%);
+  --kk-primary-tint: rgb(0 170 139 / 14%);
+  --kk-muted-fg: #71717a;
+  --kk-n50: #fafafa;
+  --kk-n100: #f5f5f5;
+  --kk-n200: #e5e5e5;
+  --kk-n400: #a3a3a3;
+  --kk-n500: #737373;
+  --kk-n600: #525252;
+  --kk-n700: #404040;
+  --kk-alert-bg: #fef2f2;
+  --kk-alert-fg: #ef4444;
+  --kk-focus-ring: 0 0 0 5px rgb(0 170 139 / 14%);
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 24px;
+  background: #123a315e;
+  backdrop-filter: blur(7px);
+  font-family:
+    "Open Sans",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-weight: 400;
+  color: var(--kk-fg);
+  -webkit-font-smoothing: antialiased;
+}
+.kiosk-stage *,
+.kiosk-stage *::before,
+.kiosk-stage *::after {
+  box-sizing: border-box;
+}
+.kiosk-stage button {
+  font: inherit;
+  color: inherit;
+  transition: none;
+  filter: none;
+}
+.kiosk-stage button:hover {
+  filter: none;
+}
+.kiosk-stage button:active {
+  transform: none;
+}
+.kiosk-stage:focus {
+  outline: none;
+}
+.kiosk-stage button:focus-visible,
+.kiosk-stage a:focus-visible {
+  outline: none;
+  box-shadow: var(--kk-focus-ring);
+}
+.kiosk-stage input:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 0;
+}
+.kiosk-stage [hidden] {
+  display: none !important;
+}
+/* Device bezel around the screen. */
+.kiosk-device {
+  position: relative;
+  flex: 0 1 1000px;
+  height: min(680px, 100%);
+  min-width: 0;
+  padding: 14px 14px 30px;
+  border-radius: 28px;
+  background: linear-gradient(#26292d, #16181b);
+  box-shadow:
+    0 30px 80px rgb(0 0 0 / 40%),
+    inset 0 0 0 2px #35393e;
+}
+.kiosk-device::after {
+  content: "peripass";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #6c737a;
+}
+.kiosk-frame {
+  container: kiosk / size;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--kk-bg);
+  color: var(--kk-fg);
+  --font-body: 18px;
+  --font-small: 14px;
+  --font-control: 18px;
+  --font-h2: 22px;
+  --font-h1: 32px;
+  --gap: 20px;
+  --top-gap: 20px;
+  --gap-tight: 12px;
+  --gap-row: 36px;
+  --gap-group: 32px;
+  --gap-section: 56px;
+  --tap: 64px;
+  --rail-gutter: 12px;
+  --rail: calc(var(--tap) + var(--rail-gutter) * 2);
+  --col-gap: 12px;
+  font-size: var(--font-body);
+  line-height: 1.28;
+}
+.kiosk-frame h1,
+.kiosk-frame h2,
+.kiosk-frame p {
+  margin: 0;
+}
+.kiosk-frame button {
+  font-size: var(--font-control);
+  line-height: 1;
+}
+.kiosk-frame input {
+  font-size: max(16px, var(--font-body));
+  line-height: 1.28;
+  font-family: inherit;
+  color: inherit;
+}
+/* Page layout: rails | content | rails. */
+.kiosk-page-layout {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr) var(--rail);
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: var(--col-gap);
+}
+.kiosk-page-layout__scroll {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.kiosk-scroll-content {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: var(--top-gap) var(--gap) var(--gap);
+}
+.kiosk-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.kiosk-navigation {
+  display: flex;
+  gap: 12px;
+}
+.kiosk-navigation--fixed {
+  grid-row: 1;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: var(--top-gap) var(--rail-gutter) 0;
+  position: relative;
+  z-index: 30;
+  --nav-icon: calc(var(--tap) * 0.48);
+}
+.kiosk-navigation--left {
+  grid-column: 1;
+}
+.kiosk-navigation--right {
+  grid-column: 3;
+}
+.kiosk-navigation button {
+  width: var(--tap);
+  height: var(--tap);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--kk-line);
+  border-radius: 8px;
+  background: var(--kk-paper-strong);
+  color: var(--kk-fg);
+  cursor: pointer;
+}
+.kiosk-navigation button:focus-visible {
+  border-color: var(--kk-primary);
+}
+.kiosk-navigation svg {
+  width: var(--nav-icon, 28px);
+  height: var(--nav-icon, 28px);
+  stroke-width: 2.4;
+}
+.kiosk-navigation .kiosk-nav-help {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.kiosk-navigation .kiosk-nav-help span {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.kiosk-navigation--fixed .kiosk-nav-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.kiosk-mobile-navigation {
+  display: none;
+  width: 100%;
+}
+.kiosk-navigation--inline {
+  position: relative;
+  z-index: 30;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0;
+  padding: 8px var(--gap);
+  margin-block-end: var(--gap);
+  background: var(--kk-paper);
+  border-bottom: 1px solid var(--kk-line);
+  --nav-size: 40px;
+  --nav-icon: 28px;
+}
+.kiosk-navigation__group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.kiosk-navigation--inline .kiosk-navigation__group:first-child {
+  flex: 1;
+}
+.kiosk-navigation--inline button {
+  width: auto;
+  min-width: var(--nav-size);
+  height: var(--nav-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding-inline: 10px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 1rem;
+  font-weight: 400;
+  border-radius: 8px;
+}
+.kiosk-navigation--inline button:active {
+  background: var(--kk-primary-tint);
+  color: var(--kk-primary);
+}
+.kiosk-navigation--inline .kiosk-nav-help {
+  flex-direction: row-reverse;
+}
+.kiosk-navigation--inline .kiosk-nav-help span {
+  font-size: inherit;
+  font-weight: inherit;
+  text-transform: none;
+}
+.kiosk-navigation--inline .kiosk-nav-back svg,
+.kiosk-navigation--inline .kiosk-nav-help svg {
+  width: calc(var(--nav-icon) * 0.7);
+  height: calc(var(--nav-icon) * 0.7);
+}
+.kiosk-navigation--inline .kiosk-nav-home {
+  width: var(--nav-size);
+  padding: 0;
+}
+.kiosk-navigation__ghost {
+  width: 0;
+  height: var(--nav-size);
+  visibility: hidden;
+}
+/* Page head, titles. */
+.kiosk-page-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+  margin-bottom: var(--gap-group);
+  flex-shrink: 0;
+}
+.kiosk-page-title {
+  font-size: var(--font-h1);
+  line-height: 1.04;
+  font-weight: 700;
+  text-wrap: balance;
+  align-self: flex-start;
+  text-align: left;
+}
+.kiosk-page-description {
+  font-size: var(--font-h2);
+  line-height: 1.32;
+  font-weight: 400;
+  text-wrap: balance;
+  align-self: flex-start;
+  text-align: left;
+}
+.kiosk-rich b {
+  display: block;
+  margin-bottom: var(--gap-tight);
+}
+/* Selection options (toggle group). */
+.kiosk-options-wrap {
+  display: grid;
+  grid-template-rows: 2fr auto 3fr;
+  flex: 1;
+  min-height: 0;
+}
+.kiosk-options {
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  width: 100%;
+}
+.kiosk-options--two {
+  grid-template-columns: 1fr;
+}
+.kiosk-options--languages {
+  grid-template-columns: repeat(3, 1fr);
+  padding: 0 16px;
+}
+.kiosk-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 64px;
+  padding: 20px 16px;
+  border: 2px solid #fff;
+  border-radius: 4px;
+  background: #fff;
+  color: var(--kk-fg);
+  text-align: left;
+  line-height: 24px;
+  cursor: pointer;
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 10%),
+    0 1px 2px -1px rgb(0 0 0 / 10%);
+}
+.kiosk-option:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.kiosk-option.is-on {
+  border-color: var(--kk-primary);
+  font-weight: 700;
+}
+.kiosk-option__check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+.kiosk-option__check svg {
+  display: none;
+  width: 28px;
+  height: 28px;
+  color: #fff;
+  fill: var(--kk-primary);
+  stroke: #fff;
+}
+.kiosk-option.is-on .kiosk-option__check svg {
+  display: block;
+}
+.kiosk-option__body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  flex: 1;
+}
+.kiosk-option__media {
+  width: 80px;
+  height: 80px;
+  flex: none;
+  margin: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kk-primary);
+}
+.kiosk-option__media svg {
+  width: 100%;
+  height: 100%;
+}
+.kiosk-option__media--tall {
+  height: 96px;
+  width: auto;
+  aspect-ratio: 1;
+}
+.kiosk-option__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  text-align: left;
+  min-width: 0;
+}
+.kiosk-option__title {
+  font-weight: 700;
+}
+.kiosk-option__description {
+  font-weight: 400;
+}
+.kiosk-option--profile .kiosk-option__title {
+  margin-top: 16px;
+}
+.kiosk-option--profile .kiosk-option__description {
+  margin: 8px 0 16px;
+}
+.kiosk-flag {
+  width: 48px;
+  height: 36px;
+  flex: none;
+  margin-right: 16px;
+  border: 1px solid var(--kk-n200);
+  display: block;
+}
+.kiosk-option--language .kiosk-option__body {
+  gap: 0;
+}
+.kiosk-option--language .kiosk-option__text {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 6px;
+}
+.kiosk-option--language small {
+  font-size: inherit;
+  font-weight: 400;
+  color: rgb(113 113 122 / 75%);
+}
+/* Language page. */
+.kiosk-page-layout--language {
+  grid-template-columns: minmax(0, 1fr);
+}
+.kiosk-page-layout--language .kiosk-page-layout__scroll {
+  grid-column: 1;
+}
+.kiosk-page-layout--language .kiosk-scroll-content {
+  padding: 0;
+}
+.kiosk-language-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.kiosk-language-page__banner {
+  height: 15cqh;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+.kiosk-tenant-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-weight: 800;
+  font-size: clamp(18px, 3cqh, 26px);
+  letter-spacing: 4px;
+  color: #163e38;
+}
+.kiosk-tenant-logo small {
+  font-size: clamp(9px, 1.4cqh, 12px);
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #00a990;
+}
+.kiosk-language-page__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 85cqh;
+  padding: 0 var(--gap);
+}
+.kiosk-page-head--language {
+  margin: clamp(24px, 6cqh, 64px) 0;
+  align-items: center;
+}
+.kiosk-page-head--language .kiosk-page-title,
+.kiosk-page-head--language .kiosk-page-description {
+  align-self: center;
+  text-align: center;
+}
+.kiosk-language-page__logo {
+  align-self: center;
+  width: clamp(72px, 9cqw, 120px);
+  max-height: 8cqh;
+  margin: 16px 0;
+}
+/* Forms. */
+.kiosk-form {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  max-width: 72rem;
+}
+.kiosk-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kiosk-input-wrap {
+  position: relative;
+  min-width: 0;
+}
+.kiosk-input {
+  width: 100%;
+  height: 56px;
+  border: 0;
+  outline: 1px solid var(--kk-line);
+  border-radius: 4px;
+  padding: 8px 64px 8px 16px;
+  background: #fff;
+}
+.kiosk-input::placeholder {
+  color: var(--kk-n400);
+}
+.kiosk-input:disabled {
+  color: var(--kk-n500);
+}
+.kiosk-input--reference {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 1.125rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.kiosk-prefix {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 4px 0 0 4px;
+  background: #cffafe;
+  font-weight: 600;
+  pointer-events: none;
+}
+.kiosk-input-clear {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  display: none;
+  align-items: center;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: #000;
+  cursor: pointer;
+}
+.kiosk-input-clear svg {
+  width: 20px;
+  height: 20px;
+}
+.kiosk-input-wrap.has-value:focus-within .kiosk-input-clear {
+  display: flex;
+}
+.kiosk-btn {
+  width: 100%;
+  height: 56px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--kk-primary);
+  color: var(--kk-primary-fg);
+  user-select: none;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+.kiosk-btn svg {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+.kiosk-btn:active {
+  background: var(--kk-primary-active);
+}
+.kiosk-btn:disabled {
+  background: var(--kk-n200);
+  color: var(--kk-n400);
+  cursor: default;
+}
+.kiosk-btn--outline {
+  background: transparent;
+  color: var(--kk-primary);
+  border: 1px solid var(--kk-primary);
+  font-weight: 500;
+}
+.kiosk-btn--outline:active {
+  background: rgb(229 229 229 / 80%);
+}
+.kiosk-btn--secondary {
+  background: var(--kk-n200);
+  color: var(--kk-n600);
+  border: 1px solid var(--kk-n400);
+}
+.kiosk-btn--secondary:active {
+  background: var(--kk-n200);
+}
+.kiosk-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: var(--gap-tight);
+  padding: 16px 24px;
+  border-radius: 4px;
+  background: var(--kk-alert-bg);
+  color: var(--kk-alert-fg);
+}
+.kiosk-alert svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-top: 2px;
+}
+.kiosk-alert p {
+  font-weight: 400;
+}
+.kiosk-alert p + p {
+  margin-top: 8px;
+}
+.kiosk-alert .is-headline {
+  font-weight: 700;
+}
+.kiosk-reference-code {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+.kiosk-reference-code::before {
+  content: "«";
+  letter-spacing: 0;
+}
+.kiosk-reference-code::after {
+  content: "»";
+  letter-spacing: 0;
+}
+.kiosk-form-error {
+  margin-top: var(--gap-tight);
+  font-size: var(--font-small);
+  font-weight: 500;
+  color: var(--kk-alert-fg);
+}
+.kiosk-extra-info {
+  align-self: stretch;
+  margin-top: var(--gap-group);
+  padding: 16px;
+  border-radius: 4px;
+  background: var(--kk-n50);
+  min-height: min(96px, min-content);
+}
+.kiosk-extra-info--divided {
+  margin-top: var(--gap-group);
+  padding: var(--gap-tight) 0 0;
+  border-top: 1px solid var(--kk-line);
+  border-radius: 0;
+  background: transparent;
+}
+.kiosk-confirmation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 8px;
+  border: 1px solid #00aa8b;
+  border-radius: 4px;
+  background: #ccfbf1;
+}
+.kiosk-confirmation svg {
+  width: 32px;
+  height: 32px;
+  margin-left: 16px;
+  color: #00aa8b;
+  flex: none;
+}
+.kiosk-confirmation div {
+  margin-left: 16px;
+  padding: 8px;
+  text-align: right;
+}
+.kiosk-confirmation b {
+  display: block;
+  font-weight: 600;
+}
+.kiosk-confirmation small {
+  display: block;
+  font-size: inherit;
+  color: var(--kk-muted-fg);
+}
+/* Phone step. */
+.kiosk-phone-row {
+  display: flex;
+  gap: 8px;
+}
+.kiosk-phone-row .kiosk-input-wrap {
+  flex: 1;
+}
+.kiosk-country {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 140px;
+  flex: none;
+  padding: 8px 12px 8px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.kiosk-country .kiosk-flag {
+  width: 42px;
+  height: 32px;
+  margin: 0;
+  border: 0;
+}
+.kiosk-country b {
+  font-weight: 400;
+  flex: 1;
+}
+.kiosk-country svg:last-child {
+  width: 20px;
+  height: 20px;
+  color: var(--kk-muted-fg);
+}
+.kiosk-btn--phone {
+  margin-top: 28px;
+}
+/* Message template (endscreen). */
+.kiosk-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: center;
+  width: 100%;
+  max-width: 48rem;
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  margin-bottom: 10cqh;
+}
+.kiosk-message__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: min(20cqh, 24cqw);
+  aspect-ratio: 1;
+  margin: 2cqh 0 5cqh;
+  color: var(--kk-primary);
+}
+.kiosk-message__icon svg {
+  width: 100%;
+  height: 100%;
+}
+.kiosk-message .kiosk-page-title {
+  align-self: center;
+  text-align: center;
+}
+.kiosk-message .kiosk-confirmation {
+  align-self: stretch;
+  max-width: 32rem;
+  margin: 4cqh auto 0;
+  width: 100%;
+}
+.kiosk-message .kiosk-extra-info {
+  max-width: 65ch;
+}
+.kiosk-message__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 32rem;
+  margin-top: 4cqh;
+}
+/* In-screen overlays: help, country picker, leave confirmation. */
+.kiosk-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr) var(--rail);
+  column-gap: var(--col-gap);
+  background: rgb(244 246 249 / 62%);
+  backdrop-filter: blur(18px);
+}
+.kiosk-overlay__content {
+  grid-column: 2;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: var(--gap) 0;
+}
+.kiosk-overlay--sheet {
+  display: block;
+  background: rgb(0 0 0 / 80%);
+  backdrop-filter: none;
+}
+.kiosk-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 8px 24px;
+  border-radius: 10px 10px 0 0;
+  border: 1px solid var(--kk-line);
+  background: #fff;
+  overflow: auto;
+}
+.kiosk-sheet .kiosk-page-title,
+.kiosk-sheet .kiosk-page-description {
+  align-self: center;
+  text-align: center;
+}
+.kiosk-sheet .kiosk-page-description {
+  margin-top: 16px;
+}
+.kiosk-sheet .kiosk-page-head {
+  margin: 8px 16px 24px;
+}
+.kiosk-card {
+  align-self: center;
+  width: min(600px, 100%);
+  margin: auto 0;
+  padding: 48px 24px;
+  border-radius: 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  text-align: center;
+}
+.kiosk-card .kiosk-page-title,
+.kiosk-card .kiosk-page-description {
+  align-self: center;
+  text-align: center;
+}
+.kiosk-card__actions,
+.kiosk-sheet__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.kiosk-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 16px;
+  border: 0;
+  background: transparent;
+  color: var(--kk-muted-fg);
+  cursor: pointer;
+}
+.kiosk-close svg {
+  width: 20px;
+  height: 20px;
+}
+.kiosk-country-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 var(--gap);
+}
+.kiosk-country-item {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid var(--kk-n100);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.kiosk-country-item:last-child {
+  border-bottom: 0;
+}
+.kiosk-country-item.is-on {
+  font-weight: 700;
+}
+.kiosk-country-item > span {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.kiosk-country-item b {
+  font-weight: 600;
+}
+.kiosk-search-wrap .kiosk-input {
+  padding-left: 48px;
+  padding-right: 16px;
+}
+.kiosk-search-icon {
+  position: absolute;
+  left: 16px;
+  top: 0;
+  bottom: 0;
+  margin: auto 0;
+  width: 20px;
+  height: 20px;
+  color: #9ca3af;
+  pointer-events: none;
+}
+/* The driver's paperwork beside the kiosk. */
+.kiosk-paper-wrap {
+  flex: none;
+  width: 264px;
+  align-self: center;
+  transform: rotate(-2.5deg);
+}
+.kiosk-paper {
+  position: relative;
+  padding: 18px 18px 14px;
+  background: #fffdf8;
+  color: #2b2b2b;
+  border-radius: 3px;
+  box-shadow:
+    0 18px 45px rgb(0 0 0 / 35%),
+    0 1px 0 rgb(255 255 255 / 60%) inset;
+  font-family: "Open Sans", system-ui, sans-serif;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.kiosk-paper::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: repeating-linear-gradient(
+    90deg,
+    #163e38 0 12px,
+    transparent 12px 16px
+  );
+  opacity: 0.55;
+}
+.kiosk-paper header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 8px;
+  border-bottom: 1.5px solid #2b2b2b;
+  margin-bottom: 8px;
+}
+.kiosk-paper__title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.kiosk-paper__tab,
+.kiosk-paper__toggle {
+  display: none;
+}
+.kiosk-paper header b {
+  font-size: 13px;
+  letter-spacing: 1.5px;
+}
+.kiosk-paper header span {
+  font-size: 9.5px;
+  color: #666;
+  white-space: nowrap;
+}
+.kiosk-paper dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  margin: 0 0 12px;
+}
+.kiosk-paper dt {
+  font-size: 8.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #777;
+  padding-top: 2px;
+}
+.kiosk-paper dd {
+  margin: 0;
+  font-weight: 600;
+}
+.kiosk-paper__reference {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 2px solid #00a88c;
+  border-radius: 4px;
+  background: #e6f7f3;
+}
+.kiosk-paper__reference span {
+  font-size: 8.5px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #0d6e5d;
+  font-weight: 700;
+}
+.kiosk-paper__reference b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 24px;
+  letter-spacing: 0.08em;
+  color: #163e38;
+}
+.kiosk-paper__reference b em {
+  font-style: normal;
+  color: #3b7a70;
+}
+.kiosk-paper__reference small {
+  font-size: 9.5px;
+  color: #3b5f58;
+}
+.kiosk-paper footer {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed #bbb;
+  font-size: 8.5px;
+  color: #888;
+  display: flex;
+  justify-content: space-between;
+}
+.kiosk-paper__stamp {
+  position: absolute;
+  right: 14px;
+  bottom: 44px;
+  padding: 3px 8px;
+  border: 2px solid #b33a3a;
+  border-radius: 4px;
+  color: #b33a3a;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  transform: rotate(-12deg);
+  opacity: 0.7;
+}
+/* Mobile Driver Portal: the screen fills the viewport, paperwork slides up. */
+.kiosk-stage[data-mode="mdp"] {
+  padding: 0;
+  gap: 0;
+  backdrop-filter: none;
+  background: var(--kk-bg);
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-device {
+  position: absolute;
+  inset: 0;
+  flex: none;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-device::after {
+  display: none;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-frame {
+  border-radius: 0;
+}
+/* The delivery note is a drawer on the right, offered only while the reference
+   is typed. A slim tab lives in a gutter beside the screen; nothing is dimmed or
+   blocked, so the driver reads and types at once. */
+.kiosk-stage[data-mode="mdp"] {
+  --paper-w: min(240px, 62vw);
+  --tab-w: 34px;
+}
+.kiosk-stage[data-mode="mdp"][data-step="reference"]:not([data-overlay])
+  .kiosk-device {
+  right: var(--tab-w);
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--paper-w);
+  /* The desktop rule centres the note; on a fixed box with both insets that would shrink it. */
+  align-self: stretch;
+  z-index: 45;
+  padding: 0;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap.is-open {
+  transform: translateX(0);
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap.is-dragging {
+  transition: none;
+  animation: none;
+}
+/* Until the note has been opened once, the closed drawer slips a finger's width
+   into view every few seconds so the tab reads as something to pull. */
+.kiosk-stage[data-mode="mdp"] .kiosk-paper-wrap.is-nudging:not(.is-open) {
+  animation: kiosk-paper-nudge 5s cubic-bezier(0.4, 0, 0.2, 1) 0.8s infinite;
+}
+@keyframes kiosk-paper-nudge {
+  0%,
+  22%,
+  100% {
+    transform: translateX(100%);
+  }
+  6%,
+  16% {
+    transform: translateX(calc(100% - 28px));
+  }
+}
+.kiosk-stage[data-mode="mdp"]:not([data-step="reference"]) .kiosk-paper-wrap,
+.kiosk-stage[data-mode="mdp"][data-overlay] .kiosk-paper-wrap {
+  display: none;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--tab-w);
+  height: 150px;
+  padding: 0;
+  border: 0;
+  border-left: 3px solid #00a88c;
+  border-radius: 10px 0 0 10px;
+  background: #fffdf8;
+  color: #163e38;
+  box-shadow: -6px 0 22px rgb(0 0 0 / 20%);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__tab span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font:
+    700 9.5px "Open Sans",
+    system-ui,
+    sans-serif;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__tab svg {
+  width: 16px;
+  height: 16px;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper {
+  height: 100%;
+  overflow-y: auto;
+  border-radius: 0;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+  transform: none;
+  box-shadow: -12px 0 40px rgb(0 0 0 / 30%);
+  font-size: 11px;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper header {
+  align-items: center;
+  padding: 6px 0 8px;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__title {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  height: 28px;
+  padding: 0 8px 0 11px;
+  border: 1px solid #d9d2c3;
+  border-radius: 14px;
+  background: #f4f0e7;
+  color: #4a4a4a;
+  font:
+    700 11px "Open Sans",
+    system-ui,
+    sans-serif;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+}
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__toggle svg {
+  width: 15px;
+  height: 15px;
+}
+/* The drawer is taller than its content: keep the stamp with the footer, not the screen edge. */
+.kiosk-stage[data-mode="mdp"] .kiosk-paper__stamp {
+  position: static;
+  float: right;
+  margin: -26px 6px 0 0;
+}
+/* Landscape phones have room to keep the whole screen visible beside the open note. */
+@media (min-width: 720px) {
+  .kiosk-stage[data-mode="mdp"] {
+    --paper-w: 264px;
+  }
+  .kiosk-stage[data-mode="mdp"][data-step="reference"][data-paper="open"]:not(
+      [data-overlay]
+    )
+    .kiosk-device {
+    right: calc(var(--paper-w) + var(--tab-w));
+  }
+}
+/* Compact screens (phone width): single column, inline top bar. */
+@container kiosk (max-width: 600px) {
+  .kiosk-page-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .kiosk-page-layout__scroll {
+    grid-column: 1;
+  }
+  .kiosk-navigation--fixed {
+    display: none;
+  }
+  .kiosk-mobile-navigation {
+    display: block;
+  }
+  .kiosk-scroll-content {
+    padding: 0 0 calc(var(--gap) + var(--tap));
+  }
+  .kiosk-scroll-content > :not(.kiosk-mobile-navigation) {
+    padding-inline: var(--gap);
+  }
+  .kiosk-page-layout--language
+    .kiosk-scroll-content
+    > :not(.kiosk-mobile-navigation) {
+    padding-inline: 0;
+  }
+  .kiosk-page-title,
+  .kiosk-page-description {
+    align-self: center;
+    text-align: center;
+  }
+  .kiosk-options--two,
+  .kiosk-options--languages {
+    grid-template-columns: 1fr;
+  }
+  .kiosk-options--languages {
+    padding: 0 16px;
+  }
+  .kiosk-option__media--tall {
+    height: 72px;
+  }
+  .kiosk-overlay {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .kiosk-overlay__content {
+    grid-column: 1;
+    padding-inline: var(--gap);
+  }
+  .kiosk-message__icon {
+    width: min(10cqh, 36cqw);
+    margin-top: 5cqh;
+  }
+}
+@container kiosk ((max-width: 520px) or (max-height: 640px)) {
+  .kiosk-page-layout {
+    --font-body: 16px;
+    --font-small: 12px;
+    --font-control: 16px;
+    --font-h2: 20px;
+    --font-h1: 28px;
+    --tap: 56px;
+  }
+}
+@container kiosk (max-width: 900px) {
+  .kiosk-options--languages {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@container kiosk (min-width: 1100px) {
+  .kiosk-options--two {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@container kiosk (min-width: 601px) and (orientation: landscape) {
+  .kiosk-page-head--language .kiosk-page-description {
+    display: none;
+  }
+}
+@container kiosk (max-width: 600px) {
+  .kiosk-options--languages {
+    grid-template-columns: 1fr;
+  }
+}
+@container kiosk (min-height: 1000px) {
+  .kiosk-page-layout {
+    --font-body: 20px;
+    --font-control: 20px;
+    --font-h2: 26px;
+    --font-h1: 40px;
+  }
+}
+/* Reference step: scan instead of typing. */
+.kiosk-btn--scan {
+  margin-top: 4px;
+}
+/* Camera viewfinder. The content column becomes the camera feed: a dimmed
+   scene with a clear frame, the delivery note lying half outside it. The
+   guidance pill, outline colours and status pictograms follow the production
+   kiosk's Document Capture. */
+.kiosk-page-layout--scan .kiosk-page-layout__scroll {
+  overflow: hidden;
+}
+.kiosk-page-layout--scan .kiosk-scroll-content {
+  height: 100%;
+  padding: 0;
+}
+.kiosk-page-layout--scan .kiosk-scroll-content > .kiosk-page {
+  padding: 0;
+}
+.kiosk-scan {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  --scan-color: #4d9be8;
+  --scan-wash: rgb(77 155 232 / 12%);
+  --doc-scale: 1;
+}
+.kiosk-scan[data-status="ready"] {
+  --scan-color: #3fbf6f;
+  --scan-wash: rgb(63 191 111 / 14%);
+}
+.kiosk-scan__feed {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      120% 90% at 50% 15%,
+      rgb(255 255 255 / 7%),
+      transparent 60%
+    ),
+    repeating-linear-gradient(
+      115deg,
+      rgb(255 255 255 / 1.5%) 0 2px,
+      transparent 2px 7px
+    ),
+    linear-gradient(165deg, #3b4046, #1d2125 55%, #0f1214);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.kiosk-scan__feed:active {
+  cursor: grabbing;
+}
+.kiosk-scan__feed:focus-visible {
+  outline: 3px solid var(--kk-primary);
+  outline-offset: -3px;
+}
+.kiosk-scan__doc {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 264px;
+  transform: translate(-50%, -50%) rotate(-4deg) scale(var(--doc-scale));
+  will-change: transform;
+}
+.kiosk-scan__doc .kiosk-paper {
+  box-shadow:
+    0 22px 50px rgb(0 0 0 / 55%),
+    0 2px 6px rgb(0 0 0 / 35%);
+  transition: box-shadow 0.2s;
+  pointer-events: none;
+}
+.kiosk-scan__doc.is-lifted .kiosk-paper {
+  box-shadow:
+    0 34px 70px rgb(0 0 0 / 65%),
+    0 4px 10px rgb(0 0 0 / 40%);
+}
+/* Everything outside the frame is dimmed; the frame itself stays clear. */
+.kiosk-scan__window {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(80%, 460px);
+  height: min(44%, 210px);
+  translate: -50% -50%;
+  border-radius: 14px;
+  box-shadow: 0 0 0 200vmax rgb(0 0 0 / 52%);
+  pointer-events: none;
+}
+.kiosk-scan__window i,
+.kiosk-scan__quad i {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgb(255 255 255 / 85%);
+  transition: border-color 0.2s;
+}
+.kiosk-scan__window i:nth-child(1) {
+  top: -3px;
+  left: -3px;
+  border-right: 0;
+  border-bottom: 0;
+  border-top-left-radius: 14px;
+}
+.kiosk-scan__window i:nth-child(2) {
+  top: -3px;
+  right: -3px;
+  border-left: 0;
+  border-bottom: 0;
+  border-top-right-radius: 14px;
+}
+.kiosk-scan__window i:nth-child(3) {
+  bottom: -3px;
+  right: -3px;
+  border-left: 0;
+  border-top: 0;
+  border-bottom-right-radius: 14px;
+}
+.kiosk-scan__window i:nth-child(4) {
+  bottom: -3px;
+  left: -3px;
+  border-right: 0;
+  border-top: 0;
+  border-bottom-left-radius: 14px;
+}
+.kiosk-scan[data-status="holding"] .kiosk-scan__window i,
+.kiosk-scan[data-status="ready"] .kiosk-scan__window i {
+  border-color: var(--scan-color);
+}
+/* Detected-document outline, shown once the reference is inside the frame:
+   hairline edge, interior wash, corner brackets in the status colour. */
+.kiosk-scan__quad {
+  position: absolute;
+  z-index: 2;
+  border: 1.5px solid var(--scan-color);
+  background: var(--scan-wash);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.kiosk-scan__quad i {
+  width: 18px;
+  height: 18px;
+  border-width: 3px;
+  border-color: var(--scan-color);
+}
+.kiosk-scan__quad i:nth-child(1) {
+  top: -3px;
+  left: -3px;
+  border-right: 0;
+  border-bottom: 0;
+}
+.kiosk-scan__quad i:nth-child(2) {
+  top: -3px;
+  right: -3px;
+  border-left: 0;
+  border-bottom: 0;
+}
+.kiosk-scan__quad i:nth-child(3) {
+  bottom: -3px;
+  right: -3px;
+  border-left: 0;
+  border-top: 0;
+}
+.kiosk-scan__quad i:nth-child(4) {
+  bottom: -3px;
+  left: -3px;
+  border-right: 0;
+  border-top: 0;
+}
+.kiosk-scan__flash {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+.kiosk-scan__flash.is-on {
+  animation: kiosk-scan-flash 0.38s ease-out forwards;
+}
+@keyframes kiosk-scan-flash {
+  0% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* Guidance pill: one dark card with the status pictogram beside the copy. */
+.kiosk-scan__pill {
+  position: absolute;
+  z-index: 4;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  width: fit-content;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 16px;
+  background: rgb(20 24 26 / 95%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  pointer-events: none;
+}
+.kiosk-scan__pill svg {
+  flex: none;
+}
+/* Intro hint: the lesson before the mistake, parked under the frame so the
+   note and the frame stay clear; melts away on first touch. */
+.kiosk-scan__intro {
+  position: absolute;
+  inset: auto 16px 16px;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.kiosk-scan__intro.is-hidden {
+  opacity: 0;
+}
+.kiosk-scan__intro-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 440px;
+  padding: 12px 16px;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 16px;
+  background: rgb(20 24 26 / 95%);
+  color: #fff;
+  text-align: left;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 35%);
+}
+.kiosk-scan__intro-card svg {
+  flex: none;
+  width: 52px;
+  height: auto;
+}
+.kiosk-scan__intro-card p {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.kiosk-scan__intro-card small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgb(255 255 255 / 60%);
+}
+/* On the physical kiosk the driver has picked the note up: it leaves the desk. */
+.kiosk-stage:not([data-mode="mdp"]) .kiosk-paper-wrap {
+  transition:
+    opacity 0.3s,
+    transform 0.3s;
+}
+.kiosk-stage:not([data-mode="mdp"])[data-step="scan"] .kiosk-paper-wrap,
+.kiosk-stage:not([data-mode="mdp"])[data-step="verifying"] .kiosk-paper-wrap {
+  opacity: 0;
+  transform: translate(-40px, -30px) rotate(-8deg);
+  pointer-events: none;
+}
+/* Reading the document: the production kiosk's scanning page. */
+.kiosk-verifying {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding-bottom: 18cqh;
+}
+.kiosk-verifying__device {
+  display: block;
+  width: 148px;
+  height: 120px;
+  color: #000;
+}
+.kiosk-verifying__device svg {
+  width: 100%;
+  height: 100%;
+}
+.kiosk-verifying__spinner {
+  display: block;
+  width: 56px;
+  height: 56px;
+  color: var(--kk-primary);
+  animation: kiosk-spin 1s linear infinite;
+}
+.kiosk-verifying__spinner svg {
+  width: 100%;
+  height: 100%;
+  stroke-width: 2;
+}
+@keyframes kiosk-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Compact screens: the top bar floats over the feed, as the production kiosk does full-bleed. */
+@container kiosk (max-width: 600px) {
+  .kiosk-page-layout--scan .kiosk-scroll-content {
+    padding: 0;
+  }
+  .kiosk-page-layout--scan .kiosk-mobile-navigation {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+  }
+  .kiosk-page-layout--scan .kiosk-navigation--inline {
+    margin: 0;
+    border-bottom: 0;
+    background: linear-gradient(rgb(0 0 0 / 55%), transparent);
+    color: #fff;
+  }
+  .kiosk-page-layout--scan .kiosk-navigation--inline button {
+    color: #fff;
+  }
+  .kiosk-page-layout--scan .kiosk-navigation--inline button:active {
+    background: rgb(255 255 255 / 18%);
+    color: #fff;
+  }
+  .kiosk-scan__pill {
+    top: 64px;
+  }
+  .kiosk-scan__window {
+    width: min(88%, 460px);
+  }
+}
+@container kiosk (min-width: 760px) and (min-height: 560px) {
+  .kiosk-scan {
+    --doc-scale: 1.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-stage .kiosk-paper-wrap,
+  .kiosk-scan__intro {
+    transition: none;
+    animation: none;
+  }
+}
