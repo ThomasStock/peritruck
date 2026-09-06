@@ -134,7 +134,7 @@ npm run models       # Rebuild original GLB assets with installed Blender
 
 The renderer does not own physics. `State` is plain serializable data; `step` is the sole timed simulation transition. Explicit actions handle kiosk/PIN interaction. `predict` runs the same truck integrator for the visible path guide.
 
-Collision uses oriented rectangles for both tractor and trailer. A closed gate and its side fences are real obstacles. Docking checks the trailer's rear, lateral error (<0.85 m), heading (<6°), bumper gap (−0.45…1.05 m), stopped speed and a 0.7 s hold. All measurements are in metres, seconds and radians; heading zero is +Z.
+Collision uses oriented rectangles for both tractor and trailer. A closed gate and its side fences are real obstacles. Docking checks the trailer's rear, lateral error (<1.2 m), heading (<9°), bumper gap (−0.45…1.5 m), speed under 0.3 m/s and a 0.5 s hold; the window lives in `DOCK_TOLERANCE`. All measurements are in metres, seconds and radians; heading zero is +Z.
 
 ## Assets and design research
 
