@@ -223,9 +223,9 @@ export function rigRects(t: Truck): Rect[] {
   return [
     { ...offset(t, t.heading, 1.75), w: 2.5, d: 6.5, h: t.heading },
     {
-      ...offset(t, t.trailerHeading, -4.7),
+      ...offset(t, t.trailerHeading, -5.1),
       w: 2.55,
-      d: 13.6,
+      d: 12.8,
       h: t.trailerHeading,
     },
   ];

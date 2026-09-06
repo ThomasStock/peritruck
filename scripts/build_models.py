@@ -128,8 +128,9 @@ for side in [-1,1]:
     box('Mirror',(side*1.59,2.93,4.09),(.15,.5,.2),'dark',.045)
     box('Headlamp',(side*.98,1.16,4.95),(.37,.22,.08),'light',.04)
     box('Indicator',(side*1.13,1.4,4.95),(.12,.13,.08),'orange',.02)
-    box('Fuel tank',(side*1.04,.89,1.21),(.48,.64,1.55),'metal',.12)
-    box('Mudguard',(side*1.12,1.17,-.05),(.55,.13,2.14),'teal',.06)
+    # Tank between the cab step and the drive tyres: rear face at .64 clears the
+    # front tyre (radius .58 about z 0) and the front face stays behind the step.
+    box('Fuel tank',(side*1.04,.89,1.27),(.48,.64,1.26),'metal',.12)
     wheel(side*1.1,3.57,True)
     wheel(side*1.1,0)
     wheel(side*1.1,-1.23)
@@ -139,21 +140,28 @@ for i in range(3):
 text('peripass',(0,2.22,4.99),.22,'white')
 export('tractor')
 
-# 13.6 m box trailer. Hitch at 0; rear at -11.5.
-box('Trailer box',(0,2.65,-4.7),(2.55,2.7,13.6),'white',.075)
-box('Trailer chassis',(0,1.11,-4.7),(2.48,.24,13.6),'dark',.035)
-box('Roof cap',(0,4.03,-4.7),(2.61,.09,13.67),'metal',.025)
+# 12.8 m box trailer. Hitch at 0; front at 1.3, rear at -11.5.
+# The cab back sits at 1.76, so the front face keeps 0.46 m clear when straight
+# and stays outside the cab through the assisted-reverse articulation range.
+box('Trailer box',(0,2.65,-5.1),(2.55,2.7,12.8),'white',.075)
+box('Trailer chassis',(0,1.11,-5.1),(2.48,.24,12.8),'dark',.035)
+box('Roof cap',(0,4.03,-5.1),(2.61,.09,12.87),'metal',.025)
 for side in [-1,1]:
-    box('Side rail',(side*1.3,1.36,-4.7),(.055,.12,13.5),'metal')
-    box('Brand stripe',(side*1.283,1.64,-4.7),(.025,.32,13.25),'teal')
-    box('Side underrun',(side*1.1,.65,-3.2),(.1,.28,4.7),'metal',.03)
-    for z in [-10.8,-8.7,-6.6,-4.5,-2.4,-.3,1.5]:
+    box('Side rail',(side*1.3,1.36,-5.1),(.055,.12,12.7),'metal')
+    box('Brand stripe',(side*1.283,1.64,-5.1),(.025,.32,12.45),'teal')
+    # Side underrun bar: front edge at -2.25 so it stays clear of the tractor's
+    # rear tandem through the full jackknife range; rear edge at -5.55 keeps it
+    # ahead of the trailer bogie.
+    box('Side underrun',(side*1.1,.65,-3.9),(.1,.28,3.3),'metal',.03)
+    for z in [-10.8,-8.85,-6.9,-4.95,-3,-1.05,.9]:
         box('Reflector',(side*1.317,1.39,z),(.027,.06,.15),'orange')
     for z in [-9.1,-7.85,-6.6]:wheel(side*1.1,z)
-    box('Landing leg',(side*.8,.71,-1.3),(.13,.87,.18),'dark')
-    box('Landing foot',(side*.8,.24,-1.3),(.35,.06,.35),'metal')
+    # Landing gear 2.8 m behind the kingpin: any closer and the feet sweep through
+    # the tractor's drive tyres under articulation (0.44 m deep at z -1.3).
+    box('Landing leg',(side*.8,.71,-2.8),(.13,.87,.18),'dark')
+    box('Landing foot',(side*.8,.24,-2.8),(.35,.06,.35),'metal')
     # Typography placed on trailer side with Blender text facing outward.
-    t=text('peripass',(side*1.285,2.65,-4.5),.74,'teal')
+    t=text('peripass',(side*1.285,2.65,-4.9),.74,'teal')
     t.rotation_euler=(math.pi/2,0, side*math.pi/2)
 box('Rear doors',(0,2.65,-11.54),(2.42,2.53,.035),'warehouse')
 box('Door split',(0,2.65,-11.57),(.035,2.5,.04),'metal')
