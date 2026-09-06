@@ -99,6 +99,28 @@ export const offset = (p: Point, h: number, d: number): Point => ({
   z: p.z + Math.cos(h) * d,
 });
 export const rear = (t: Truck) => offset(t, t.trailerHeading, -RIG.rear);
+export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+/** Interpolate the short way round, so a heading crossing ±π does not spin.
+ * Equal inputs return the input itself, so a rig at rest keeps an exact pose. */
+export const lerpAngle = (a: number, b: number, t: number) => {
+  const turn = angle(b - a);
+  return turn === 0 ? a : angle(a + turn * t);
+};
+export const blendPoint = (a: Point, b: Point, t: number): Point => ({
+  x: lerp(a.x, b.x, t),
+  z: lerp(a.z, b.z, t),
+});
+/** Pose between two consecutive fixed steps. Renderers draw this at the display
+ * rate so motion stays continuous whatever the refresh rate; the simulation
+ * itself never sees blended values. */
+export const blendTruck = (a: Truck, b: Truck, t: number): Truck => ({
+  x: lerp(a.x, b.x, t),
+  z: lerp(a.z, b.z, t),
+  heading: lerpAngle(a.heading, b.heading, t),
+  trailerHeading: lerpAngle(a.trailerHeading, b.trailerHeading, t),
+  speed: lerp(a.speed, b.speed, t),
+  steer: lerp(a.steer, b.steer, t),
+});
 export const walking = (s: State) =>
   ["walk-kiosk", "walk-truck", "kiosk"].includes(s.phase);
 /** The check-in SMS with the gate PIN has arrived. Sessions saved before the delay existed count as delivered. */
@@ -169,23 +191,53 @@ export function corners(r: Rect): Point[] {
     })),
   );
 }
+type PreparedRect = {
+  rect: Rect;
+  points: Point[];
+  axes: Point[];
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+};
+function prepareRect(rect: Rect): PreparedRect {
+  const points = corners(rect);
+  return {
+    rect,
+    points,
+    axes: [forward(rect.h), forward(rect.h + Math.PI / 2)],
+    minX: Math.min(...points.map((p) => p.x)),
+    maxX: Math.max(...points.map((p) => p.x)),
+    minZ: Math.min(...points.map((p) => p.z)),
+    maxZ: Math.max(...points.map((p) => p.z)),
+  };
+}
+function preparedOverlap(a: PreparedRect, b: PreparedRect): boolean {
+  // Reject only geometric separation. The SAT tolerance belongs to its own axes.
+  if (a.maxX < b.minX || b.maxX < a.minX || a.maxZ < b.minZ || b.maxZ < a.minZ)
+    return false;
+  for (const axes of [a.axes, b.axes])
+    for (const axis of axes) {
+      let aMin = Infinity,
+        aMax = -Infinity,
+        bMin = Infinity,
+        bMax = -Infinity;
+      for (const p of a.points) {
+        const projection = p.x * axis.x + p.z * axis.z;
+        aMin = Math.min(aMin, projection);
+        aMax = Math.max(aMax, projection);
+      }
+      for (const p of b.points) {
+        const projection = p.x * axis.x + p.z * axis.z;
+        bMin = Math.min(bMin, projection);
+        bMax = Math.max(bMax, projection);
+      }
+      if (!(aMax > bMin + 0.005 && bMax > aMin + 0.005)) return false;
+    }
+  return true;
+}
 export function overlap(a: Rect, b: Rect): boolean {
-  const ac = corners(a),
-    bc = corners(b);
-  const axes = [
-    forward(a.h),
-    forward(a.h + Math.PI / 2),
-    forward(b.h),
-    forward(b.h + Math.PI / 2),
-  ];
-  return axes.every((axis) => {
-    const ap = ac.map((p) => p.x * axis.x + p.z * axis.z),
-      bp = bc.map((p) => p.x * axis.x + p.z * axis.z);
-    return (
-      Math.max(...ap) > Math.min(...bp) + 0.005 &&
-      Math.max(...bp) > Math.min(...ap) + 0.005
-    );
-  });
+  return preparedOverlap(prepareRect(a), prepareRect(b));
 }
 export const staticRigs: Truck[] = [
   {
@@ -213,7 +265,9 @@ const obstacle = (
   d: number,
   name: string,
 ): Rect => ({ x, z, w, d, h: 0, name });
-export function obstacles(s: State): Rect[] {
+/** The kiosk housing. The driver faces its centre while checking in. */
+export const KIOSK: Readonly<Rect> = obstacle(-33.7, 26, 1.1, 0.8, "Kiosk");
+function buildObstacles(gateOpen: boolean): Rect[] {
   return [
     obstacle(-53, 14, 2, 132, "Perimeter fence"),
     obstacle(53, 14, 2, 132, "Perimeter fence"),
@@ -221,7 +275,7 @@ export function obstacles(s: State): Rect[] {
     obstacle(0, 81, 106, 2, "Site boundary"),
     obstacle(-20.2, 12, 64, 0.4, "Security fence"),
     obstacle(38, 12, 28, 0.4, "Security fence"),
-    ...(s.gateOpen
+    ...(gateOpen
       ? []
       : [
           obstacle(
@@ -233,16 +287,52 @@ export function obstacles(s: State): Rect[] {
           ),
         ]),
     obstacle(-41, 21, 9, 5, "Reception"),
-    obstacle(-33.7, 26, 1.1, 0.8, "Kiosk"),
+    { ...KIOSK },
     obstacle(-32.5, 39, 2.6, 39, "Protected footpath"),
     ...staticRigs.flatMap((t) =>
       rigRects(t).map((r) => ({ ...r, name: "Parked truck" })),
     ),
   ];
 }
+type ObstacleSet = { all: PreparedRect[]; walking: PreparedRect[] };
+let obstacleCache: { open: ObstacleSet; closed: ObstacleSet } | undefined;
+let parkedSnapshot: Truck[] = [];
+function preparedObstacles(s: State): ObstacleSet {
+  // staticRigs is a public mutable array. Rebuild only when a shape actually changes.
+  if (
+    !obstacleCache ||
+    parkedSnapshot.length !== staticRigs.length ||
+    staticRigs.some((t, i) => {
+      const last = parkedSnapshot[i];
+      return (
+        t.x !== last.x ||
+        t.z !== last.z ||
+        t.heading !== last.heading ||
+        t.trailerHeading !== last.trailerHeading
+      );
+    })
+  ) {
+    const build = (open: boolean): ObstacleSet => {
+      const all = buildObstacles(open).map(prepareRect);
+      return {
+        all,
+        walking: all.filter((o) => o.rect.name !== "Protected footpath"),
+      };
+    };
+    obstacleCache = { open: build(true), closed: build(false) };
+    parkedSnapshot = staticRigs.map((t) => ({ ...t }));
+  }
+  return s.gateOpen ? obstacleCache.open : obstacleCache.closed;
+}
+/** Fresh copies retain the public API without exposing the prepared caches. */
+export function obstacles(s: State): Rect[] {
+  return preparedObstacles(s).all.map((o) => ({ ...o.rect }));
+}
 export function collision(s: State, t = s.truck): string | undefined {
-  const rects = rigRects(t);
-  return obstacles(s).find((o) => rects.some((r) => overlap(r, o)))?.name;
+  const rects = rigRects(t).map(prepareRect);
+  return preparedObstacles(s).all.find((o) =>
+    rects.some((r) => preparedOverlap(r, o)),
+  )?.rect.name;
 }
 export function parking(s: State) {
   const p = YARD.park;
@@ -570,12 +660,12 @@ export function step(s: State, input = idleInput(), dt = DT) {
       x: s.driver.x + (input.walkX / len) * 3 * dt,
       z: s.driver.z + (input.walkZ / len) * 3 * dt,
     };
-    const rect = { ...p, w: 0.55, d: 0.55, h: 0 };
+    const rect = prepareRect({ ...p, w: 0.55, d: 0.55, h: 0 });
     // Pedestrians can use the protected path, but cannot walk through trucks or the gate.
-    const blocked = obstacles(s)
-      .filter((o) => o.name !== "Protected footpath")
-      .concat(rigRects(s.truck));
-    if (!blocked.some((o) => overlap(rect, o))) s.driver = p;
+    const blocked =
+      preparedObstacles(s).walking.some((o) => preparedOverlap(rect, o)) ||
+      rigRects(s.truck).some((o) => preparedOverlap(rect, prepareRect(o)));
+    if (!blocked) s.driver = p;
     return;
   }
   const before = { ...s.truck };
