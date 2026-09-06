@@ -878,12 +878,6 @@ export const STRINGS = {
     fr: "Commandes",
     de: "Steuerung",
   },
-  "set.description": {
-    en: "Driving is paused. Once started, your race clock keeps running.",
-    nl: "Het rijden is gepauzeerd. Eenmaal gestart, loopt je raceklok door.",
-    fr: "La conduite est en pause. Une fois lancé, le chrono continue de tourner.",
-    de: "Das Fahren ist pausiert. Einmal gestartet, läuft deine Rennuhr weiter.",
-  },
   "set.assist": {
     en: "Trailer reverse assist",
     nl: "Achteruitrij-assistent trailer",
