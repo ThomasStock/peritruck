@@ -26,6 +26,7 @@ async function game() {
     captures.delete(this);
   };
   const require = createRequire(new URL("../src/main.ts", import.meta.url));
+  const sentFeedback: unknown[] = [];
   const context = createContext({
     window,
     document: window.document,
@@ -49,6 +50,13 @@ async function game() {
     require: (id: string) => {
       if (id.endsWith(".css")) return {};
       if (id === "./sentry") return {};
+      if (id === "./feedback")
+        return {
+          sendFeedback(feedback: unknown) {
+            sentFeedback.push(feedback);
+            return Promise.resolve();
+          },
+        };
       if (id === "./leaderboard-convex") return {};
       if (id === "./analytics")
         return {
@@ -108,7 +116,7 @@ async function game() {
   await Promise.resolve();
   const run = (code: string) => runInContext(code, context);
   run("start(); updateUI()");
-  return { dom, run, document: window.document };
+  return { dom, run, document: window.document, sentFeedback };
 }
 
 function pointer(element: Element, type: string, x: number, y: number, id = 1) {
@@ -494,6 +502,68 @@ test("stage rows show your section rank and expand one section board at a time",
     toggle(0).click();
     assert.ok([0, 1, 2, 3].every((i) => board(i).hidden));
     assert.equal(toggle(0).getAttribute("aria-expanded"), "false");
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("feedback form opens from the top bar and the results screen and sends to Sentry", async () => {
+  const { dom, run, document, sentFeedback } = await game();
+  try {
+    document.getElementById("feedback")!.click();
+    assert.match(
+      document.getElementById("dialog-title")!.textContent!,
+      /what you think/,
+    );
+    const form = document.getElementById("feedback-form") as HTMLFormElement;
+    // Bypass native `required` validation to reach the script-side guard.
+    const submit = () =>
+      form.dispatchEvent(new dom.window.Event("submit", { cancelable: true }));
+    submit();
+    await Promise.resolve();
+    assert.equal(sentFeedback.length, 0, "empty message is not sent");
+    assert.match(
+      document.getElementById("form-error")!.textContent!,
+      /few words/,
+    );
+    (document.getElementById("feedback-message") as HTMLTextAreaElement).value =
+      "Trailer clipped through the gate.";
+    (document.getElementById("feedback-email") as HTMLInputElement).value =
+      "driver@example.com";
+    submit();
+    await new Promise((r) => setTimeout(r, 0));
+    assert.deepEqual(JSON.parse(JSON.stringify(sentFeedback)), [
+      {
+        message: "Trailer clipped through the gate.",
+        email: "driver@example.com",
+        source: "topbar",
+        phase: "arrive",
+      },
+    ]);
+    assert.ok(form.classList.contains("hidden"));
+    assert.equal(
+      document.getElementById("feedback-thanks")!.classList.contains("hidden"),
+      false,
+    );
+    document.getElementById("close-dialog")!.click();
+    assert.equal(document.getElementById("modal-root")!.firstChild, null);
+
+    run(
+      'skipAhead(state); skipAhead(state); skipAhead(state); execute(state, { op: "input", seconds: 1 }); updateUI()',
+    );
+    assert.match(
+      document.getElementById("dialog-title")!.textContent!,
+      /Practice/,
+    );
+    document.getElementById("results-feedback")!.click();
+    assert.ok(document.getElementById("feedback-form"));
+    document.getElementById("feedback-cancel")!.click();
+    assert.match(
+      document.getElementById("dialog-title")!.textContent!,
+      /Practice/,
+      "closing feedback returns to the results screen",
+    );
+    assert.ok(document.getElementById("results-feedback"));
   } finally {
     dom.window.close();
   }

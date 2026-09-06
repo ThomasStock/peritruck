@@ -55,6 +55,7 @@ import { mountKiosk, type KioskController } from "./kiosk/view";
 import { mountDispatch, type DispatchController } from "./dispatch/view";
 import { clock, phoneHtml, smsBannerHtml } from "./sms";
 import { walkingJoystick } from "./walking-joystick";
+import { sendFeedback } from "./feedback";
 import { STAGES, formatTime, tickRace, type Race } from "./game/race";
 import {
   createLeaderboard,
@@ -80,6 +81,9 @@ const leaderboard = convexUrl
 const BOARD = leaderboard.shared ? "GLOBAL" : "LOCAL";
 const boardLabel = leaderboard.shared ? "global" : "local";
 let leaderboardOpen = false;
+let feedbackOpen = false,
+  feedbackSource: "topbar" | "results" = "topbar",
+  feedbackCloseTimer = 0;
 let completedRace: Race | undefined;
 let completedResult: Result | undefined;
 let savedResultId = "";
@@ -109,7 +113,7 @@ document.addEventListener(
 );
 app.innerHTML = `
 <div id="world"></div>
-<header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><button id="leaderboard-button" class="leaderboard-button" aria-label="View ${boardLabel} leaderboard">♛ <span>Leaderboard</span></button><button id="camera" class="icon-button" aria-label="Change camera view" title="Camera · C">◩</button><button id="help" class="icon-button" aria-label="Controls and settings" title="Controls · Escape">?</button></div></header>
+<header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><button id="leaderboard-button" class="leaderboard-button" aria-label="View ${boardLabel} leaderboard">♛ <span>Leaderboard</span></button><button id="feedback" class="feedback-button" title="Send feedback">Feedback</button><button id="camera" class="icon-button" aria-label="Change camera view" title="Camera · C">◩</button><button id="help" class="icon-button" aria-label="Controls and settings" title="Controls · Escape">?</button></div></header>
 <section id="intro" class="intro panel"><div class="race-kicker">PERITRUCK · TIME TRIAL</div><h1>Big truck.<br/>Quick delivery.</h1><p>Park. Check in. Open the gate. Nail the dock. How fast can you finish?</p><div class="intro-stages">${STAGES.map((stage, i) => `<span><b>0${i + 1}</b>${stage.short}</span>`).join("")}</div><button id="start" class="primary" disabled>Loading… <span>↗</span></button><small class="race-intro-note">The clock starts when your truck moves.</small><div id="intro-best" class="intro-best"></div></section>
 <section id="race-hud" class="race-hud hidden" aria-label="Time trial progress"><div class="race-clock-row"><div><span class="race-kicker" id="race-status">READY WHEN YOU ARE</span><strong id="race-clock" role="timer" aria-label="Elapsed run time">00:00.00</strong></div><div class="race-best"><span>${BOARD} BEST</span><b id="race-best">—</b></div></div><ol class="race-stages">${STAGES.map((stage, i) => `<li id="race-stage-${i}"><span class="stage-number">${i + 1}</span><span>${stage.short}</span><b id="race-split-${i}">—</b></li>`).join("")}</ol></section>
 <aside id="mission" class="mission panel hidden"><div class="eyebrow" id="step-label">01 / 04 · ARRIVAL</div><h1 id="objective-title"></h1><p id="objective-detail"></p><div class="mission-progress"><i></i><i></i><i></i><i></i></div><div class="delivery-note"><span id="note-label">YOUR DELIVERY</span><b id="delivery-reference">${BOOKING} <span>→</span> Ghent</b><small id="note-detail">Registration reference</small></div><div id="stage-hint" class="stage-hint"></div></aside>
@@ -318,6 +322,13 @@ $("help").onclick = () => {
   keys.clear();
   syncDialog();
 };
+function openFeedback(source: "topbar" | "results") {
+  feedbackOpen = true;
+  feedbackSource = source;
+  keys.clear();
+  syncDialog();
+}
+$("feedback").onclick = () => openFeedback("topbar");
 $("cli-resume").onclick = () => {
   cliPaused = false;
   accumulator = 0;
@@ -347,6 +358,8 @@ let remapping: string | null = null,
 function closeDialog() {
   settingsOpen = false;
   leaderboardOpen = false;
+  feedbackOpen = false;
+  clearTimeout(feedbackCloseTimer);
   if (state.phase === "kiosk") state.phase = "walk-kiosk";
   if (state.phase === "pin") state.phase = "gate";
   remapping = null;
@@ -483,13 +496,15 @@ function modal(title: string, body: string, cls = "") {
     ?.focus({ preventScroll: true });
 }
 function syncDialog() {
-  const kind = leaderboardOpen
-    ? "leaderboard"
-    : settingsOpen
-      ? "settings"
-      : ["kiosk", "pin", "complete"].includes(state.phase)
-        ? state.phase
-        : "";
+  const kind = feedbackOpen
+    ? "feedback"
+    : leaderboardOpen
+      ? "leaderboard"
+      : settingsOpen
+        ? "settings"
+        : ["kiosk", "pin", "complete"].includes(state.phase)
+          ? state.phase
+          : "";
   if (kind === lastDialog) return;
   lastDialog = kind;
   kiosk?.destroy();
@@ -499,7 +514,50 @@ function syncDialog() {
     modalReturnFocus?.focus();
     return;
   }
-  if (kind === "leaderboard") {
+  if (kind === "feedback") {
+    modal(
+      "Tell us what you think",
+      `<p class="dialog-description">Found a bug, got stuck, or have an idea? A few words help us make Peritruck better.</p><form id="feedback-form" class="feedback-form"><label class="field">Your feedback<textarea id="feedback-message" rows="5" maxlength="2000" placeholder="What happened, or what would you change?" required></textarea></label><label class="field"><span>Email <small>optional, if you'd like a reply</small></span><input id="feedback-email" type="email" autocomplete="email" placeholder="you@example.com" maxlength="120"/></label><div id="form-error" class="form-error" role="alert"></div><div class="dialog-buttons"><button class="primary" type="submit">Send feedback <span>↗</span></button><button type="button" id="feedback-cancel" class="text-button">Cancel</button></div></form><p id="feedback-thanks" class="feedback-thanks hidden" role="status"><b>Thanks for the feedback!</b>We read every message.</p>`,
+      "feedback-dialog",
+    );
+    $("feedback-cancel").onclick = closeDialog;
+    $("feedback-message").focus({ preventScroll: true });
+    $("feedback-form").onsubmit = async (event) => {
+      event.preventDefault();
+      const form = $("feedback-form") as HTMLFormElement,
+        error = $("form-error"),
+        button = form.querySelector("button")!;
+      const message = ($("feedback-message") as HTMLTextAreaElement).value;
+      const email = ($("feedback-email") as HTMLInputElement).value;
+      if (!message.trim()) {
+        error.textContent = "Write a few words first.";
+        return;
+      }
+      button.disabled = true;
+      error.textContent = "";
+      try {
+        await sendFeedback({
+          message,
+          email,
+          source: feedbackSource,
+          phase: state.phase,
+        });
+      } catch (e) {
+        button.disabled = false;
+        error.textContent =
+          "Could not send your feedback. Check your connection and try again.";
+        console.error(e);
+        return;
+      }
+      trackAction("feedback_sent", state, { source: feedbackSource });
+      form.classList.add("hidden");
+      $("feedback-thanks").classList.remove("hidden");
+      $("close-dialog").focus();
+      feedbackCloseTimer = window.setTimeout(() => {
+        if (feedbackOpen) closeDialog();
+      }, 1800);
+    };
+  } else if (kind === "leaderboard") {
     modal(
       "Yard legends",
       `<p class="dialog-description">${leaderboard.shared ? "Fastest deliveries worldwide." : "Fastest deliveries on this browser."} Your next run could take the top spot.</p><div id="leaderboard-list"></div><p class="local-note">${leaderboard.shared ? "Global" : "Local"} leaderboard · Top 100 · Lower is better</p><button id="back-to-yard" class="primary">Back to the yard <span>↗</span></button>`,
@@ -627,6 +685,7 @@ function syncDialog() {
       completedRace = state.race;
       completedResult = resultFromRace(state.race, state);
       openSplit = -1;
+      beep(880);
     }
     const result = completedResult!;
     const best = leaderboard.list()[0];
@@ -640,9 +699,10 @@ function syncDialog() {
         : eligible
           ? "Delivery nailed!"
           : "Practice complete!",
-      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? "↻ PRACTICE RUN" : newBest ? `★ ${BOARD} BEST` : "✓ RUN COMPLETE"}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? "Ready to try the full delivery?" : !best ? "First run on the board. Set the pace!" : newBest ? `${formatTime(best.seconds - result.seconds)} faster than the ${boardLabel} best` : `${formatTime(result.seconds - best.seconds)} off the ${boardLabel} best. Go again?`}</p><div id="result-splits"></div><div class="result-stats"><span>${result.contacts} contacts</span><span>${result.recoveries} recoveries</span><span>${result.assisted ? "Assist on" : "Classic steering"}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">Put your name on the board</label><div><input id="player-name" maxlength="24" placeholder="Your driver name" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">Save run <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? "Skipped stages make this a practice run. Complete all four stages to join the leaderboard." : saved ? "Your run is on the board." : leaderboard.shared ? "Save your run to the global board. No account needed." : "Save your run on this browser. No account needed."}</p><div class="result-board-title"><b>♛ Yard legends</b><span>${BOARD} TOP 5</span></div><div id="leaderboard-list"></div><button id="play-again" class="primary play-again">Beat your time <span>↻</span></button>`,
+      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? "↻ PRACTICE RUN" : newBest ? `★ ${BOARD} BEST` : "✓ RUN COMPLETE"}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? "Ready to try the full delivery?" : !best ? "First run on the board. Set the pace!" : newBest ? `${formatTime(best.seconds - result.seconds)} faster than the ${boardLabel} best` : `${formatTime(result.seconds - best.seconds)} off the ${boardLabel} best. Go again?`}</p><div id="result-splits"></div><div class="result-stats"><span>${result.contacts} contacts</span><span>${result.recoveries} recoveries</span><span>${result.assisted ? "Assist on" : "Classic steering"}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">Put your name on the board</label><div><input id="player-name" maxlength="24" placeholder="Your driver name" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">Save run <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? "Skipped stages make this a practice run. Complete all four stages to join the leaderboard." : saved ? "Your run is on the board." : leaderboard.shared ? "Save your run to the global board. No account needed." : "Save your run on this browser. No account needed."}</p><div class="result-board-title"><b>♛ Yard legends</b><span>${BOARD} TOP 5</span></div><div id="leaderboard-list"></div><button id="play-again" class="primary play-again">Beat your time <span>↻</span></button><button id="results-feedback" class="secondary results-feedback">✎ Something off? Send feedback</button>`,
       "complete-dialog race-results",
     );
+    $("results-feedback").onclick = () => openFeedback("results");
     $("close-dialog").classList.add("hidden");
     renderLeaderboard(result.id, 5);
     renderSplits();
@@ -697,7 +757,6 @@ function syncDialog() {
       syncDialog();
       start();
     };
-    beep(880);
   }
 }
 function refreshBest() {

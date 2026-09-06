@@ -2228,3 +2228,68 @@ body.operator .race-hud {
     display: none;
   }
 }
+
+/* Feedback: top-bar pencil and results-screen button both open one short form
+   that lands in Sentry User Feedback. */
+.feedback-button {
+  border: 1px solid #8da59977;
+  border-radius: 24px;
+  background: #f5faf5ee;
+  color: var(--ink);
+  padding: 9px 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+@media (max-width: 600px), (max-height: 510px) and (orientation: landscape) {
+  .feedback-button {
+    padding: 8px 11px;
+    font-size: 13px;
+  }
+}
+.feedback-dialog {
+  width: min(460px, 100%);
+}
+.feedback-form .field small {
+  font-weight: 500;
+  color: #759180;
+  margin-left: 4px;
+}
+.feedback-form textarea {
+  border: 1px solid #c6d6c8;
+  background: #fffefb;
+  color: #224932;
+  border-radius: 7px;
+  padding: 13px 12px;
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.feedback-form textarea:focus,
+.feedback-form input:focus {
+  outline: 2px solid #8fd66a;
+  outline-offset: 1px;
+}
+.feedback-thanks {
+  display: grid;
+  gap: 6px;
+  padding: 26px 18px;
+  border-radius: 12px;
+  background: #e8f7d8;
+  color: #255e37;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.feedback-thanks b {
+  font-size: 18px;
+}
+.results-feedback {
+  width: 100%;
+  margin-top: 10px;
+  padding: 13px;
+  font-size: 13px;
+}
