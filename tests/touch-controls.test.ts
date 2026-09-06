@@ -599,7 +599,7 @@ test("the language control switches every layer of copy and persists the choice"
   assert.equal(html.lang, "nl");
   assert.equal(
     document.querySelector("#intro h1")!.textContent,
-    "Grote truck.Snelle levering.",
+    "Snelste truckop het terrein.",
   );
   assert.equal(
     document.getElementById("objective-title")!.textContent,
