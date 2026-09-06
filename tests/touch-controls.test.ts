@@ -50,6 +50,14 @@ async function game() {
       if (id.endsWith(".css")) return {};
       if (id === "./sentry") return {};
       if (id === "./leaderboard-convex") return {};
+      if (id === "./analytics")
+        return {
+          identifyBest() {},
+          initAnalytics() {},
+          observe() {},
+          setControls() {},
+          trackAction() {},
+        };
       if (id === "./kiosk/view")
         return { mountKiosk: () => ({ destroy() {} }) };
       if (id === "./scene")
