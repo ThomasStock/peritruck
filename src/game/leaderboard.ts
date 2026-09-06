@@ -108,3 +108,27 @@ export function resultFromRace(
     date: new Date().toISOString(),
   };
 }
+/** Seconds spent in one timed section; splits are cumulative. Undefined once a run stops short. */
+export function sectionSeconds(result: Pick<Result, "splits">, stage: number) {
+  const end = result.splits[stage];
+  return end === undefined ? undefined : end - (result.splits[stage - 1] ?? 0);
+}
+export type SectionEntry = { result: Result; seconds: number; rank: number };
+/** Runs ordered by one section's time, fastest first; `own` joins the board until it is saved. */
+export function sectionBoard(
+  rows: Result[],
+  stage: number,
+  own?: Result,
+): SectionEntry[] {
+  const all = own && !rows.some((r) => r.id === own.id) ? [...rows, own] : rows;
+  return all
+    .flatMap((result) => {
+      const seconds = sectionSeconds(result, stage);
+      return seconds === undefined ? [] : [{ result, seconds }];
+    })
+    .sort(
+      (a, b) =>
+        a.seconds - b.seconds || a.result.date.localeCompare(b.result.date),
+    )
+    .map((entry, i) => ({ ...entry, rank: i + 1 }));
+}

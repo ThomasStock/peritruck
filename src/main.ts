@@ -54,6 +54,8 @@ import {
   createLeaderboard,
   resultFromRace,
   cleanName,
+  sectionBoard,
+  sectionSeconds,
   type Result,
 } from "./game/leaderboard";
 import { createConvexLeaderboard } from "./leaderboard-convex";
@@ -75,6 +77,7 @@ let leaderboardOpen = false;
 let completedRace: Race | undefined;
 let completedResult: Result | undefined;
 let savedResultId = "";
+let openSplit = -1;
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const isEditable = (target: EventTarget | null) =>
   target instanceof Element &&
@@ -612,6 +615,7 @@ function syncDialog() {
     if (completedRace !== state.race) {
       completedRace = state.race;
       completedResult = resultFromRace(state.race, state);
+      openSplit = -1;
     }
     const result = completedResult!;
     const best = leaderboard.list()[0];
@@ -625,11 +629,12 @@ function syncDialog() {
         : eligible
           ? "Delivery nailed!"
           : "Practice complete!",
-      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? "↻ PRACTICE RUN" : newBest ? `★ ${BOARD} BEST` : "✓ RUN COMPLETE"}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? "Ready to try the full delivery?" : !best ? "First run on the board. Set the pace!" : newBest ? `${formatTime(best.seconds - result.seconds)} faster than the ${boardLabel} best` : `${formatTime(result.seconds - best.seconds)} off the ${boardLabel} best. Go again?`}</p><ol class="result-splits">${STAGES.map((stage, i) => `<li><span class="stage-number">✓</span><span>${stage.name}</span><b>${result.splits[i] === undefined ? "—" : formatTime(result.splits[i] - (result.splits[i - 1] ?? 0))}</b></li>`).join("")}</ol><div class="result-stats"><span>${result.contacts} contacts</span><span>${result.recoveries} recoveries</span><span>${result.assisted ? "Assist on" : "Classic steering"}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">Put your name on the board</label><div><input id="player-name" maxlength="24" placeholder="Your driver name" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">Save run <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? "Skipped stages make this a practice run. Complete all four stages to join the leaderboard." : saved ? "Your run is on the board." : leaderboard.shared ? "Save your run to the global board. No account needed." : "Save your run on this browser. No account needed."}</p><div class="result-board-title"><b>♛ Yard legends</b><span>${BOARD} TOP 5</span></div><div id="leaderboard-list"></div><button id="play-again" class="primary play-again">Beat your time <span>↻</span></button>`,
+      `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? "↻ PRACTICE RUN" : newBest ? `★ ${BOARD} BEST` : "✓ RUN COMPLETE"}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? "Ready to try the full delivery?" : !best ? "First run on the board. Set the pace!" : newBest ? `${formatTime(best.seconds - result.seconds)} faster than the ${boardLabel} best` : `${formatTime(result.seconds - best.seconds)} off the ${boardLabel} best. Go again?`}</p><div id="result-splits"></div><div class="result-stats"><span>${result.contacts} contacts</span><span>${result.recoveries} recoveries</span><span>${result.assisted ? "Assist on" : "Classic steering"}</span></div><form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">Put your name on the board</label><div><input id="player-name" maxlength="24" placeholder="Your driver name" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">Save run <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? "Skipped stages make this a practice run. Complete all four stages to join the leaderboard." : saved ? "Your run is on the board." : leaderboard.shared ? "Save your run to the global board. No account needed." : "Save your run on this browser. No account needed."}</p><div class="result-board-title"><b>♛ Yard legends</b><span>${BOARD} TOP 5</span></div><div id="leaderboard-list"></div><button id="play-again" class="primary play-again">Beat your time <span>↻</span></button>`,
       "complete-dialog race-results",
     );
     $("close-dialog").classList.add("hidden");
     renderLeaderboard(result.id, 5);
+    renderSplits();
     $("score-form").onsubmit = async (event) => {
       event.preventDefault();
       if (!eligible || savedResultId === result.id) return;
@@ -668,6 +673,7 @@ function syncDialog() {
       }
       if (document.getElementById("leaderboard-list"))
         renderLeaderboard(result.id, 5);
+      renderSplits();
       refreshBest();
       document.getElementById("play-again")?.focus();
     };
@@ -726,9 +732,113 @@ function renderLeaderboard(highlight = "", limit = 100) {
   }
   root.append(ol);
 }
+/** Stage rows on the results screen: your section rank at a glance, tap for that section's board. */
+function renderSplits() {
+  const result = completedResult;
+  const root = document.getElementById("result-splits");
+  if (!result || !root) return;
+  const eligible =
+    !completedRace?.practice && result.splits.length === STAGES.length;
+  const rows = leaderboard.list();
+  const ol = document.createElement("ol");
+  ol.className = "result-splits";
+  STAGES.forEach((stage, i) => {
+    const board = sectionBoard(rows, i, eligible ? result : undefined);
+    const own = board.find((entry) => entry.result.id === result.id);
+    const seconds = sectionSeconds(result, i);
+    const open = openSplit === i;
+    const label = `${stage.short.toLowerCase()} times`;
+    const li = document.createElement("li");
+    li.classList.toggle("split-open", open);
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "split-toggle";
+    toggle.id = `split-toggle-${i}`;
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.setAttribute("aria-controls", `split-board-${i}`);
+    // Rank only means something once there is someone to compare with.
+    const ranked = own && board.length > 1 ? own : undefined;
+    const time = seconds === undefined ? "—" : formatTime(seconds);
+    const rank = ranked
+      ? `<span class="${["split-rank", ranked.rank === 1 ? "rank-first" : ranked.rank <= 3 ? "rank-podium" : ""].join(" ").trim()}">#${ranked.rank}</span>`
+      : "";
+    toggle.innerHTML = `<span class="stage-number">✓</span><span class="split-name">${stage.name}</span>${rank}<b>${time}</b><span class="split-chevron" aria-hidden="true"></span>`;
+    toggle.setAttribute(
+      "aria-label",
+      `${stage.name}: ${time}${ranked ? `, ranked ${ranked.rank} of ${board.length}` : ""}`,
+    );
+    toggle.onclick = () => {
+      openSplit = open ? -1 : i;
+      if (!open)
+        trackAction("section_board_opened", state, {
+          stage: stage.short,
+          rank: own?.rank ?? null,
+          entries: board.length,
+        });
+      renderSplits();
+      $(`split-toggle-${i}`).focus({ preventScroll: true });
+      if (!open)
+        document.getElementById(`split-board-${i}`)?.scrollIntoView?.({
+          block: "nearest",
+          behavior: reducedMotion ? "auto" : "smooth",
+        });
+    };
+    const panel = document.createElement("div");
+    panel.className = "split-board";
+    panel.id = `split-board-${i}`;
+    panel.setAttribute("role", "region");
+    panel.setAttribute("aria-label", `Fastest ${label}`);
+    panel.hidden = !open;
+    if (open) {
+      const title = document.createElement("div");
+      title.className = "split-board-title";
+      title.innerHTML = `<b>Fastest ${label}</b><span>${BOARD} TOP 5</span>`;
+      panel.append(title);
+      if (!board.length) {
+        const empty = document.createElement("p");
+        empty.className = "split-board-empty";
+        empty.textContent = `No ${label} on the board yet.`;
+        panel.append(empty);
+      } else {
+        const list = document.createElement("ol");
+        list.className = "leaderboard-rows";
+        const visible = board.slice(0, 5);
+        if (own && !visible.includes(own)) visible.push(own);
+        const best = board[0].seconds;
+        for (const entry of visible) {
+          const row = document.createElement("li");
+          row.classList.toggle("your-result", entry === own);
+          const position = document.createElement("span");
+          position.className = "leaderboard-rank";
+          position.textContent =
+            entry.rank === 1 ? "♛" : String(entry.rank).padStart(2, "0");
+          const name = document.createElement("span");
+          name.className = "leaderboard-name";
+          name.textContent = entry.result.name || "You";
+          const meta = document.createElement("small");
+          meta.textContent = `${entry.rank === 1 ? "Section best" : `+${formatTime(entry.seconds - best)}`}${entry === own && entry.result.name ? " · You" : ""}`;
+          name.append(meta);
+          const time = document.createElement("b");
+          time.textContent = formatTime(entry.seconds);
+          row.append(position, name, time);
+          list.append(row);
+        }
+        panel.append(list);
+      }
+    }
+    li.append(toggle, panel);
+    ol.append(li);
+  });
+  // Live board updates re-render the rows; keep keyboard focus on the same stage.
+  const focused = document.activeElement?.id ?? "";
+  root.replaceChildren(ol);
+  if (focused.startsWith("split-toggle-"))
+    document.getElementById(focused)?.focus({ preventScroll: true });
+}
 refreshBest();
 function refreshBoard() {
   refreshBest();
+  renderSplits();
   if (document.getElementById("leaderboard-list"))
     renderLeaderboard(
       completedResult?.id,
