@@ -30,6 +30,28 @@ import {
 } from "./game/simulation";
 import { execute } from "./game/commands";
 const app = document.querySelector<HTMLDivElement>("#app")!;
+const isEditable = (target: EventTarget | null) =>
+  target instanceof Element &&
+  !!target.closest('input,textarea,[contenteditable="true"]');
+for (const type of ["selectstart", "contextmenu", "dblclick"]) {
+  app.addEventListener(type, (event) => {
+    if (!isEditable(event.target)) event.preventDefault();
+  });
+}
+app.addEventListener("dragstart", (event) => event.preventDefault());
+// Safari trackpad gestures and Ctrl+wheel can bypass touch-action.
+for (const type of ["gesturestart", "gesturechange"]) {
+  document.addEventListener(type, (event) => event.preventDefault(), {
+    passive: false,
+  });
+}
+document.addEventListener(
+  "wheel",
+  (event) => {
+    if (event.ctrlKey) event.preventDefault();
+  },
+  { passive: false },
+);
 app.innerHTML = `
 <div id="world"></div>
 <header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><button id="camera" class="icon-button" aria-label="Change camera view" title="Camera · C">◩</button><button id="help" class="icon-button" aria-label="Controls and settings" title="Controls · Escape">?</button></div></header>
@@ -250,8 +272,7 @@ function closeDialog() {
   if (state.phase === "kiosk") state.phase = "walk-kiosk";
   if (state.phase === "pin") state.phase = "gate";
   remapping = null;
-  keys.clear();
-  touch.clear();
+  clearInput();
   syncDialog();
 }
 window.addEventListener("keydown", (e) => {
@@ -329,6 +350,9 @@ window.addEventListener("keyup", (e) => keys.delete(e.key.toLowerCase()));
 const clearInput = () => {
   keys.clear();
   touch.clear();
+  document.querySelectorAll("[data-touch].pressed").forEach((button) => {
+    button.classList.remove("pressed");
+  });
 };
 window.addEventListener("blur", clearInput);
 document.addEventListener("visibilitychange", () => {
@@ -341,8 +365,7 @@ function modal(title: string, body: string, cls = "") {
   $("modal-root").innerHTML =
     `<div class="modal-scrim"><section class="dialog ${cls}" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><button class="dialog-close" id="close-dialog" aria-label="Close dialog">×</button><div class="eyebrow">PERIPASS</div><h2 id="dialog-title">${title}</h2>${body}</section></div>`;
   $("close-dialog").onclick = closeDialog;
-  keys.clear();
-  touch.clear();
+  clearInput();
   requestAnimationFrame(() =>
     $("modal-root")
       .querySelector<HTMLElement>("[autofocus],.primary,input,button")
