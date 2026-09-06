@@ -51,6 +51,55 @@ Tests additionally compare 6,000 random rectangle pairs in both directions, graz
 
 Raw evidence: `artifacts/performance/step3-before.json`, `step3-after.json`, corresponding logs and `reference-simulation.ts` (extracted from `77a053d`).
 
+## 4. Frame pacing in the running app
+
+The three profiles above time CPU submission in an isolated fixture. They cannot see what the player sees: how the rendered pose advances from one displayed frame to the next. `scripts/profile-frames.mjs` drives the real app through its own keyboard controls and records, per frame, the rAF interval, JS time inside the frame callback, WebGL draw calls, HUD DOM writes, and the pose handed to `YardScene.render`. With `HEADED=1` the window follows the display's refresh rate; headless Chrome paces at 60 Hz.
+
+**Cause.** The simulation advances in fixed 1/60 s steps from an accumulator, and the renderer drew the raw state. On a 120 Hz display every other frame ran zero steps, so the truck and driver moved on half the frames while the damped camera moved on all of them. At 60 Hz, timestamp jitter around the step length produced irregular frames with zero or two steps. That is the stutter.
+
+**Changes** (commit `f4f8bce`):
+
+- Render a pose blended between the last two simulation poses by the accumulator's remainder (`blendTruck`, `blendPoint`). The simulation never sees blended values; the prediction cache keys on the blended pose and still hits while stationary because equal inputs return exact values. Recoveries, skips and restarts snap instead of sliding (0.5 m or 0.35 rad guard).
+- Bake the three parked rigs into one mesh per material (`mergeByMaterial`): 13 draw calls per pass instead of 111. Gate arms: 2 instead of 12. Geometry, materials and world-space bounds are asserted equal in `tests/scene.test.ts`.
+- Drop `preserveDrawingBuffer`; screenshots already render synchronously before `toDataURL`.
+- Keep one instanced mesh, two circle geometries and one material for the route across phases (`RouteDots`). Disposing them per phase released the shader program, which the renderer recompiled at the next phase change. All shaders compile during `load()` with `compileAsync`.
+- Write HUD text, styles and the minimap only when the shown value changes; read the gamepad once per frame; face the kiosk from a constant instead of copying the obstacle list every frame.
+
+**Rendered motion, 120 Hz display** (headed, 1440 × 900 CSS px, DPR 2, runs 3 and 4 identical to the shown precision). "Frozen" frames show no movement while the actor is under way; "double" frames move more than 1.75× the mean rendered speed of the surrounding quarter second.
+
+| Scenario        | Frozen frames before → after | Double frames before → after |
+| --------------- | ---------------------------: | ---------------------------: |
+| Drive forward   |                 50.1% → 0.0% |                 49.9% → 0.0% |
+| Drive and steer |                 50.7% → 0.7% |                 44.5% → 1.4% |
+| Walking         |                 52.5% → 4.0% |                 47.5% → 0.9% |
+
+The residual frozen frames in the steering and walking scenarios are the truck stopping against an obstacle and the driver reaching the truck; both versions show them at 60 Hz too (walking 5.4% → 4.5% headless).
+
+**Per-frame work** (same runs):
+
+| Measure                                                   | Before | After |
+| --------------------------------------------------------- | -----: | ----: |
+| WebGL draw calls per frame, colour + shadow pass, driving |    325 |   170 |
+| Same, whole-yard view                                     |    375 |   173 |
+| HUD `textContent` writes per 80 ms UI tick, at rest       |     20 |     0 |
+| Same, driving                                             |     20 |   2–3 |
+| Minimap canvas operations per tick, at rest               |     14 |     0 |
+| `Layout` events per second while driving (trace)          |     12 |     7 |
+| `Paint` events per second while driving (trace)           |     51 |    17 |
+
+Fixture (`scripts/profile-performance.mjs`, colour pass only, same method as sections 1–3): gate 188 → 87 draw calls, walk to kiosk 201 → 100, complete 183 → 82; median submission 0.5 → 0.3 ms at the gate. Gate, walk-to-kiosk and dock screenshots differ from the stage 2 captures at 0.34% of pixels (mean channel difference 14), consistent with the 1 m near plane merged from `main` and edge sampling; the merged rigs render in place.
+
+**Frame rate.** After the change all four headed runs held 120 fps in every in-game scenario with a p95 frame interval of 9.3 ms or less. Two baseline runs did the same; the other two ran at 86–111 fps with intervals up to 73 ms. The frame-rate difference is therefore not established on this machine; the continuity difference is, and the draw-call and DOM-write reductions are deterministic.
+
+Reproduce, with the dev server on port 5173:
+
+```sh
+HEADED=1 node scripts/profile-frames.mjs current-frames
+node scripts/profile-frames.mjs current-frames-headless
+```
+
+Results land in `artifacts/performance/<label>.json` with a Chrome trace and CPU profile of the driving window.
+
 ## Environment and interpretation
 
 Browser profiles: Chrome `152.0.7977.83`, macOS arm64, Apple M4, ANGLE Metal renderer on Apple M4; 1280 × 800, DPR 1. Isolated same-origin development fixture loads the normal assets and `YardScene` without the app animation loop. Fixed yard camera, reduced motion, 30 warmup frames, then five batches of 30 frames. Moving prediction fixtures advance the truck at fixed `DT` outside the timed render interval.
@@ -84,6 +133,6 @@ The commands above profile the current code with fresh labels, preserving the or
 
 Validation: baseline 23 tests passed; stage 1 25; stage 2 27; stage 3 30. All stages passed TypeScript/Vite production builds and changed-file Prettier checks. The existing Vite warning about a chunk over 500 kB remains. Locked dependency installation reported zero vulnerabilities.
 
-Maintenance: new trajectory physics dependencies must join the prediction key. New dynamic obstacles must participate in shape-cache invalidation. Rendering bounds must refresh whenever trajectory or instance positions change.
+Maintenance: new trajectory physics dependencies must join the prediction key. New dynamic obstacles must participate in shape-cache invalidation. Rendering bounds must refresh whenever trajectory or instance positions change. Anything that moves at runtime must not be merged with `mergeByMaterial`; anything a phase change hides must stay allocated, or its shader program is released and recompiled.
 
 PR preparation integrated `main` at `aee2d90`, preserving its newer kiosk, SMS and session behavior. The combined branch passes 34 tests, the production build, formatting and diff checks. The frozen-reference collision/walking benchmark also passes again (`artifacts/performance/pr-validation.json`). The paired measurements above remain the original sequential profiles, before this integration.
