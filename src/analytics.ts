@@ -151,7 +151,8 @@ export function trackAction(
     | "leaderboard_opened"
     | "section_board_opened"
     | "score_saved"
-    | "visitor_dispatched",
+    | "visitor_dispatched"
+    | "feedback_sent",
   s: State,
   props: Record<string, unknown> = {},
 ) {
