@@ -200,7 +200,7 @@ text('DISTRIBUTION  /  01',(-27,7.4,-44.76),.68,'dark')
 for i,x in enumerate([-42,-24,-6]):
     for dx in [-3,3]:box('Parking white line',(x+dx,.044,44),(.15,.014,23),'paint')
     box('Parking back line',(x,.044,55.5),(6,.014,.15),'paint')
-    text('P0'+str(i+1),(x,.06,48),1.05,'paint',(-math.pi/2,0,0))
+    text('P0'+str(i+1),(x,.06,48),1.05,'paint',(0,0,0))
 # Road dashed centre lines and arrows
 for z in range(22,76,5):box('Lane divider',(8,.043,z),(.12,.01,2.3),'paint')
 for z in [25,45,65]:
@@ -208,7 +208,7 @@ for z in [25,45,65]:
     for side in [-1,1]:
         o=box('Arrow chevron',(18+side*.38,.045,z-1),(.17,.014,1.05),'paint');o.rotation_euler[2]=side*.75
 box('Stop line',(18,.048,19),(10,.02,.35),'paint')
-text('STOP',(18,.06,21.4),1.3,'paint',(-math.pi/2,0,0))
+text('STOP',(18,.06,21.4),1.3,'paint',(0,0,0))
 # Safe walkway & crossing
 box('Pedestrian path',(-32.5,.075,39),(3,.18,40),'concrete',.1)
 for z in range(21,59,3):box('Walkway edge',(-30.92,.18,z),(.13,.025,1.4),'yellow')
