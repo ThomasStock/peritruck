@@ -156,8 +156,10 @@ for side in [-1,1]:
     for z in [-10.8,-8.85,-6.9,-4.95,-3,-1.05,.9]:
         box('Reflector',(side*1.317,1.39,z),(.027,.06,.15),'orange')
     for z in [-9.1,-7.85,-6.6]:wheel(side*1.1,z)
-    box('Landing leg',(side*.8,.71,-1.3),(.13,.87,.18),'dark')
-    box('Landing foot',(side*.8,.24,-1.3),(.35,.06,.35),'metal')
+    # Landing gear 2.8 m behind the kingpin: any closer and the feet sweep through
+    # the tractor's drive tyres under articulation (0.44 m deep at z -1.3).
+    box('Landing leg',(side*.8,.71,-2.8),(.13,.87,.18),'dark')
+    box('Landing foot',(side*.8,.24,-2.8),(.35,.06,.35),'metal')
     # Typography placed on trailer side with Blender text facing outward.
     t=text('peripass',(side*1.285,2.65,-4.9),.74,'teal')
     t.rotation_euler=(math.pi/2,0, side*math.pi/2)
