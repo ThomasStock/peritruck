@@ -882,6 +882,13 @@ kbd {
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  position: relative;
+}
+/* Invisible hit slop: taps landing in the gaps or just outside a button still register. */
+.touch-group button::before {
+  content: "";
+  position: absolute;
+  inset: -14px -4px;
 }
 .touch-group button.pressed {
   background: #c6f389;
@@ -1102,19 +1109,22 @@ kbd {
     gap: 6px;
   }
   .touch-group button {
-    width: 50px;
-    height: 54px;
-    border-radius: 13px;
-    font-size: 20px;
+    width: 64px;
+    height: 68px;
+    border-radius: 14px;
+    font-size: 24px;
   }
   .touch-group.pedals button {
-    width: 48px;
-    height: 66px;
+    width: 58px;
+    height: 78px;
   }
   .touch-group.pedals button[data-touch="brake"] {
-    width: 40px;
-    height: 46px;
-    font-size: 14px;
+    width: 48px;
+    height: 58px;
+    font-size: 16px;
+  }
+  .touch-group button small {
+    font-size: 8px;
   }
   .telemetry {
     width: auto;
@@ -1257,16 +1267,16 @@ kbd {
   }
   .telemetry {
     right: 12px;
-    bottom: 90px;
+    bottom: 104px;
   }
   .dock-guide {
     top: auto;
-    bottom: 90px;
+    bottom: 104px;
     left: 12px;
     right: auto;
   }
   .action-wrap {
-    bottom: 90px;
+    bottom: 104px;
     left: 12px;
     transform: none;
     max-width: calc(100vw - 150px);
@@ -1326,7 +1336,7 @@ kbd {
   }
   .telemetry {
     right: 12px;
-    bottom: 86px;
+    bottom: 100px;
   }
   .dock-guide {
     top: 56px;
@@ -1336,7 +1346,7 @@ kbd {
     width: 170px;
   }
   .action-wrap {
-    bottom: 86px;
+    bottom: 100px;
     left: 50%;
     transform: translateX(-50%);
     max-width: calc(100vw - 300px);
