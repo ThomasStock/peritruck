@@ -57,13 +57,13 @@ The chosen dock is real: its number panel lights up teal and its lamp turns gree
 
 On desktop the phone is a handset beside the 3D view; on phone-sized viewports the app fills the screen. The screens are laid out at a phone's 390 logical pixels and zoomed. The flow is a pure step machine in `src/dispatch/flow.ts`, covered by `tests/dispatch.test.ts`; the simulation holds a `dispatch` phase in which the driver waits, and the CLI `dispatch --dock N` command performs the same call-off. Hold X during the operator's turn to skip it.
 
-## Time trial and local leaderboard
+## Time trial and leaderboard
 
 Finish the delivery as fast as possible. The race starts on the truck’s first actual movement, with four timed sections: parking in P02 and stepping out, completing kiosk check-in, opening the gate (including the yard operator's call-off), and parking at your dock. Each section includes travel from the preceding milestone.
 
-The browser uses real elapsed time, including kiosk/PIN entry, settings, and hidden-tab time. Recovery preserves the clock and splits. The existing hold-X playtest shortcut marks the run as practice; skipped runs cannot enter the leaderboard. The final docking hold stops the clock. The results screen shows total time, stage durations, contacts, recoveries and steering mode; enter a driver name to save the run, or immediately race again.
+The browser uses real elapsed time, including kiosk/PIN entry, settings, and hidden-tab time. Recovery preserves the clock and splits. The existing hold-X playtest shortcut marks the run as practice; skipped runs cannot enter the leaderboard. The final docking hold stops the clock. The results screen shows total time, stage durations, contacts, recoveries and steering mode; enter a driver name to save the run, or immediately race again. Each stage row carries your rank for that section (shown once another run is on the board) and expands to that section's fastest five times, so a slow stage stands out without cluttering the summary. Section boards are derived client-side from the fastest 100 runs by total time, with an unsaved run seated provisionally.
 
-The leaderboard keeps the fastest 100 runs in this browser’s local storage (`peritruck-leaderboard-v1`), ranked by total time. It is shared across visits on the same browser/origin, not across devices. Blocked/full storage falls back to this visit only and explains that after saving. `src/game/leaderboard.ts` owns the storage adapter so a future backend can replace it. CLI runs use deterministic simulation steps for race timing, including explicit waits at the kiosk/gate; live CLI control suspends the browser clock while commands advance it.
+The leaderboard is backed by [Convex](https://convex.dev) when `VITE_CONVEX_URL` is set: `convex/schema.ts` defines the `results` table, `convex/leaderboard.ts` exposes the `top` query and `save` mutation (server-side validation, one row per run, rank computed on save), and `src/leaderboard-convex.ts` subscribes so every open client updates live. Without that variable (tests, offline dev) `src/game/leaderboard.ts` falls back to the fastest 100 runs in this browser’s local storage (`peritruck-leaderboard-v1`). Run `npm run convex` (`npx convex dev`) alongside `npm run dev` to push functions and write `.env.local`. Vercel builds with `npm run build:vercel` (`convex deploy --cmd 'npm run build'`), which needs `CONVEX_DEPLOY_KEY` in the project environment. CLI runs use deterministic simulation steps for race timing, including explicit waits at the kiosk/gate; live CLI control suspends the browser clock while commands advance it.
 
 ## Drive from the CLI
 
@@ -143,7 +143,7 @@ npm run models       # Rebuild original GLB assets with installed Blender
 
 The renderer does not own physics. `State` is plain serializable data; `step` is the sole timed simulation transition. Explicit actions handle kiosk, call-off and PIN interaction. `predict` runs the same truck integrator for the visible path guide. The camera cut between the driver and the yard operator is presentation in `src/scene.ts`; the simulation only knows the `dispatch` phase.
 
-Collision uses oriented rectangles for both tractor and trailer. A closed gate and its side fences are real obstacles. Docking checks the trailer's rear against the assigned dock, lateral error (<0.85 m), heading (<6°), bumper gap (−0.45…1.05 m), stopped speed and a 0.7 s hold. All measurements are in metres, seconds and radians; heading zero is +Z.
+Collision uses oriented rectangles for both tractor and trailer. A closed gate and its side fences are real obstacles. Docking checks the trailer's rear against the assigned dock, lateral error (<1.2 m), heading (<9°), bumper gap (−0.45…1.5 m), speed under 0.3 m/s and a 0.5 s hold; the window lives in `DOCK_TOLERANCE`. All measurements are in metres, seconds and radians; heading zero is +Z.
 
 ## Assets and design research
 

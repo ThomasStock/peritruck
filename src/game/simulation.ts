@@ -98,7 +98,17 @@ export const dockPoint = (s: State): Point => ({
   z: YARD.dock.z,
 });
 /** Speeds (m/s) below which a driving step can complete. */
-export const STOP_SPEED = { park: 0.18, gate: 0.3, dock: 0.18 };
+export const STOP_SPEED = { park: 0.18, gate: 0.3, dock: 0.3 };
+/** Docking acceptance window for the trailer rear: metres, radians and seconds.
+ * The dock 03 apron marking is 5 m wide, so a 2.55 m trailer offset by up to
+ * 1.2 m still sits inside the marking. */
+export const DOCK_TOLERANCE = {
+  lateral: 1.2,
+  gapMin: -0.45,
+  gapMax: 1.5,
+  heading: 0.16,
+  hold: 0.5,
+};
 /** Radius (m) around a driving target inside which excess speed warns the driver. */
 export const SLOW_ZONE = 4;
 /** Seconds between the dock assignment and the gate PIN landing on the driver's phone. */
@@ -396,10 +406,10 @@ export function docking(s: State) {
     headingError,
     angleDegrees: (headingError * 180) / Math.PI,
     ready:
-      lateral < 0.85 &&
-      gap > -0.45 &&
-      gap < 1.05 &&
-      headingError < 0.105 &&
+      lateral < DOCK_TOLERANCE.lateral &&
+      gap > DOCK_TOLERANCE.gapMin &&
+      gap < DOCK_TOLERANCE.gapMax &&
+      headingError < DOCK_TOLERANCE.heading &&
       Math.abs(s.truck.speed) < STOP_SPEED.dock,
   };
 }
@@ -810,7 +820,7 @@ export function step(s: State, input = idleInput(), dt = DT, timed = true) {
   }
   if (s.phase === "dock") {
     s.dockHold = docking(s).ready ? s.dockHold + dt : 0;
-    if (s.dockHold > 0.7) {
+    if (s.dockHold > DOCK_TOLERANCE.hold) {
       s.phase = "complete";
       finishStage(s.race, 3);
       s.race.finished = true;

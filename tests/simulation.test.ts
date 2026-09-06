@@ -148,10 +148,21 @@ test("dock success requires rear-first alignment, lateral position and stationar
     steer: 0,
   };
   assert.ok(docking(s).ready);
-  advance(s, idleInput(), 0.5);
+  advance(s, idleInput(), 0.3);
   assert.equal(s.phase, "dock");
   advance(s, idleInput(), 0.3);
   assert.equal(s.phase, "complete");
+  // Inside the loosened window: 1 m off centre, 8° skewed, 1.3 m from the bumper.
+  const loose = createState();
+  loose.phase = "dock";
+  loose.truck = {
+    ...s.truck,
+    x: 1,
+    z: -44 + 11.5 + 1.3,
+    heading: 0.14,
+    trailerHeading: 0.14,
+  };
+  assert.ok(docking(loose).ready);
   const wrong = createState();
   wrong.phase = "dock";
   wrong.truck = { ...s.truck, heading: Math.PI, trailerHeading: Math.PI };

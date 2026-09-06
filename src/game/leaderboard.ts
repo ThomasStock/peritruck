@@ -20,7 +20,15 @@ export const cleanName = (name: string) =>
     .trim()
     .replace(/\s+/g, " ")
     .slice(0, 24);
-function valid(value: unknown): value is Result {
+export type Leaderboard = {
+  /** True when runs are shared across devices, false for this browser only. */
+  shared: boolean;
+  readonly available: boolean;
+  list(): Result[];
+  onChange(listener: () => void): () => void;
+  save(result: Result): Promise<{ rank: number; persisted: boolean }>;
+};
+export function validResult(value: unknown): value is Result {
   if (!value || typeof value !== "object") return false;
   const r = value as Result;
   return (
@@ -44,14 +52,14 @@ function valid(value: unknown): value is Result {
 const ranked = (rows: Result[]) =>
   rows.sort((a, b) => a.seconds - b.seconds || a.date.localeCompare(b.date));
 
-/** Replace this small repository with an API when a shared backend is ready. */
-export function createLeaderboard(getStorage: () => Storage) {
+/** Browser-local fallback used when no Convex URL is configured. */
+export function createLeaderboard(getStorage: () => Storage): Leaderboard {
   let memory: Result[] = [];
   let available = true;
   function list() {
     try {
       const parsed: unknown = JSON.parse(getStorage().getItem(KEY) ?? "[]");
-      const rows = Array.isArray(parsed) ? parsed.filter(valid) : [];
+      const rows = Array.isArray(parsed) ? parsed.filter(validResult) : [];
       memory = ranked([
         ...new Map([...rows, ...memory].map((r) => [r.id, r])).values(),
       ]).slice(0, 100);
@@ -61,13 +69,15 @@ export function createLeaderboard(getStorage: () => Storage) {
     return [...memory];
   }
   return {
+    shared: false,
     list,
     get available() {
       return available;
     },
-    save(result: Result) {
+    onChange: () => () => {},
+    async save(result: Result) {
       const row = { ...result, name: cleanName(result.name) };
-      if (!valid(row))
+      if (!validResult(row))
         throw new Error("Enter a name to save your completed run.");
       const rows = list().filter((r) => r.id !== row.id);
       const all = ranked([...rows, row]);
@@ -97,4 +107,28 @@ export function resultFromRace(
     assisted: stats.assisted,
     date: new Date().toISOString(),
   };
+}
+/** Seconds spent in one timed section; splits are cumulative. Undefined once a run stops short. */
+export function sectionSeconds(result: Pick<Result, "splits">, stage: number) {
+  const end = result.splits[stage];
+  return end === undefined ? undefined : end - (result.splits[stage - 1] ?? 0);
+}
+export type SectionEntry = { result: Result; seconds: number; rank: number };
+/** Runs ordered by one section's time, fastest first; `own` joins the board until it is saved. */
+export function sectionBoard(
+  rows: Result[],
+  stage: number,
+  own?: Result,
+): SectionEntry[] {
+  const all = own && !rows.some((r) => r.id === own.id) ? [...rows, own] : rows;
+  return all
+    .flatMap((result) => {
+      const seconds = sectionSeconds(result, stage);
+      return seconds === undefined ? [] : [{ result, seconds }];
+    })
+    .sort(
+      (a, b) =>
+        a.seconds - b.seconds || a.result.date.localeCompare(b.result.date),
+    )
+    .map((entry, i) => ({ ...entry, rank: i + 1 }));
 }

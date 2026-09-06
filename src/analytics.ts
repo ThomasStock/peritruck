@@ -149,6 +149,7 @@ export function trackAction(
     | "skip_used"
     | "recover_used"
     | "leaderboard_opened"
+    | "section_board_opened"
     | "score_saved"
     | "visitor_dispatched",
   s: State,
