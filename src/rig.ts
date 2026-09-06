@@ -2,9 +2,9 @@ import * as THREE from "three";
 import {
   type Input,
   type State,
+  KIOSK,
   angle,
   objective,
-  obstacles,
   walking,
 } from "./game/simulation";
 /** Procedural driver animation. Legs, arms, head and body hang from the named
@@ -58,10 +58,9 @@ export class DriverRig {
     } else {
       if (moved > 1e-4) this.lastMove = this.clock;
       this.phase = (this.phase + (moved / CYCLE) * Math.PI * 2) % (Math.PI * 2);
-      if (s.phase === "kiosk") {
-        const kiosk = obstacles(s).find((o) => o.name === "Kiosk");
-        if (kiosk) facing = Math.atan2(kiosk.x - d.x, kiosk.z - d.z);
-      } else if (command > 0.1) facing = Math.atan2(input.walkX, input.walkZ);
+      if (s.phase === "kiosk")
+        facing = Math.atan2(KIOSK.x - d.x, KIOSK.z - d.z);
+      else if (command > 0.1) facing = Math.atan2(input.walkX, input.walkZ);
     }
     this.last = { x: d.x, z: d.z };
     // Fixed-step simulation moves in quanta; a short window hides empty frames.
