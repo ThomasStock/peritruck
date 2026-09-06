@@ -18,6 +18,7 @@ import { RigWheels } from "./wheels";
 import { PredictionPath } from "./prediction";
 import { RouteDots } from "./route";
 import { RigLamps, lampState } from "./lights";
+import { DockArrival } from "./docks";
 export type CameraMode = "follow" | "yard" | "overhead";
 /** Who the camera follows: the driver, or the yard operator by dock 05. */
 export type Attention = "driver" | "operator";
@@ -96,6 +97,7 @@ export class YardScene {
   private env: THREE.WebGLRenderTarget;
   private rig = new DriverRig(this.driver);
   private lamps = new RigLamps();
+  private dockArrival = new DockArrival();
   private operatorRig = new DriverRig(this.operator);
   private steering: THREE.Object3D[] = [];
   private wheels = new RigWheels();
@@ -173,6 +175,7 @@ export class YardScene {
       this.target,
       this.prediction,
       this.route,
+      this.dockArrival.root,
     );
     // Dock number panels sit just proud of the baked ones, behind the painted
     // digits, so the assigned dock can light up. A green lamp joins the red one.
@@ -261,8 +264,8 @@ export class YardScene {
   };
   async load() {
     const loader = new GLTFLoader();
-    const [yard, tractor, trailer, driver] = await Promise.all(
-      ["yard", "tractor", "trailer", "driver"].map((n) =>
+    const [yard, tractor, trailer, driver, forklift] = await Promise.all(
+      ["yard", "tractor", "trailer", "driver", "forklift"].map((n) =>
         loader.loadAsync(`/models/${n}.glb`),
       ),
     );
@@ -271,6 +274,7 @@ export class YardScene {
     this.trailer.add(trailer.scene);
     this.driver.add(driver.scene);
     this.rig.bind();
+    this.dockArrival.bind(driver.scene, forklift.scene);
     // The operator wears the same rig in a yellow-green vest and a white hat.
     const operator = driver.scene.clone(true);
     const recolour: Record<string, string> = {
@@ -337,7 +341,12 @@ export class YardScene {
     this.lamps.bind(this.tractor, this.trailer);
     // Compile every shader before play starts, including the ones for objects
     // that only appear later, so the first drive and phase changes do not stall.
-    const hidden = [this.prediction, this.route].filter((o) => !o.visible);
+    const hidden = [
+      this.prediction,
+      this.route,
+      this.dockArrival.crew,
+      this.dockArrival.forklift,
+    ].filter((o) => !o.visible);
     for (const o of hidden) o.visible = true;
     try {
       await this.renderer.compileAsync(this.scene, this.camera);
@@ -455,6 +464,7 @@ export class YardScene {
     // the overhead roll instead — north up, +X right, whichever way anyone moves.
     if (overhead) this.camera.rotation.set(-Math.PI / 2, 0, 0);
     else this.camera.lookAt(this.focus);
+    this.dockArrival.update(s, this.camera, dt, this.reducedMotion);
     this.renderer.render(this.scene, this.camera);
   }
   project(p: { x: number; z: number }, height = 2) {

@@ -95,6 +95,28 @@ export class DriverRig {
     this.phone = THREE.MathUtils.damp(this.phone, phone ? 1 : 0, 6, dt);
     this.pose(x, z, reducedMotion);
   }
+  /** Walk a scene-owned route, with strides driven by actual displacement. */
+  walk(
+    x: number,
+    z: number,
+    heading: number,
+    dt: number,
+    reducedMotion: boolean,
+  ) {
+    this.root.visible = true;
+    this.clock += dt;
+    const moved = this.last ? Math.hypot(x - this.last.x, z - this.last.z) : 0;
+    this.last = { x, z };
+    if (moved > 1.5) {
+      this.gait = this.phase = 0;
+    } else {
+      this.phase = (this.phase + (moved / CYCLE) * Math.PI * 2) % (Math.PI * 2);
+      this.gait = THREE.MathUtils.damp(this.gait, moved > 1e-4 ? 1 : 0, 10, dt);
+    }
+    this.turn(heading, dt);
+    this.phone = 0;
+    this.pose(x, z, reducedMotion);
+  }
   private turn(facing: number, dt: number) {
     const turn = angle(facing - this.heading) * (1 - Math.exp(-dt * 12));
     this.heading = angle(this.heading + turn);
