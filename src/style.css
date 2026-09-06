@@ -1701,8 +1701,17 @@ body:not(.playing) #touch-controls {
   font-size: 11px;
   letter-spacing: 1px;
 }
+/* Results boards list the top 20 but show about five rows; the rest scroll. */
+.board-scroll {
+  max-height: 272px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
 .split-board .leaderboard-rows {
   overflow: hidden;
+  overflow-y: auto;
+  max-height: 226px;
   border: 1px solid #dfe9e0;
   border-radius: 11px;
   background: #fbfcf9;
