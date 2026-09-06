@@ -4,102 +4,58 @@ import { readFile } from "node:fs/promises";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createState, idleInput, type Input } from "../src/game/simulation";
-import {
-  BLINK_HZ,
-  INDICATOR_THRESHOLD,
-  RigLamps,
-  lampState,
-} from "../src/lights";
+import { RigLamps, lampState } from "../src/lights";
 
 const truck = (speed: number) => ({ ...createState().truck, speed });
 const input = (patch: Partial<Input>) => ({ ...idleInput(), ...patch });
-const dark = {
-  running: false,
-  brake: false,
-  reverse: false,
-  left: false,
-  right: false,
-};
+const dark = { running: false, brake: false, reverse: false };
 
 test("every lamp is dark while the engine is off, whatever the pedals say", () => {
   assert.deepEqual(
-    lampState(
-      truck(3),
-      input({ throttle: -1, brake: true, steer: 1 }),
-      0,
-      false,
-    ),
+    lampState(truck(3), input({ throttle: -1, brake: true, steer: 1 }), false),
     dark,
   );
 });
 
 test("driving forward shows running lights only", () => {
-  assert.deepEqual(lampState(truck(3), input({ throttle: 1 }), 0, true), {
+  assert.deepEqual(lampState(truck(3), input({ throttle: 1 }), true), {
     ...dark,
     running: true,
   });
-  assert.deepEqual(lampState(truck(3), input({}), 0, true), {
+  assert.deepEqual(lampState(truck(3), input({}), true), {
     ...dark,
     running: true,
   });
+});
+
+test("steering alone changes nothing: the rig has no indicators", () => {
+  const straight = lampState(truck(3), input({ throttle: 1 }), true);
+  for (const steer of [-1, -0.5, 0.5, 1])
+    assert.deepEqual(
+      lampState(truck(3), input({ throttle: 1, steer }), true),
+      straight,
+    );
 });
 
 test("brake lamps follow the brake pedal and a throttle against the motion", () => {
-  assert.equal(
-    lampState(truck(3), input({ brake: true }), 0, true).brake,
-    true,
-  );
-  assert.equal(
-    lampState(truck(0), input({ brake: true }), 0, true).brake,
-    true,
-  );
-  const slowing = lampState(truck(3), input({ throttle: -1 }), 0, true);
+  assert.equal(lampState(truck(3), input({ brake: true }), true).brake, true);
+  assert.equal(lampState(truck(0), input({ brake: true }), true).brake, true);
+  const slowing = lampState(truck(3), input({ throttle: -1 }), true);
   assert.equal(slowing.brake, true);
   assert.equal(slowing.reverse, false);
-  assert.equal(
-    lampState(truck(-1), input({ throttle: 1 }), 0, true).brake,
-    true,
-  );
+  assert.equal(lampState(truck(-1), input({ throttle: 1 }), true).brake, true);
 });
 
 test("reverse lamps light once reverse gear is in, and go out again", () => {
-  const stopped = lampState(truck(0), input({ throttle: -1 }), 0, true);
+  const stopped = lampState(truck(0), input({ throttle: -1 }), true);
   assert.equal(stopped.reverse, true);
   assert.equal(stopped.brake, false);
-  const backing = lampState(truck(-1.5), input({ throttle: -1 }), 0, true);
+  const backing = lampState(truck(-1.5), input({ throttle: -1 }), true);
   assert.equal(backing.reverse, true);
   assert.equal(backing.brake, false);
-  assert.equal(lampState(truck(-1.5), input({}), 0, true).reverse, true);
-  assert.equal(lampState(truck(0), input({}), 0, true).reverse, false);
-  assert.equal(lampState(truck(2), input({}), 0, true).reverse, false);
-});
-
-test("indicators flash on the steered side at the blink rate", () => {
-  const period = 1 / BLINK_HZ;
-  const left = lampState(truck(2), input({ steer: 1 }), 0, true);
-  assert.equal(left.left, true);
-  assert.equal(left.right, false);
-  const right = lampState(truck(2), input({ steer: -1 }), 0, true);
-  assert.equal(right.left, false);
-  assert.equal(right.right, true);
-  assert.equal(
-    lampState(truck(2), input({ steer: 1 }), period * 0.5 + 1e-6, true).left,
-    false,
-  );
-  assert.equal(
-    lampState(truck(2), input({ steer: 1 }), period, true).left,
-    true,
-  );
-  const slight = input({ steer: INDICATOR_THRESHOLD * 0.9 });
-  assert.equal(lampState(truck(2), slight, 0, true).left, false);
-  const backing = lampState(
-    truck(-1),
-    input({ steer: -1, throttle: -1 }),
-    0,
-    true,
-  );
-  assert.equal(backing.right, true);
-  assert.equal(backing.reverse, true);
+  assert.equal(lampState(truck(-1.5), input({}), true).reverse, true);
+  assert.equal(lampState(truck(0), input({}), true).reverse, false);
+  assert.equal(lampState(truck(2), input({}), true).reverse, false);
 });
 
 async function loadModel(name: string) {
@@ -135,26 +91,19 @@ test("the player's lamps glow on their own materials; parked copies keep the pai
   const parkedTrailer = trailer.scene.clone(true);
   const paintedHead = material(parked, "Headlamps"),
     paintedTail = material(parkedTrailer, "Tail lamps");
-  const before = tractor.scene.children.length + trailer.scene.children.length;
+  const tractorBefore = tractor.scene.children.length,
+    trailerBefore = trailer.scene.children.length;
   const lamps = new RigLamps();
   lamps.bind(tractor.scene, trailer.scene);
   const head = material(tractor.scene, "Headlamps"),
     tail = material(trailer.scene, "Tail lamps");
   assert.notEqual(head, paintedHead);
   assert.notEqual(tail, paintedTail);
-  // Two reverse lamps and two indicators at the rear, two indicators in front.
-  assert.equal(
-    tractor.scene.children.length + trailer.scene.children.length,
-    before + 6,
-  );
+  // Two reverse lamps at the rear, and nothing added to the tractor.
+  assert.equal(trailer.scene.children.length, trailerBefore + 2);
+  assert.equal(tractor.scene.children.length, tractorBefore);
   const hose = material(tractor.scene, "Tail lamps");
-  lamps.update({
-    running: true,
-    brake: true,
-    reverse: true,
-    left: true,
-    right: false,
-  });
+  lamps.update({ running: true, brake: true, reverse: true });
   assert.ok(glow(head) > 0);
   assert.ok(glow(tail) > 0);
   assert.equal(glow(paintedHead), 0);
@@ -169,16 +118,10 @@ test("the player's lamps glow on their own materials; parked copies keep the pai
       )
         glowing.add(o.material as THREE.Material);
     });
-  // Headlamps, tail lamps, reverse lamps and the left indicator; not the right.
-  assert.equal(glowing.size, 4);
+  // Headlamps, tail lamps and the reverse lamps: no amber anywhere.
+  assert.equal(glowing.size, 3);
   const braking = glow(tail);
-  lamps.update({
-    running: true,
-    brake: false,
-    reverse: false,
-    left: false,
-    right: false,
-  });
+  lamps.update({ running: true, brake: false, reverse: false });
   assert.ok(glow(tail) > 0 && glow(tail) < braking);
   lamps.update(dark);
   assert.equal(glow(head), 0);

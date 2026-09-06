@@ -361,9 +361,7 @@ export class YardScene {
     this.trailer.position.copy(this.tractor.position);
     this.trailer.rotation.y = s.truck.trailerHeading;
     this.rig.update(s, input, dt, this.reducedMotion);
-    this.lamps.update(
-      lampState(s.truck, input, s.elapsed, started && !walking(s)),
-    );
+    this.lamps.update(lampState(s.truck, input, started && !walking(s)));
     this.operatorRig.stand(
       YARD.operator.x,
       YARD.operator.z,
