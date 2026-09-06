@@ -127,24 +127,26 @@ npm run build        # TypeScript check + Vite production build
 npm run preview      # Serve production output locally
 npm run format:check
 npm run models       # Rebuild original GLB assets with installed Blender
+npm run share-card   # Rebuild the link preview card from a running dev server
 ```
 
-| Module                    | Owns                                                                                              |
-| ------------------------- | ------------------------------------------------------------------------------------------------- |
-| `src/game/simulation.ts`  | Articulated kinematics, oriented collision, progression, proximity, parking/docking, measurements |
-| `src/game/commands.ts`    | Validated CLI/WebMCP commands and feedback driver                                                 |
-| `src/scene.ts`            | Three.js rendering, camera, lights, models, merged parked rigs                                    |
-| `src/route.ts`            | Guide dots per phase as one reusable instanced mesh                                               |
-| `src/prediction.ts`       | Projected tyre track, recomputed only when pose or controls change                                |
-| `src/rig.ts`              | Driver rig: displacement-driven gait, turning, idle motion                                        |
-| `src/main.ts`             | Input adapters, accessible overlays, HUD, sound and agent tool registration                       |
-| `src/i18n.ts`             | Game copy in six languages; the current language for UI, SMS and simulation text                  |
-| `src/kiosk/`              | Kiosk replica: step flow, six-language copy, DOM view and stylesheet                              |
-| `src/dispatch/`           | Yard operator's phone: call-off flow, Yard Operator App replica, icons and stylesheet             |
-| `src/sms.ts`              | The driver's phone: SMS banner and handset with the Messages thread                               |
-| `vite.config.ts`          | Local-only CLI/browser bridge                                                                     |
-| `scripts/truck.ts`        | JSON command-line client and session persistence                                                  |
-| `scripts/build_models.py` | Reproducible Blender asset authoring                                                              |
+| Module                         | Owns                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `src/game/simulation.ts`       | Articulated kinematics, oriented collision, progression, proximity, parking/docking, measurements |
+| `src/game/commands.ts`         | Validated CLI/WebMCP commands and feedback driver                                                 |
+| `src/scene.ts`                 | Three.js rendering, camera, lights, models, merged parked rigs                                    |
+| `src/route.ts`                 | Guide dots per phase as one reusable instanced mesh                                               |
+| `src/prediction.ts`            | Projected tyre track, recomputed only when pose or controls change                                |
+| `src/rig.ts`                   | Driver rig: displacement-driven gait, turning, idle motion                                        |
+| `src/main.ts`                  | Input adapters, accessible overlays, HUD, sound and agent tool registration                       |
+| `src/i18n.ts`                  | Game copy in six languages; the current language for UI, SMS and simulation text                  |
+| `src/kiosk/`                   | Kiosk replica: step flow, six-language copy, DOM view and stylesheet                              |
+| `src/dispatch/`                | Yard operator's phone: call-off flow, Yard Operator App replica, icons and stylesheet             |
+| `src/sms.ts`                   | The driver's phone: SMS banner and handset with the Messages thread                               |
+| `vite.config.ts`               | Local-only CLI/browser bridge                                                                     |
+| `scripts/truck.ts`             | JSON command-line client and session persistence                                                  |
+| `scripts/build_models.py`      | Reproducible Blender asset authoring                                                              |
+| `scripts/build-share-card.mjs` | Link preview card, composed over a screenshot of the running yard                                 |
 
 The renderer does not own physics. `State` is plain serializable data; `step` is the sole timed simulation transition. Explicit actions handle kiosk, call-off and PIN interaction. `predict` runs the same truck integrator for the visible path guide. The camera cut between the driver and the yard operator is presentation in `src/scene.ts`; the simulation only knows the `dispatch` phase.
 
@@ -155,6 +157,19 @@ Collision uses oriented rectangles for both tractor and trailer. A closed gate a
 All 3D assets were authored in Blender from `scripts/build_models.py`, validated with Blender 5.2.1 LTS, and exported as GLB. A generated cab-over tractor, 12.8 m trailer, driver and yard require about 3.4 MB uncompressed. Assets include bevelled bodywork, mirrors, grille, multi-axle wheels, trailer rails, docking equipment, solar roof panels, fencing, kiosk, footpath, trees and lighting columns. Every wheel hangs from a named empty and rolls with the ground it covers, inside wheels slower through a turn; the front pair also steers. The driver's legs, arms, head and torso hang from named empties so the renderer can pose them. Distant scenery is joined by material to keep draw calls down.
 
 The Peripass logo is the official first-party SVG. The house-style starting point is Montserrat and Peripass teal `#00A990`; the game adds dark green and lime feedback accents. The kiosk uses Open Sans and the kiosk app's tokens (page background `#F4F6F9`, primary teal, 56 px controls). Fonts are bundled locally. See [the cited research](docs/research.md) for the real yard process, control rationale, source links and which dimensions are deliberately simplified for play. This is a game, not a truck-driving simulator or an operational safety tool.
+
+## Link preview
+
+Shared links (WhatsApp, Slack, LinkedIn, X) show `public/og/share.jpg`: the yard as the game itself draws it on the start screen, with the start screen's own copy over it and the invitation "Think you can dock faster?". `index.html` carries the matching `og:*` tags and `twitter:card=summary_large_image`; `og:url` and `og:image` are absolute, as the crawlers require. The plain `description` stays the product one — only the share card teases.
+
+The card is generated, not drawn by hand. With `npm run dev` running:
+
+```sh
+npm run share-card                  # writes public/og/share.jpg (2400x1260, ~170 kB)
+PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs npm run share-card
+```
+
+The script asks the game for a canvas screenshot over the same `/__yard/control` bridge the CLI uses, so the card follows the yard: change the models, the lighting or the start screen copy, rerun it and commit the new JPEG. Playwright is not a project dependency; point `PLAYWRIGHT_MODULE` at an install outside the project, as `scripts/profile-frames.mjs` does. Crawlers cache aggressively — after deploying, refresh the preview in each network's own debugger.
 
 ## Shipping
 

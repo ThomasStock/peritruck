@@ -10,6 +10,7 @@
     "test": "tsx --test tests/*.test.ts",
     "truck": "tsx scripts/truck.ts",
     "models": "blender --background --python scripts/build_models.py",
+    "share-card": "node scripts/build-share-card.mjs",
     "format": "prettier --write src tests scripts/truck.ts vite.config.ts README.md docs/*.md",
     "format:check": "prettier --check src tests scripts/truck.ts vite.config.ts README.md docs/*.md",
     "build:vercel": "convex deploy --cmd 'npm run build'",
