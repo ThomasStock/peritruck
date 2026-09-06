@@ -1,5 +1,26 @@
 import { defineConfig, type Plugin, type WebSocketClient } from "vite";
 import { randomUUID } from "node:crypto";
+import { execSync } from "node:child_process";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
+
+// Browser JS self-profiling requires this document policy on the HTML response.
+const PROFILING_HEADERS = { "Document-Policy": "js-profiling" };
+
+function gitSha(): string | undefined {
+  try {
+    return execSync("git rev-parse HEAD", {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+  } catch {
+    return undefined;
+  }
+}
+
+const RELEASE = process.env.VERCEL_GIT_COMMIT_SHA ?? gitSha();
+const APP_ENV = process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "development";
+
 function yardBridge(): Plugin {
   return {
     name: "yard-local-control",
@@ -94,10 +115,35 @@ function yardBridge(): Plugin {
   };
 }
 export default defineConfig({
-  plugins: [yardBridge()],
+  plugins: [
+    yardBridge(),
+    sentryVitePlugin({
+      org: "stackhouse-2e",
+      project: "peritruck",
+      // Set SENTRY_AUTH_TOKEN (org auth token) in the build environment to
+      // upload source maps. Without it the plugin is disabled and the build
+      // still succeeds.
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      disable: !process.env.SENTRY_AUTH_TOKEN,
+      telemetry: false,
+      release: { name: RELEASE, inject: true, setCommits: { auto: true } },
+      sourcemaps: { filesToDeleteAfterUpload: ["./dist/**/*.map"] },
+    }),
+  ],
+  define: {
+    __APP_ENV__: JSON.stringify(APP_ENV),
+    __APP_RELEASE__: JSON.stringify(RELEASE ?? null),
+  },
   // Tooling may assign a port through PORT; otherwise Vite picks its default.
-  server: process.env.PORT
-    ? { port: Number(process.env.PORT), strictPort: true }
-    : undefined,
-  build: { rollupOptions: { output: { manualChunks: { three: ["three"] } } } },
+  server: {
+    ...(process.env.PORT
+      ? { port: Number(process.env.PORT), strictPort: true }
+      : {}),
+    headers: PROFILING_HEADERS,
+  },
+  preview: { headers: PROFILING_HEADERS },
+  build: {
+    sourcemap: true,
+    rollupOptions: { output: { manualChunks: { three: ["three"] } } },
+  },
 });
