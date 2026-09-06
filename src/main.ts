@@ -579,7 +579,7 @@ window.addEventListener("keydown", (e) => {
     interact(state);
     syncDialog();
   }
-  if (k === bindings.camera) $("camera").click();
+  if (k === bindings.camera && started) $("camera").click();
   if (k === bindings.recover && started) {
     recover(state);
     trackAction("recover_used", state);

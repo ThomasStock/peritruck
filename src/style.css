@@ -1376,6 +1376,10 @@ kbd {
 body:not(.playing) #touch-controls {
   display: none;
 }
+/* The camera toggle has nothing to frame until the drive starts. */
+body:not(.playing) #camera {
+  display: none;
+}
 @media (pointer: coarse), (max-width: 600px) {
   body.walking .action-wrap {
     left: auto;
