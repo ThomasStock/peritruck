@@ -129,7 +129,6 @@ for side in [-1,1]:
     box('Headlamp',(side*.98,1.16,4.95),(.37,.22,.08),'light',.04)
     box('Indicator',(side*1.13,1.4,4.95),(.12,.13,.08),'orange',.02)
     box('Fuel tank',(side*1.04,.89,1.21),(.48,.64,1.55),'metal',.12)
-    box('Mudguard',(side*1.12,1.17,-.05),(.55,.13,2.14),'teal',.06)
     wheel(side*1.1,3.57,True)
     wheel(side*1.1,0)
     wheel(side*1.1,-1.23)
