@@ -26,6 +26,7 @@
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
+  touch-action: none;
   transform: translate(-50%, -160%);
   opacity: 0;
   transition:
@@ -36,6 +37,64 @@
   transform: translate(-50%, 0);
   opacity: 1;
   animation: sms-buzz 0.55s 0.45s ease-in-out both;
+}
+/* Finger on the card: it follows the pointer with no easing in between. */
+.sms-banner.is-dragging {
+  transition: none;
+}
+/* Swiped or tapped away: a quick slide up behind the notch, fading as it goes. */
+.sms-banner.is-out {
+  transform: translate(-50%, -160%);
+  opacity: 0;
+  transition:
+    transform 0.32s cubic-bezier(0.5, 0, 0.9, 0.5),
+    opacity 0.22s 0.05s;
+}
+/* Close dot in the corner, only for pointers that can hover (a finger swipes). */
+.sms-banner__close {
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  display: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #e4e4e8;
+  color: #3a3a3c;
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 22%),
+    0 0 0 0.5px rgb(0 0 0 / 8%);
+  opacity: 0;
+  scale: 0.6;
+  transition:
+    opacity 0.16s,
+    scale 0.16s cubic-bezier(0.22, 1.1, 0.36, 1),
+    background 0.16s;
+}
+.sms-banner__close svg {
+  width: 10px;
+  height: 10px;
+}
+.sms-banner__close:hover {
+  filter: none;
+  background: #d6d6db;
+}
+@media (hover: hover) {
+  .sms-banner__close {
+    display: grid;
+  }
+  .sms-banner:hover .sms-banner__close,
+  .sms-banner__close:focus-visible {
+    opacity: 1;
+    scale: 1;
+  }
+  .sms-banner.is-dragging .sms-banner__close,
+  .sms-banner.is-out .sms-banner__close {
+    opacity: 0;
+  }
 }
 @keyframes sms-buzz {
   0%,
@@ -498,7 +557,8 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sms-banner {
+  .sms-banner,
+  .sms-banner__close {
     transition: none;
     animation: none;
   }

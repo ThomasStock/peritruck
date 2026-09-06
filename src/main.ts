@@ -671,7 +671,8 @@ function showSmsBanner() {
   const banner = $("sms-banner");
   clearTimeout(smsBannerTimer);
   banner.innerHTML = smsBannerHtml(state.booking, state.pin);
-  banner.classList.remove("hidden");
+  banner.style.transform = "";
+  banner.classList.remove("hidden", "is-out", "is-dragging");
   void banner.offsetWidth; // commit display before the slide-in transition
   banner.classList.add("is-in");
   smsBannerUntil = state.elapsed + 9;
@@ -685,12 +686,75 @@ function showSmsBanner() {
 }
 function hideSmsBanner() {
   const banner = $("sms-banner");
-  if (banner.classList.contains("hidden")) return;
-  banner.classList.remove("is-in");
+  if (
+    banner.classList.contains("hidden") ||
+    banner.classList.contains("is-out")
+  )
+    return;
+  banner.classList.remove("is-in", "is-dragging");
+  banner.classList.add("is-out");
+  banner.style.transform = ""; // from wherever the finger left it, up and away
   clearTimeout(smsBannerTimer);
-  smsBannerTimer = setTimeout(() => banner.classList.add("hidden"), 600);
+  smsBannerTimer = setTimeout(() => {
+    banner.classList.remove("is-out");
+    banner.classList.add("hidden");
+  }, 400);
 }
-$("sms-banner").onclick = hideSmsBanner;
+// Dismissing works as on a phone: the card follows a finger dragging it up and
+// flies off once it has gone far or fast enough; a short drag springs back and a
+// tap (or the hover-only close dot) sends it away too.
+let smsDrag: {
+  id: number;
+  x0: number;
+  y0: number;
+  y: number;
+  t: number;
+  vy: number;
+} | null = null;
+{
+  const banner = $("sms-banner");
+  const onClose = (e: Event) =>
+    (e.target as Element).closest(".sms-banner__close") !== null;
+  banner.addEventListener("pointerdown", (e) => {
+    if (smsDrag || onClose(e) || !banner.classList.contains("is-in")) return;
+    smsDrag = {
+      id: e.pointerId,
+      x0: e.clientX,
+      y0: e.clientY,
+      y: e.clientY,
+      t: e.timeStamp,
+      vy: 0,
+    };
+    banner.setPointerCapture(e.pointerId);
+    banner.classList.add("is-dragging");
+  });
+  banner.addEventListener("pointermove", (e) => {
+    if (e.pointerId !== smsDrag?.id) return;
+    const dt = e.timeStamp - smsDrag.t;
+    if (dt > 0) smsDrag.vy = (e.clientY - smsDrag.y) / dt; // px per ms, latest segment
+    smsDrag.y = e.clientY;
+    smsDrag.t = e.timeStamp;
+    const dy = e.clientY - smsDrag.y0;
+    // Upward follows the finger; downward only rubber-bands a little.
+    banner.style.transform = `translate(-50%, ${dy < 0 ? dy : dy * 0.15}px)`;
+  });
+  const release = (e: PointerEvent) => {
+    if (e.pointerId !== smsDrag?.id) return;
+    const dx = e.clientX - smsDrag.x0;
+    const dy = e.clientY - smsDrag.y0;
+    const flick = dy < -36 || smsDrag.vy < -0.5;
+    smsDrag = null;
+    banner.classList.remove("is-dragging");
+    const tap = e.type === "pointerup" && Math.hypot(dx, dy) < 8;
+    if (tap || flick) hideSmsBanner();
+    else banner.style.transform = ""; // not far enough: spring back into place
+  };
+  banner.addEventListener("pointerup", release);
+  banner.addEventListener("pointercancel", release);
+  banner.addEventListener("click", (e) => {
+    if (onClose(e)) hideSmsBanner();
+  });
+}
 function syncSms() {
   const received = smsReceived(state);
   if (!state.registered && smsSeen) {
@@ -706,7 +770,7 @@ function syncSms() {
     // Only a message received on foot or in the cab drops in; a skip straight to the dock is silent.
     if (["walk-truck", "gate"].includes(state.phase)) showSmsBanner();
   }
-  if (smsBannerUntil && state.elapsed > smsBannerUntil) {
+  if (smsBannerUntil && state.elapsed > smsBannerUntil && !smsDrag) {
     smsBannerUntil = 0;
     hideSmsBanner();
   }

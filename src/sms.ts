@@ -14,9 +14,9 @@ export const SMS_SENDER = "Peripass";
 /** The message body, one entry per paragraph. The PIN sits alone on the middle line. */
 export function smsLines(booking: string, pin: string): string[] {
   return [
-    `Welcome to Yard Shift Logistics, Ghent. You are checked in for ${booking}.`,
+    `Checked in for ${booking} at Yard Shift Logistics, Ghent.`,
     `Gate PIN: ${pin}`,
-    "Drive to the entry gate and enter the PIN at the terminal. Then proceed to dock 03.",
+    "Enter it at the gate, then drive to dock\u00a003.",
   ];
 }
 /** 24-hour wall clock, as shown on the handset. */
@@ -45,14 +45,19 @@ const chevronLeft = svg(
   "0 0 12 20",
   '<path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
 );
+const closeIcon = svg(
+  "0 0 10 10",
+  '<path d="m1.5 1.5 7 7m0-7-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+);
 const chevronRight = svg(
   "0 0 8 12",
   '<path d="m2 1 4 5-4 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
 );
-/** Notification banner as it drops onto the driver's lock screen. */
+/** Notification banner as it drops onto the driver's lock screen. Swipe up or
+ * tap to dismiss; pointers that can hover also get the close dot. */
 export function smsBannerHtml(booking: string, pin: string): string {
   const body = smsLines(booking, pin).map(esc).join("\n");
-  return `<span class="sms-banner__icon">${messagesIcon}</span><span class="sms-banner__text"><span class="sms-banner__row"><b>${esc(SMS_SENDER)}</b><time>now</time></span><span class="sms-banner__body">${body}</span></span>`;
+  return `<button type="button" class="sms-banner__close" aria-label="Dismiss">${closeIcon}</button><span class="sms-banner__icon">${messagesIcon}</span><span class="sms-banner__text"><span class="sms-banner__row"><b>${esc(SMS_SENDER)}</b><time>now</time></span><span class="sms-banner__body">${body}</span></span>`;
 }
 /** A handset opened on the Messages thread with the Peripass SMS. Sizes inside
  * the screen use container-query units, so the phone scales with its width. */
