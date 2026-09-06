@@ -712,8 +712,7 @@ function syncDialog() {
   } else if (kind === "settings") {
     modal(
       t("set.title"),
-      `<p class="dialog-description">${t("set.description")}</p>
-      <label class="setting-row"><span><b>${t("set.assist")}</b><small>${t("set.assistHint")}</small></span><input id="assist-setting" type="checkbox" ${state.assisted ? "checked" : ""}/></label>
+      `<label class="setting-row"><span><b>${t("set.assist")}</b><small>${t("set.assistHint")}</small></span><input id="assist-setting" type="checkbox" ${state.assisted ? "checked" : ""}/></label>
       <label class="setting-row"><span><b>${t("set.sound")}</b><small>${t("set.soundHint")}</small></span><input id="sound-setting" type="checkbox" ${soundEnabled ? "checked" : ""}/></label>
       <label class="setting-row"><span><b>${t("set.motion")}</b><small>${t("set.motionHint")}</small></span><input id="motion-setting" type="checkbox" ${reducedMotion ? "checked" : ""}/></label>
       <div class="controls-title">${t("set.controlsTitle")} <span>${t("set.controlsHint")}</span></div><div class="keybindings" id="keybindings"></div>

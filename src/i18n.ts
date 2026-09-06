@@ -878,12 +878,6 @@ export const STRINGS = {
     fr: "Commandes",
     de: "Steuerung",
   },
-  "set.description": {
-    en: "Everything is paused while this is open, your race clock included.",
-    nl: "Alles staat stil zolang dit openstaat, ook je raceklok.",
-    fr: "Tout est en pause tant que ceci est ouvert, y compris votre chrono.",
-    de: "Alles pausiert, solange dies offen ist — auch deine Rennuhr.",
-  },
   "set.assist": {
     en: "Trailer reverse assist",
     nl: "Achteruitrij-assistent trailer",
