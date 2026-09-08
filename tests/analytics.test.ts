@@ -23,8 +23,11 @@ function load(env: Record<string, unknown> = { PROD: true }) {
       return this;
     }
   }
+  const inits: Record<string, unknown>[] = [];
   const amplitude = {
-    init() {},
+    init(_key: string, options: Record<string, unknown>) {
+      inits.push(options);
+    },
     track(event: string, props: Record<string, unknown>) {
       calls.push({ event, props });
     },
@@ -57,8 +60,43 @@ function load(env: Record<string, unknown> = { PROD: true }) {
     context,
   );
   const api = context.exports as typeof import("../src/analytics");
-  return { api, calls, identities, events: () => calls.map((c) => c.event) };
+  return {
+    api,
+    calls,
+    identities,
+    inits,
+    events: () => calls.map((c) => c.event),
+  };
 }
+
+test("init captures clicks, taps and forms so runs can be replayed event by event", () => {
+  const { api, inits } = load();
+  api.initAnalytics();
+  assert.equal(inits.length, 1);
+  const autocapture = inits[0].autocapture as Record<string, unknown>;
+  assert.equal(autocapture.elementInteractions, true);
+  assert.equal(autocapture.formInteractions, true);
+  assert.equal(autocapture.frustrationInteractions, true);
+  assert.equal(autocapture.sessions, true);
+  assert.equal(autocapture.pageViews, true);
+});
+
+test("kiosk registration and paste actions carry run progress", () => {
+  const { api, calls } = load();
+  const s = createState();
+  api.trackAction("kiosk_registered", s, { scanned: false, pasted: true });
+  api.trackAction("reference_pasted", s, { length: 6 });
+  assert.deepEqual(
+    calls.map((c) => [c.event, c.props.phase]),
+    [
+      ["kiosk_registered", "arrive"],
+      ["reference_pasted", "arrive"],
+    ],
+  );
+  assert.equal(calls[0].props.scanned, false);
+  assert.equal(calls[0].props.pasted, true);
+  assert.equal(calls[1].props.length, 6);
+});
 
 function finish(s: State, splits = [20, 45, 60, 90.5]) {
   s.race.started = true;

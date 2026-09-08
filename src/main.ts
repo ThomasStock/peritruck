@@ -169,7 +169,8 @@ app.innerHTML = `
 <div id="modal-root"></div>
 `;
 const $ = (id: string) => document.getElementById(id)!;
-let registrationUsedScanning = false;
+let registrationUsedScanning = false,
+  referencePasted = false;
 let state = createState(),
   started = false,
   last = performance.now(),
@@ -346,6 +347,15 @@ function currentInput(gamepad?: Gamepad): Input {
   return i;
 }
 $("start").onclick = start;
+// A pasted reference explains a kiosk split that looks too quick to type.
+// Only the pasted length is recorded, never the text.
+$("modal-root").addEventListener("paste", (e) => {
+  if (!(e.target as Element | null)?.matches(".kiosk-input--reference")) return;
+  referencePasted = true;
+  trackAction("reference_pasted", state, {
+    length: e.clipboardData?.getData("text").trim().length ?? 0,
+  });
+});
 $("leaderboard-button").onclick = () => {
   leaderboardOpen = true;
   trackAction("leaderboard_opened", state, { started });
@@ -780,10 +790,15 @@ function syncDialog() {
       onComplete: (reference, usedDocumentScanning) => {
         if (register(state, reference)) {
           registrationUsedScanning = usedDocumentScanning;
+          trackAction("kiosk_registered", state, {
+            scanned: usedDocumentScanning,
+            pasted: referencePasted,
+          });
           syncDialog();
         }
       },
     });
+    referencePasted = false;
     const kioskStage = $("modal-root").querySelector(".kiosk-stage");
     if (kioskStage) {
       kioskStage.classList.add("timed-kiosk");
@@ -868,6 +883,7 @@ function syncDialog() {
           rank: saved.rank,
           persisted: saved.persisted,
           best: saved.rank === 1,
+          scanned: registrationUsedScanning,
         });
         identifyBest(leaderboard.list()[0]?.seconds ?? result.seconds);
         form.classList.add("hidden");
