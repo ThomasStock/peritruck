@@ -29,12 +29,16 @@ import {
   submitPhone,
   submitReference,
 } from "./flow";
-import { LANGUAGES, type StringKey, t } from "./i18n";
+import { LANGUAGES, type Lang, type StringKey, t } from "./i18n";
 import { flags, icons } from "./icons";
 export type KioskOptions = {
   booking: string;
   onQuit: () => void;
-  onComplete: (reference: string, usedDocumentScanning: boolean) => void;
+  onComplete: (
+    reference: string,
+    usedDocumentScanning: boolean,
+    language: Lang,
+  ) => void;
 };
 export type KioskController = { flow: Flow; destroy(): void };
 type Overlay = null | "help" | "leave" | "country";
@@ -225,6 +229,7 @@ export function mountKiosk(
     opts.onComplete(
       fullReference(flow.booking, flow.reference),
       flow.usedDocumentScanning,
+      flow.language,
     );
   }
   function quit() {

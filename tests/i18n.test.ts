@@ -70,14 +70,13 @@ test("obstacle identifiers stay English in the simulation and translate in toast
   }
 });
 
-test("the simulation, SMS and stages speak the chosen language", () => {
+test("the simulation and stages speak the chosen language", () => {
   const s = createState();
   setLanguage("fr");
   try {
     assert.equal(objective(s).title, "Parking chauffeurs");
     assert.equal(prompt(s), "");
     assert.equal(stageName(STAGES[3].key), "Se garer au quai");
-    assert.match(smsLines("PP-1", "1234", 2)[2], /quai 02\./);
     interact(s); // not parked yet: the toast is French too
     assert.equal(s.message, "Arrêtez-vous d’abord dans la zone indiquée.");
   } finally {
@@ -95,4 +94,16 @@ test("the kiosk keeps its own six-language page", async () => {
   // Every game language is one the kiosk also speaks.
   for (const l of LANGUAGES)
     assert.ok(kiosk.isLang(l.code), `kiosk lacks ${l.code}`);
+});
+
+test("the SMS speaks the language the driver chose on the kiosk, not the game's", () => {
+  setLanguage("fr");
+  try {
+    assert.match(smsLines("PP-1", "1234", 2, "pl")[0], /Zameldowano dla PP-1/);
+    assert.equal(smsLines("PP-1", "1234", 2, "pl")[1], "PIN do bramy: 1234");
+    assert.match(smsLines("PP-1", "1234", 2, "ro")[2], /docul 02\./);
+    assert.match(smsLines("PP-1", "1234", 2)[2], /dock 02\./);
+  } finally {
+    setLanguage("en");
+  }
 });

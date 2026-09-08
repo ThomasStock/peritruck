@@ -777,8 +777,8 @@ function syncDialog() {
     kiosk = mountKiosk($("modal-root"), {
       booking: state.booking,
       onQuit: closeDialog,
-      onComplete: (reference, usedDocumentScanning) => {
-        if (register(state, reference)) {
+      onComplete: (reference, usedDocumentScanning, language) => {
+        if (register(state, reference, language)) {
           registrationUsedScanning = usedDocumentScanning;
           syncDialog();
         }
@@ -796,7 +796,7 @@ function syncDialog() {
     // The driver reads the SMS on their phone and types the PIN into the gate terminal.
     modal(
       t("pin.title"),
-      `<p class="dialog-description">${t("pin.description")}</p><div class="gate-layout"><div class="phone-peek">${phoneHtml(state.booking, state.pin, smsClock || clock(), state.dock)}</div><form id="pin-form" class="gate-terminal"><div class="eyebrow"><span class="live-dot"></span> ${t("pin.terminal")}</div><label class="field">${t("pin.label")}<input id="pin-input" inputmode="none" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="${t("pin.aria")}" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? t("pin.delete") : k === "Clear" ? t("pin.clear") : k}">${k === "Clear" ? t("pin.clear") : k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">${t("pin.open")} <span>↗</span></button></form></div>`,
+      `<p class="dialog-description">${t("pin.description")}</p><div class="gate-layout"><div class="phone-peek">${phoneHtml(state.booking, state.pin, smsClock || clock(), state.dock, state.language)}</div><form id="pin-form" class="gate-terminal"><div class="eyebrow"><span class="live-dot"></span> ${t("pin.terminal")}</div><label class="field">${t("pin.label")}<input id="pin-input" inputmode="none" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="${t("pin.aria")}" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? t("pin.delete") : k === "Clear" ? t("pin.clear") : k}">${k === "Clear" ? t("pin.clear") : k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">${t("pin.open")} <span>↗</span></button></form></div>`,
       "pin-dialog",
     );
     for (const b of document.querySelectorAll<HTMLButtonElement>("[data-pin]"))
@@ -1172,7 +1172,12 @@ let smsSeen = false,
 function showSmsBanner() {
   const banner = $("sms-banner");
   clearTimeout(smsBannerTimer);
-  banner.innerHTML = smsBannerHtml(state.booking, state.pin, state.dock);
+  banner.innerHTML = smsBannerHtml(
+    state.booking,
+    state.pin,
+    state.dock,
+    state.language,
+  );
   banner.style.transform = "";
   banner.classList.remove("hidden", "is-out", "is-dragging");
   void banner.offsetWidth; // commit display before the slide-in transition

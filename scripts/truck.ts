@@ -21,7 +21,7 @@ npm run truck -- input --brake --seconds 1
 npm run truck -- drive-to --x -24 --z 39
 npm run truck -- interact
 npm run truck -- walk-to --x -28 --z 29
-npm run truck -- register --booking PP-K4M7Q2
+npm run truck -- register --booking PP-K4M7Q2 [--language pl]
 npm run truck -- input --seconds 3          # the yard operator's phone buzzes
 npm run truck -- dispatch --dock 3          # free docks are listed in status
 npm run truck -- pin --pin 1234   # the PIN is in status once dispatched

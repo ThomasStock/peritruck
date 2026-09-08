@@ -28,7 +28,7 @@ Open the exact localhost address printed by Vite. No accounts, remote kiosk serv
 | R                   | Recover to last safe stop                   |
 | Escape / ?          | Pause, settings, remapping                  |
 
-The game speaks English, Dutch, French, German, Polish and Romanian: the same six languages as the kiosk. The start screen shows them as chips above the title, and the flag button in the top bar lists them at any time. The choice covers every layer of copy (start screen, HUD, mission card, docking guide, dialogs, results, the SMS on the driver's phone and the simulation's own toasts and prompts), persists in `localStorage` (`yard-language`). The game always opens in English; the browser's own language is deliberately not consulted. Copy lives in `src/i18n.ts`; the kiosk keeps its own production translations and language page, and the yard operator's phone stays in the operator's English.
+The game speaks English, Dutch, French, German, Polish and Romanian: the same six languages as the kiosk. The start screen shows them as chips above the title, and the flag button in the top bar lists them at any time. The choice covers every layer of copy (start screen, HUD, mission card, docking guide, dialogs, results and the simulation's own toasts and prompts), persists in `localStorage` (`yard-language`). The game always opens in English; the browser's own language is deliberately not consulted. Copy lives in `src/i18n.ts`; the kiosk keeps its own production translations and language page, the SMS on the driver's phone (and the handset's chrome) is sent in the language the driver picked on the kiosk, and the yard operator's phone stays in the operator's English.
 
 Touch steering and pedals appear on touch devices and small screens. Standard gamepads support left-stick steering, RT/LT pedals, B brake and A interaction. Controls can be remapped; arrow-key alternatives remain available. Gamepad mapping assumes the browser's standard layout and has not been tested with physical hardware.
 
@@ -86,7 +86,7 @@ npm run truck -- interact
 npm run truck -- walk-to --x -28 --z 29
 npm run truck -- walk-to --x -33.7 --z 28.2
 npm run truck -- interact
-npm run truck -- register --booking PP-K4M7Q2
+npm run truck -- register --booking PP-K4M7Q2 --language pl
 npm run truck -- input --seconds 3
 npm run truck -- dispatch --dock 3
 ```
@@ -142,7 +142,7 @@ npm run share-card   # Rebuild the link preview card from a running dev server
 | `src/prediction.ts`            | Projected tyre track, recomputed only when pose or controls change                                |
 | `src/rig.ts`                   | Driver rig: displacement-driven gait, turning, idle motion                                        |
 | `src/main.ts`                  | Input adapters, accessible overlays, HUD, sound and agent tool registration                       |
-| `src/i18n.ts`                  | Game copy in six languages; the current language for UI, SMS and simulation text                  |
+| `src/i18n.ts`                  | Game copy in six languages; the current language for UI and simulation text                       |
 | `src/kiosk/`                   | Kiosk replica: step flow, six-language copy, DOM view and stylesheet                              |
 | `src/dispatch/`                | Yard operator's phone: call-off flow, Yard Operator App replica, icons and stylesheet             |
 | `src/sms.ts`                   | The driver's phone: SMS banner and handset with the Messages thread                               |

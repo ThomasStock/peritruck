@@ -1,7 +1,8 @@
 /** Game copy in the four languages the game UI offers. DOM-free: the simulation
  * and the CLI import it too, so persistence and `<html lang>` live in main.ts.
- * The kiosk keeps its own production copy in `src/kiosk/i18n.ts`; the yard
- * operator's phone stays in the operator's language (English).
+ * The kiosk keeps its own production copy in `src/kiosk/i18n.ts`, and the SMS
+ * on the driver's phone follows the language chosen there; the yard operator's
+ * phone stays in the operator's language (English).
  */
 export const LANGUAGES = [
   { code: "en", native: "English", english: "English", flag: "GB" },
@@ -1343,43 +1344,8 @@ export const STRINGS = {
     fr: "{{stage}} : {{time}}",
     de: "{{stage}}: {{time}}",
   },
-  // SMS
-  "sms.line1": {
-    en: "Checked in for {{booking}} at Yard Shift Logistics, Ghent.",
-    nl: "Ingecheckt voor {{booking}} bij Yard Shift Logistics, Gent.",
-    fr: "Enregistré pour {{booking}} chez Yard Shift Logistics, Gand.",
-    de: "Eingecheckt für {{booking}} bei Yard Shift Logistics, Gent.",
-  },
-  "sms.pin": {
-    en: "Gate PIN: {{pin}}",
-    nl: "Poort-PIN: {{pin}}",
-    fr: "PIN de la barrière : {{pin}}",
-    de: "Tor-PIN: {{pin}}",
-  },
-  "sms.line3": {
-    en: "Enter it at the gate, then drive to dock {{dock}}.",
-    nl: "Voer die in aan de poort en rij dan naar dok {{dock}}.",
-    fr: "Saisissez-le à la barrière, puis roulez jusqu’au quai {{dock}}.",
-    de: "Gib sie am Tor ein und fahre dann zu Dock {{dock}}.",
-  },
-  "sms.now": {
-    en: "now",
-    nl: "nu",
-    fr: "maintenant",
-    de: "jetzt",
-  },
-  "sms.today": {
-    en: "Today",
-    nl: "Vandaag",
-    fr: "Aujourd’hui",
-    de: "Heute",
-  },
-  "sms.compose": {
-    en: "Text Message · SMS",
-    nl: "Bericht · SMS",
-    fr: "Message · SMS",
-    de: "Nachricht · SMS",
-  },
+  // SMS: the message body and phone chrome follow the driver's kiosk language
+  // (src/kiosk/i18n.ts); only the player-facing controls are translated here.
   "sms.dismiss": {
     en: "Dismiss",
     nl: "Sluiten",
