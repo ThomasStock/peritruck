@@ -36,12 +36,16 @@ let tracked: State | undefined,
 export function initAnalytics() {
   if (!enabled) return;
   amplitude.init(API_KEY, {
+    // Element, form and frustration (rage/dead click) capture give every
+    // click and tap a trail, so a suspicious leaderboard run can be replayed
+    // event by event. Input values are never captured by these plugins.
     autocapture: {
       sessions: true,
       pageViews: true,
-      formInteractions: false,
+      formInteractions: true,
       fileDownloads: false,
-      elementInteractions: false,
+      elementInteractions: true,
+      frustrationInteractions: true,
     },
     defaultTracking: false,
   });
@@ -148,6 +152,8 @@ export function trackAction(
     | "recover_used"
     | "leaderboard_opened"
     | "section_board_opened"
+    | "kiosk_registered"
+    | "reference_pasted"
     | "score_saved"
     | "visitor_dispatched"
     | "feedback_sent"
