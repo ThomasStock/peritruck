@@ -1629,15 +1629,16 @@ function viewState(): State {
 }
 function frame(now: number) {
   const wallDelta = Math.max(0, (now - last) / 1000);
-  // The controls dialog does not stop the clock or the simulation: pausing
-  // there let drivers copy the reference off the mission card at no cost.
-  // The yard keeps moving behind it; the modal only swallows the input.
+  // Neither the controls dialog nor the leaderboard stops the clock or the
+  // simulation: pausing there let drivers copy the reference off the mission
+  // card at no cost. The yard keeps moving behind them; the modals only
+  // swallow the input.
   if (started && !cliPaused) tickRace(state.race, wallDelta);
   const dt = Math.min(wallDelta, 0.05);
   last = now;
   const pad = navigator.getGamepads?.().find((g) => g?.connected) ?? undefined;
   const input = currentInput(pad),
-    dialogPaused = leaderboardOpen || cliPaused || document.hidden,
+    dialogPaused = cliPaused || document.hidden,
     // The driver also waits while the camera is with the yard operator.
     paused = dialogPaused || operatorBusy();
   const pressed = !!pad?.buttons[0]?.pressed;

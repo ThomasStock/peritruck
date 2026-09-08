@@ -308,9 +308,10 @@ test("race HUD waits for movement and keeps real time under the controls dialog 
     );
     run('keys.add("w"); frame(last + 50); keys.clear()');
     assert.equal(run("state.race.started"), true);
-    // The controls dialog does not pause: a frozen yard let drivers copy the
-    // reference off the mission card for free. Input is swallowed, so the rig
-    // only coasts, but the clock and the simulation keep going.
+    // Neither the controls dialog nor the leaderboard pauses: a frozen yard
+    // let drivers copy the reference off the mission card for free. Input is
+    // swallowed, so the rig only coasts, but the clock and the simulation keep
+    // going.
     document.getElementById("help")!.click();
     const elapsed = run("state.race.elapsed");
     assert.equal(run("currentInput().throttle"), 0);
@@ -326,8 +327,10 @@ test("race HUD waits for movement and keeps real time under the controls dialog 
     document.getElementById("leaderboard-button")!.click();
     run("updateUI()");
     assert.ok(document.getElementById("touch-controls")!.hidden);
+    const simElapsed = run("state.elapsed");
     run("frame(last + 3000)");
     assert.ok(Math.abs(run("state.race.elapsed") - (elapsed + 8)) < 1e-9);
+    assert.ok(run("state.elapsed") > simElapsed);
   } finally {
     dom.window.close();
   }
