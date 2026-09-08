@@ -26,7 +26,7 @@ Open the exact localhost address printed by Vite. No accounts, remote kiosk serv
 | E                   | Contextual interaction                      |
 | C                   | Follow / whole yard / overhead camera       |
 | R                   | Recover to last safe stop                   |
-| Escape / ?          | Pause, settings, remapping                  |
+| Escape / ?          | Settings, remapping (game keeps running)    |
 
 The game speaks English, Dutch, French, German, Polish and Romanian: the same six languages as the kiosk. The start screen shows them as chips above the title, and the flag button in the top bar lists them at any time. The choice covers every layer of copy (start screen, HUD, mission card, docking guide, dialogs, results, the SMS on the driver's phone and the simulation's own toasts and prompts), persists in `localStorage` (`yard-language`). The game always opens in English; the browser's own language is deliberately not consulted. Copy lives in `src/i18n.ts`; the kiosk keeps its own production translations and language page, and the yard operator's phone stays in the operator's English.
 

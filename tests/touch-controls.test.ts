@@ -298,7 +298,7 @@ test("kiosk hides controls; return walk restores joystick; entering truck restor
   }
 });
 
-test("race HUD waits for movement, holds under the controls dialog and keeps real time while the leaderboard is open", async () => {
+test("race HUD waits for movement and keeps real time under the controls dialog and the leaderboard", async () => {
   const { dom, run, document } = await game();
   try {
     run("frame(last + 5000)");
@@ -308,12 +308,16 @@ test("race HUD waits for movement, holds under the controls dialog and keeps rea
     );
     run('keys.add("w"); frame(last + 50); keys.clear()');
     assert.equal(run("state.race.started"), true);
+    // The controls dialog does not pause: a frozen yard let drivers copy the
+    // reference off the mission card for free. Input is swallowed, so the rig
+    // only coasts, but the clock and the simulation keep going.
     document.getElementById("help")!.click();
     const elapsed = run("state.race.elapsed");
-    const z = run("state.truck.z");
+    assert.equal(run("currentInput().throttle"), 0);
     run("frame(last + 5000)");
-    assert.equal(run("state.race.elapsed"), elapsed);
-    assert.equal(run("state.truck.z"), z);
+    // Wall time is a float difference of performance.now() values.
+    assert.ok(Math.abs(run("state.race.elapsed") - (elapsed + 5)) < 1e-9);
+    assert.ok(run("state.elapsed") > 0);
     assert.equal(
       document.getElementById("dialog-race-clock")!.textContent,
       document.getElementById("race-clock")!.textContent,
@@ -323,8 +327,7 @@ test("race HUD waits for movement, holds under the controls dialog and keeps rea
     run("updateUI()");
     assert.ok(document.getElementById("touch-controls")!.hidden);
     run("frame(last + 3000)");
-    // Wall time is a float difference of performance.now() values.
-    assert.ok(Math.abs(run("state.race.elapsed") - (elapsed + 3)) < 1e-9);
+    assert.ok(Math.abs(run("state.race.elapsed") - (elapsed + 8)) < 1e-9);
   } finally {
     dom.window.close();
   }
