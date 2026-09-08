@@ -21,6 +21,7 @@ import {
   DISPATCH_DELAY,
   docking,
 } from "./simulation";
+import { isLang as isDriverLang } from "../kiosk/i18n";
 export type Command = { op: string; [key: string]: unknown };
 function number(value: unknown, name: string, fallback?: number): number {
   if (value === undefined && fallback !== undefined) return fallback;
@@ -161,13 +162,18 @@ export function execute(s: State, raw: unknown) {
     case "interact":
       if (!interact(s)) throw new Error(s.message);
       break;
-    case "register":
+    case "register": {
       if (typeof c.booking !== "string")
         throw new Error("booking must be a string.");
+      const language = c.language ?? "en";
+      if (typeof language !== "string" || !isDriverLang(language))
+        throw new Error("language must be one of the kiosk languages.");
       if (c.phone !== undefined && typeof c.phone !== "string")
         throw new Error("phone must be a string.");
-      if (!register(s, c.booking, c.phone)) throw new Error(s.message);
+      if (!register(s, c.booking, language, c.phone))
+        throw new Error(s.message);
       break;
+    }
     case "pin":
       if (typeof c.pin !== "string") throw new Error("pin must be a string.");
       if (!enterPin(s, c.pin)) throw new Error(s.message);

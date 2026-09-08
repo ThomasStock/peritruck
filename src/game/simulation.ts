@@ -4,6 +4,7 @@
  */
 import { createRace, finishStage, tickRace, type Race } from "./race";
 import { obstacleName, t } from "../i18n";
+import type { Lang as DriverLang } from "../kiosk/i18n";
 export type Point = { x: number; z: number };
 export type Truck = Point & {
   heading: number;
@@ -47,6 +48,8 @@ export type State = {
   dock: number;
   pin: string;
   booking: string;
+  /** Language the driver chose on the kiosk; the check-in SMS is sent in it. */
+  language: DriverLang;
   /** Mobile number the driver typed at the kiosk (international format). Empty until registered. */
   phone: string;
   elapsed: number;
@@ -211,6 +214,7 @@ export function createState(): State {
     dock: 3,
     pin: randomPin(),
     booking: randomBooking(),
+    language: "en",
     phone: "",
     elapsed: 0,
     race: createRace(),
@@ -555,7 +559,12 @@ export function interact(s: State): boolean {
   } else if (s.phase === "gate") s.phase = "pin";
   return true;
 }
-export function register(s: State, booking: string, phone = ""): boolean {
+export function register(
+  s: State,
+  booking: string,
+  language: DriverLang = "en",
+  phone = "",
+): boolean {
   if (s.phase !== "kiosk") {
     note(s, t("note.checkInFirst"));
     return false;
@@ -565,6 +574,7 @@ export function register(s: State, booking: string, phone = ""): boolean {
     return false;
   }
   s.registered = true;
+  s.language = language;
   s.phone = phone.trim();
   finishStage((s.race ??= createRace()), 1);
   s.phase = "walk-truck";
@@ -893,6 +903,7 @@ export function snapshot(s: State) {
     parking: parking(s),
     docking: docking(s),
     pin: s.registered ? s.pin : null,
+    language: s.language ?? "en",
     elapsed: round(s.elapsed),
     race: s.race,
     distance: round(s.distance),

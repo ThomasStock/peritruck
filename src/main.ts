@@ -168,7 +168,8 @@ app.innerHTML = `
 <div id="modal-root"></div>
 `;
 const $ = (id: string) => document.getElementById(id)!;
-let registrationUsedScanning = false;
+let registrationUsedScanning = false,
+  referencePasted = false;
 let state = createState(),
   started = false,
   last = performance.now(),
@@ -345,6 +346,15 @@ function currentInput(gamepad?: Gamepad): Input {
   return i;
 }
 $("start").onclick = start;
+// A pasted reference explains a kiosk split that looks too quick to type.
+// Only the pasted length is recorded, never the text.
+$("modal-root").addEventListener("paste", (e) => {
+  if (!(e.target as Element | null)?.matches(".kiosk-input--reference")) return;
+  referencePasted = true;
+  trackAction("reference_pasted", state, {
+    length: e.clipboardData?.getData("text").trim().length ?? 0,
+  });
+});
 $("leaderboard-button").onclick = () => {
   leaderboardOpen = true;
   trackAction("leaderboard_opened", state, { started });
@@ -776,13 +786,18 @@ function syncDialog() {
     kiosk = mountKiosk($("modal-root"), {
       booking: state.booking,
       onQuit: closeDialog,
-      onComplete: (reference, usedDocumentScanning, phone) => {
-        if (register(state, reference, phone)) {
+      onComplete: (reference, usedDocumentScanning, language, phone) => {
+        if (register(state, reference, language, phone)) {
           registrationUsedScanning = usedDocumentScanning;
+          trackAction("kiosk_registered", state, {
+            scanned: usedDocumentScanning,
+            pasted: referencePasted,
+          });
           syncDialog();
         }
       },
     });
+    referencePasted = false;
     const kioskStage = $("modal-root").querySelector(".kiosk-stage");
     if (kioskStage) {
       kioskStage.classList.add("timed-kiosk");
@@ -795,7 +810,7 @@ function syncDialog() {
     // The driver reads the SMS on their phone and types the PIN into the gate terminal.
     modal(
       t("pin.title"),
-      `<p class="dialog-description">${t("pin.description")}</p><div class="gate-layout"><div class="phone-peek">${phoneHtml(state.booking, state.pin, smsClock || clock(), state.dock)}</div><form id="pin-form" class="gate-terminal"><div class="eyebrow"><span class="live-dot"></span> ${t("pin.terminal")}</div><label class="field">${t("pin.label")}<input id="pin-input" inputmode="none" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="${t("pin.aria")}" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? t("pin.delete") : k === "Clear" ? t("pin.clear") : k}">${k === "Clear" ? t("pin.clear") : k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">${t("pin.open")} <span>↗</span></button></form></div>`,
+      `<p class="dialog-description">${t("pin.description")}</p><div class="gate-layout"><div class="phone-peek">${phoneHtml(state.booking, state.pin, smsClock || clock(), state.dock, state.language)}</div><form id="pin-form" class="gate-terminal"><div class="eyebrow"><span class="live-dot"></span> ${t("pin.terminal")}</div><label class="field">${t("pin.label")}<input id="pin-input" inputmode="none" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="— — — —" aria-label="${t("pin.aria")}" required /></label><div class="pin-grid">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "Clear", "0", "⌫"].map((k) => `<button type="button" data-pin="${k}" aria-label="${k === "⌫" ? t("pin.delete") : k === "Clear" ? t("pin.clear") : k}">${k === "Clear" ? t("pin.clear") : k}</button>`).join("")}</div><div id="form-error" class="form-error" role="alert"></div><button class="primary" type="submit">${t("pin.open")} <span>↗</span></button></form></div>`,
       "pin-dialog",
     );
     for (const b of document.querySelectorAll<HTMLButtonElement>("[data-pin]"))
@@ -867,6 +882,7 @@ function syncDialog() {
           rank: saved.rank,
           persisted: saved.persisted,
           best: saved.rank === 1,
+          scanned: registrationUsedScanning,
         });
         identifyBest(leaderboard.list()[0]?.seconds ?? result.seconds);
         form.classList.add("hidden");
@@ -1171,7 +1187,12 @@ let smsSeen = false,
 function showSmsBanner() {
   const banner = $("sms-banner");
   clearTimeout(smsBannerTimer);
-  banner.innerHTML = smsBannerHtml(state.booking, state.pin, state.dock);
+  banner.innerHTML = smsBannerHtml(
+    state.booking,
+    state.pin,
+    state.dock,
+    state.language,
+  );
   banner.style.transform = "";
   banner.classList.remove("hidden", "is-out", "is-dragging");
   void banner.offsetWidth; // commit display before the slide-in transition
@@ -1629,18 +1650,16 @@ function viewState(): State {
 }
 function frame(now: number) {
   const wallDelta = Math.max(0, (now - last) / 1000);
-  // The controls dialog stops the clock: it is the one place a driver opens to
-  // read the keys, and a timer ticking behind a modal that says "paused" reads
-  // as a bug. The leaderboard and a hidden tab still count.
-  if (started && !cliPaused && !settingsOpen) tickRace(state.race, wallDelta);
+  // No dialog and no hidden tab stops the clock or the simulation: pausing
+  // there let drivers copy the reference off the mission card at no cost. The
+  // yard keeps moving behind them; the modals only swallow the input. Only the
+  // CLI pauses, and the camera cut to the operator holds the driver.
+  if (started && !cliPaused) tickRace(state.race, wallDelta);
   const dt = Math.min(wallDelta, 0.05);
   last = now;
   const pad = navigator.getGamepads?.().find((g) => g?.connected) ?? undefined;
   const input = currentInput(pad),
-    dialogPaused =
-      settingsOpen || leaderboardOpen || cliPaused || document.hidden,
-    // The driver also waits while the camera is with the yard operator.
-    paused = dialogPaused || operatorBusy();
+    paused = cliPaused || operatorBusy();
   const pressed = !!pad?.buttons[0]?.pressed;
   if (pressed && !lastGamepadAction && started && !paused) {
     interact(state);
@@ -1651,7 +1670,7 @@ function frame(now: number) {
   // Playtest aid, deliberately unlisted. It also skips the operator's call-off.
   const holdingSkip =
     started &&
-    !dialogPaused &&
+    !cliPaused &&
     keys.has("x") &&
     !Object.values(bindings).includes("x");
   if (!holdingSkip) skipHeldSince = 0;

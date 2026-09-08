@@ -443,6 +443,55 @@ export const STRINGS = {
     pl: "Wyczyść",
     ro: "Șterge",
   },
+  // The check-in SMS and the driver's phone: sent in the language chosen on the kiosk.
+  smsLine1: {
+    en: "Checked in for {{booking}} at Yard Shift Logistics, Ghent.",
+    nl: "Ingecheckt voor {{booking}} bij Yard Shift Logistics, Gent.",
+    fr: "Enregistré pour {{booking}} chez Yard Shift Logistics, Gand.",
+    de: "Eingecheckt für {{booking}} bei Yard Shift Logistics, Gent.",
+    pl: "Zameldowano dla {{booking}} w Yard Shift Logistics, Gandawa.",
+    ro: "Înregistrat pentru {{booking}} la Yard Shift Logistics, Gent.",
+  },
+  smsPin: {
+    en: "Gate PIN: {{pin}}",
+    nl: "Poort-PIN: {{pin}}",
+    fr: "PIN de la barrière : {{pin}}",
+    de: "Tor-PIN: {{pin}}",
+    pl: "PIN do bramy: {{pin}}",
+    ro: "PIN poartă: {{pin}}",
+  },
+  smsLine3: {
+    en: "Enter it at the gate, then drive to dock {{dock}}.",
+    nl: "Voer die in aan de poort en rij dan naar dok {{dock}}.",
+    fr: "Saisissez-le à la barrière, puis roulez jusqu’au quai {{dock}}.",
+    de: "Gib sie am Tor ein und fahre dann zu Dock {{dock}}.",
+    pl: "Wpisz go przy bramie, a następnie podjedź do doku {{dock}}.",
+    ro: "Introdu-l la poartă, apoi condu până la docul {{dock}}.",
+  },
+  smsNow: {
+    en: "now",
+    nl: "nu",
+    fr: "maintenant",
+    de: "jetzt",
+    pl: "teraz",
+    ro: "acum",
+  },
+  smsToday: {
+    en: "Today",
+    nl: "Vandaag",
+    fr: "Aujourd’hui",
+    de: "Heute",
+    pl: "Dzisiaj",
+    ro: "Astăzi",
+  },
+  smsCompose: {
+    en: "Text Message · SMS",
+    nl: "Bericht · SMS",
+    fr: "Message · SMS",
+    de: "Nachricht · SMS",
+    pl: "Wiadomość · SMS",
+    ro: "Mesaj · SMS",
+  },
 } satisfies Record<string, Copy>;
 export type StringKey = keyof typeof STRINGS;
 export function t(

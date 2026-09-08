@@ -29,15 +29,16 @@ import {
   submitPhone,
   submitReference,
 } from "./flow";
-import { LANGUAGES, type StringKey, t } from "./i18n";
+import { LANGUAGES, type Lang, type StringKey, t } from "./i18n";
 import { flags, icons } from "./icons";
 export type KioskOptions = {
   booking: string;
   onQuit: () => void;
-  /** Reference and phone as the driver confirmed them; the phone is international, e.g. +32 470 12 34 56. */
+  /** Reference, language and phone as the driver confirmed them; the phone is international, e.g. +32 470 12 34 56. */
   onComplete: (
     reference: string,
     usedDocumentScanning: boolean,
+    language: Lang,
     phone: string,
   ) => void;
 };
@@ -230,6 +231,7 @@ export function mountKiosk(
     opts.onComplete(
       fullReference(flow.booking, flow.reference),
       flow.usedDocumentScanning,
+      flow.language,
       formatPhone(flow.phoneCountry, flow.phoneNumber).international,
     );
   }
