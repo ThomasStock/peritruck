@@ -168,7 +168,10 @@ export function execute(s: State, raw: unknown) {
       const language = c.language ?? "en";
       if (typeof language !== "string" || !isDriverLang(language))
         throw new Error("language must be one of the kiosk languages.");
-      if (!register(s, c.booking, language)) throw new Error(s.message);
+      if (c.phone !== undefined && typeof c.phone !== "string")
+        throw new Error("phone must be a string.");
+      if (!register(s, c.booking, language, c.phone))
+        throw new Error(s.message);
       break;
     }
     case "pin":

@@ -31,6 +31,8 @@ import { dockTiles, homeTiles, icons, peripassTile } from "./icons";
 import { batteryIcon, clock, signalIcon, wifiIcon } from "../sms";
 export type DispatchOptions = {
   booking: string;
+  /** The driver's mobile number as typed at the kiosk. */
+  phone?: string;
   /** Call the driver off in the simulation. True, or the message to show. */
   onDispatch: (dock: number) => true | string;
   /** The operator has put the phone away; the caller removes the view. */
@@ -81,7 +83,7 @@ export function mountDispatch(
   opts: DispatchOptions,
 ): DispatchController {
   const flow = createFlow();
-  const visitor = visitorFor(opts.booking);
+  const visitor = visitorFor(opts.booking, opts.phone);
   const timers = new Set<ReturnType<typeof setTimeout>>();
   const later = (fn: () => void, ms: number) => {
     const id = setTimeout(() => {

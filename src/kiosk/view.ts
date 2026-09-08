@@ -34,10 +34,12 @@ import { flags, icons } from "./icons";
 export type KioskOptions = {
   booking: string;
   onQuit: () => void;
+  /** Reference, language and phone as the driver confirmed them; the phone is international, e.g. +32 470 12 34 56. */
   onComplete: (
     reference: string,
     usedDocumentScanning: boolean,
     language: Lang,
+    phone: string,
   ) => void;
 };
 export type KioskController = { flow: Flow; destroy(): void };
@@ -230,6 +232,7 @@ export function mountKiosk(
       fullReference(flow.booking, flow.reference),
       flow.usedDocumentScanning,
       flow.language,
+      formatPhone(flow.phoneCountry, flow.phoneNumber).international,
     );
   }
   function quit() {

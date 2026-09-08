@@ -50,6 +50,8 @@ export type State = {
   booking: string;
   /** Language the driver chose on the kiosk; the check-in SMS is sent in it. */
   language: DriverLang;
+  /** Mobile number the driver typed at the kiosk (international format). Empty until registered. */
+  phone: string;
   elapsed: number;
   race: Race;
   distance: number;
@@ -119,8 +121,23 @@ export const SLOW_ZONE = 4;
 export const SMS_DELAY = 2;
 /** Seconds between leaving the kiosk and the yard operator's phone buzzing. */
 export const DISPATCH_DELAY = 2;
-/** The booking reference printed on the delivery note: fixed prefix, six-character body. */
-export const BOOKING = "PP-K4M7Q2";
+/** Fixed prefix of the booking reference printed on the delivery note. */
+export const BOOKING_PREFIX = "PP-";
+/** Characters drawn for the booking body: no 0/O or 1/I, so the delivery note reads unambiguously. */
+const BOOKING_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+const BOOKING_DIGITS = "23456789";
+const pick = (chars: string) => chars[Math.floor(Math.random() * chars.length)];
+/** A fresh booking reference for every session: PP- and six characters that
+ * always mix letters and digits, so it has to be read off the note, not guessed. */
+export function randomBooking(): string {
+  for (;;) {
+    let body = "";
+    for (let i = 0; i < 6; i++)
+      body += pick(Math.random() < 0.5 ? BOOKING_LETTERS : BOOKING_DIGITS);
+    const letters = body.replace(/\d/g, "").length;
+    if (letters >= 2 && letters <= 4) return BOOKING_PREFIX + body;
+  }
+}
 /** A fresh four-digit gate PIN for every session; leading zeros are kept. */
 export const randomPin = () =>
   String(Math.floor(Math.random() * 10000)).padStart(4, "0");
@@ -196,8 +213,9 @@ export function createState(): State {
     dispatched: false,
     dock: 3,
     pin: randomPin(),
-    booking: BOOKING,
+    booking: randomBooking(),
     language: "en",
+    phone: "",
     elapsed: 0,
     race: createRace(),
     distance: 0,
@@ -545,6 +563,7 @@ export function register(
   s: State,
   booking: string,
   language: DriverLang = "en",
+  phone = "",
 ): boolean {
   if (s.phase !== "kiosk") {
     note(s, t("note.checkInFirst"));
@@ -556,6 +575,7 @@ export function register(
   }
   s.registered = true;
   s.language = language;
+  s.phone = phone.trim();
   finishStage((s.race ??= createRace()), 1);
   s.phase = "walk-truck";
   // The yard operator's phone buzzes a moment after the driver leaves the kiosk.
@@ -871,6 +891,8 @@ export function snapshot(s: State) {
     assisted: s.assisted,
     gateOpen: s.gateOpen,
     registered: s.registered,
+    booking: s.booking,
+    phone: s.phone,
     dispatched: s.dispatched,
     dock: s.dock,
     docks: DOCKS.map((d) => ({ ...d, status: dockStatus(d.number) })),
