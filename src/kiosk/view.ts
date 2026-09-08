@@ -34,7 +34,12 @@ import { flags, icons } from "./icons";
 export type KioskOptions = {
   booking: string;
   onQuit: () => void;
-  onComplete: (reference: string, usedDocumentScanning: boolean) => void;
+  /** Reference and phone as the driver confirmed them; the phone is international, e.g. +32 470 12 34 56. */
+  onComplete: (
+    reference: string,
+    usedDocumentScanning: boolean,
+    phone: string,
+  ) => void;
 };
 export type KioskController = { flow: Flow; destroy(): void };
 type Overlay = null | "help" | "leave" | "country";
@@ -225,6 +230,7 @@ export function mountKiosk(
     opts.onComplete(
       fullReference(flow.booking, flow.reference),
       flow.usedDocumentScanning,
+      formatPhone(flow.phoneCountry, flow.phoneNumber).international,
     );
   }
   function quit() {

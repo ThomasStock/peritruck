@@ -62,7 +62,9 @@ test("complete delivery through real controls: park, walk, register, PIN, revers
 test("deterministic controls produce identical outcomes and replay split durations", () => {
   const a = createState(),
     b = createState();
-  b.pin = a.pin; // the PIN is the only random part of a fresh session
+  // The PIN and booking are the only random parts of a fresh session.
+  b.pin = a.pin;
+  b.booking = a.booking;
   const i = { ...idleInput(), throttle: 1, steer: 0.17 };
   advance(a, i, 3);
   advance(b, i, 1);
@@ -412,13 +414,33 @@ test("skipping from the road or on foot snaps to the gate line first", () => {
   assert.ok(s.truck.z < YARD.gateZ);
 });
 
-test("every session draws a fresh four-digit PIN and keeps the six-character booking", () => {
-  const pins = new Set(Array.from({ length: 50 }, () => createState().pin));
+test("every session draws a fresh four-digit PIN and a fresh six-character booking", () => {
+  const states = Array.from({ length: 50 }, () => createState());
+  const pins = new Set(states.map((s) => s.pin));
   for (const pin of pins) assert.match(pin, /^\d{4}$/);
   assert.ok(pins.size > 1);
+  const bookings = new Set(states.map((s) => s.booking));
+  assert.ok(bookings.size > 1);
+  for (const booking of bookings) {
+    assert.match(booking, /^PP-[A-HJ-NP-Z2-9]{6}$/);
+    const body = booking.slice(3);
+    assert.match(body, /[A-Z]/, `${booking} has no letter`);
+    assert.match(body, /\d/, `${booking} has no digit`);
+  }
+});
+
+test("register keeps the phone the driver typed; the CLI may leave it out", () => {
   const s = createState();
-  assert.equal(s.booking, "PP-K4M7Q2");
-  assert.equal(s.booking.slice(s.booking.indexOf("-") + 1).length, 6);
+  assert.equal(s.phone, "");
+  driveTo(s, { x: -24, z: 39 });
+  interact(s);
+  walkTo(s, { x: -28, z: 29 });
+  walkTo(s, YARD.kiosk);
+  interact(s);
+  assert.ok(register(s, s.booking, " +32 470 99 88 77 "));
+  assert.equal(s.phone, "+32 470 99 88 77");
+  assert.equal(snapshot(s).phone, "+32 470 99 88 77");
+  assert.equal(snapshot(s).booking, s.booking);
 });
 
 // Original SAT arithmetic, kept independent from production corners/overlap helpers.

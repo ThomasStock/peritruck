@@ -79,9 +79,12 @@ export type Visitor = {
   loadingType: "LiveLoading";
   fields: Field[];
 };
+/** Phone shown when the check-in came in without one (CLI register). */
+export const FALLBACK_PHONE = "+32 470 12 34 56";
 /** The driver who just checked in, as the queue lists them. Details come from
- * the delivery note that lies next to the kiosk. */
-export function visitorFor(booking: string): Visitor {
+ * the delivery note that lies next to the kiosk; the phone is what the driver
+ * typed there. */
+export function visitorFor(booking: string, phone = ""): Visitor {
   return {
     id: 4171,
     name: `Yard Shift Transport · ${booking}`,
@@ -93,7 +96,7 @@ export function visitorFor(booking: string): Visitor {
       { label: "Visit type", value: "Inbound delivery" },
       { label: "Goods", value: "General cargo · 12 pallets" },
       { label: "Time slot", value: "09:30 – 10:00" },
-      { label: "Phone", value: "+32 470 12 34 56", kind: "phone" },
+      { label: "Phone", value: phone.trim() || FALLBACK_PHONE, kind: "phone" },
     ],
   };
 }

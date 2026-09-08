@@ -14,7 +14,6 @@ import "./sms.css";
 import "./dispatch/dispatch.css";
 import { YardScene } from "./scene";
 import {
-  BOOKING,
   createState,
   idleInput,
   step,
@@ -152,7 +151,7 @@ app.innerHTML = `
 <header class="topbar"><a class="brand" href="/" aria-label="Peripass"><img src="/brand/peripass.svg" alt="Peripass"/></a><div class="top-actions"><div class="lang-control"><button id="language" class="lang-button" aria-haspopup="listbox" aria-expanded="false"></button><div id="language-menu" class="lang-menu" role="listbox" hidden></div></div><button id="leaderboard-button" class="leaderboard-button">♛ <span data-t="topbar.leaderboard"></span></button><button id="feedback" class="feedback-button" data-t="topbar.feedback" data-t-title="topbar.feedbackTitle"></button><button id="camera" class="icon-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg></button><button id="help" class="icon-button" data-t-aria="topbar.helpAria" data-t-title="topbar.helpTitle">?</button></div></header>
 <section id="intro" class="intro panel"><div id="intro-languages" class="intro-languages" role="radiogroup"></div><div class="race-kicker" data-t="intro.kicker"></div><h1 data-t-html="intro.title"></h1><p data-t="intro.tagline"></p><div class="intro-stages">${STAGES.map((stage, i) => `<span><b>0${i + 1}</b><span data-t="stage.${stage.key}.short"></span></span>`).join("")}</div><button id="start" class="primary" disabled></button><small class="race-intro-note" data-t="intro.note"></small></section>
 <section id="race-hud" class="race-hud hidden" data-t-aria="race.progressAria"><div class="race-clock-row"><div><span class="race-kicker" id="race-status"></span><strong id="race-clock" role="timer" data-t-aria="race.elapsedAria">00:00.00</strong></div></div><ol class="race-stages">${STAGES.map((stage, i) => `<li id="race-stage-${i}"><span class="stage-number">${i + 1}</span><span data-t="stage.${stage.key}.short"></span><b id="race-split-${i}">—</b></li>`).join("")}</ol></section>
-<aside id="mission" class="mission panel hidden"><div class="eyebrow" id="step-label"></div><h1 id="objective-title"></h1><p id="objective-detail"></p><div class="mission-progress"><i></i><i></i><i></i><i></i></div><div class="delivery-note"><span id="note-label"></span><b id="delivery-reference">${BOOKING} <span>→</span> ${t("mission.city")}</b><small id="note-detail"></small></div><div id="stage-hint" class="stage-hint"></div></aside>
+<aside id="mission" class="mission panel hidden"><div class="eyebrow" id="step-label"></div><h1 id="objective-title"></h1><p id="objective-detail"></p><div class="mission-progress"><i></i><i></i><i></i><i></i></div><div class="delivery-note"><span id="note-label"></span><b id="delivery-reference"></b><small id="note-detail"></small></div><div id="stage-hint" class="stage-hint"></div></aside>
 <button id="map-button" class="minimap panel hidden" data-t-aria="map.showAria"><div><span data-t="map.title"></span><span>↗</span></div><canvas id="map" width="340" height="270" data-t-aria="map.canvasAria"></canvas><span class="map-key"><i></i> <small data-t="map.you"></small> <b>◎</b> <small data-t="map.destination"></small> <span class="map-north">N ↑</span></span></button>
 <div id="target-label" class="target-label hidden"><span id="target-symbol" class="target-number">P</span><div><b id="target-name"></b><small id="target-distance"></small></div></div>
 <div id="action-wrap" class="action-wrap hidden"><button id="interact" class="action"><kbd id="interact-key">E</kbd><span id="action-text"></span><span>↗</span></button></div>
@@ -777,8 +776,8 @@ function syncDialog() {
     kiosk = mountKiosk($("modal-root"), {
       booking: state.booking,
       onQuit: closeDialog,
-      onComplete: (reference, usedDocumentScanning) => {
-        if (register(state, reference)) {
+      onComplete: (reference, usedDocumentScanning, phone) => {
+        if (register(state, reference, phone)) {
           registrationUsedScanning = usedDocumentScanning;
           syncDialog();
         }
@@ -1308,6 +1307,7 @@ function syncOperator() {
     operatorDone = false;
     dispatchUi = mountDispatch($("dispatch-root"), {
       booking: state.booking,
+      phone: state.phone,
       onDispatch: (dock) => {
         if (!dispatch(state, dock)) return state.message;
         operatorDone = true;

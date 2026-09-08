@@ -38,7 +38,7 @@ Reverse assist is on by default. In reverse, the steering command asks the _trai
 
 ## Kiosk check-in
 
-The kiosk is a replica of the Peripass kiosk app. On a desktop viewport it renders as a physical kiosk with navigation rails; on phone-sized viewports it renders as the Mobile Driver Portal with the inline top bar. Your delivery note lies next to the kiosk (desktop). On mobile it is a drawer on the right, offered only on the reference step: tap the **Delivery note** tab or swipe it in to read it, and keep it open while you type. Swipe it out, tap the tab or **Hide** to put it away. It carries the reference `PP-K4M7Q2`.
+The kiosk is a replica of the Peripass kiosk app. On a desktop viewport it renders as a physical kiosk with navigation rails; on phone-sized viewports it renders as the Mobile Driver Portal with the inline top bar. Your delivery note lies next to the kiosk (desktop). On mobile it is a drawer on the right, offered only on the reference step: tap the **Delivery note** tab or swipe it in to read it, and keep it open while you type. Swipe it out, tap the tab or **Hide** to put it away. It carries the booking reference: `PP-` and six characters mixing letters and digits, drawn fresh every session (e.g. `PP-K4M7Q2`).
 
 | Step       | What the driver sees                                                                                          |
 | ---------- | ------------------------------------------------------------------------------------------------------------- |
@@ -86,7 +86,8 @@ npm run truck -- interact
 npm run truck -- walk-to --x -28 --z 29
 npm run truck -- walk-to --x -33.7 --z 28.2
 npm run truck -- interact
-npm run truck -- register --booking PP-K4M7Q2
+npm run truck -- status                     # read the session's booking reference
+npm run truck -- register --booking PP-K4M7Q2 --phone "+32 470 12 34 56"
 npm run truck -- input --seconds 3
 npm run truck -- dispatch --dock 3
 ```

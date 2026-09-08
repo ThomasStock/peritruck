@@ -164,7 +164,9 @@ export function execute(s: State, raw: unknown) {
     case "register":
       if (typeof c.booking !== "string")
         throw new Error("booking must be a string.");
-      if (!register(s, c.booking)) throw new Error(s.message);
+      if (c.phone !== undefined && typeof c.phone !== "string")
+        throw new Error("phone must be a string.");
+      if (!register(s, c.booking, c.phone)) throw new Error(s.message);
       break;
     case "pin":
       if (typeof c.pin !== "string") throw new Error("pin must be a string.");

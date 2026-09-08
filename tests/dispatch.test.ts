@@ -13,6 +13,7 @@ import {
 import { demo, execute, walkTo } from "../src/game/commands";
 import {
   COPY,
+  FALLBACK_PHONE,
   LOCATIONS,
   another,
   back,
@@ -116,10 +117,20 @@ test("locations mirror the yard's docks, tagged like the production app", () => 
     ],
   );
   assert.equal(LOCATIONS[4].asset?.name, "1-KLM-482");
-  const visitor = visitorFor("PP-K4M7Q2");
+  const visitor = visitorFor("PP-K4M7Q2", "+31 6 1234 5678");
   assert.match(visitor.name, /PP-K4M7Q2/);
   assert.ok(
     visitor.fields.some((f) => f.kind === "plate" && f.value === "1-YRD-048"),
+  );
+  assert.ok(
+    visitor.fields.some(
+      (f) => f.kind === "phone" && f.value === "+31 6 1234 5678",
+    ),
+  );
+  assert.ok(
+    visitorFor("PP-K4M7Q2").fields.some(
+      (f) => f.kind === "phone" && f.value === FALLBACK_PHONE,
+    ),
   );
 });
 
