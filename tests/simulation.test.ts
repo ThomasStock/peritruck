@@ -291,8 +291,15 @@ test("the yard operator is called shortly after leaving the kiosk; the gate PIN 
   const s = createState();
   assert.equal(smsReceived(s), false);
   s.phase = "kiosk";
-  assert.ok(register(s, s.booking));
+  assert.equal(s.language, "en");
+  assert.ok(register(s, s.booking, "ro"));
   assert.equal(s.registered, true);
+  assert.equal(
+    s.language,
+    "ro",
+    "the kiosk language travels with the check-in",
+  );
+  assert.equal(snapshot(s).language, "ro");
   assert.equal(s.dispatched, false);
   assert.equal(smsReceived(s), false);
   assert.equal(s.message, "");

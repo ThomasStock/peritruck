@@ -4,6 +4,7 @@
  */
 import { createRace, finishStage, tickRace, type Race } from "./race";
 import { obstacleName, t } from "../i18n";
+import type { Lang as DriverLang } from "../kiosk/i18n";
 export type Point = { x: number; z: number };
 export type Truck = Point & {
   heading: number;
@@ -47,6 +48,8 @@ export type State = {
   dock: number;
   pin: string;
   booking: string;
+  /** Language the driver chose on the kiosk; the check-in SMS is sent in it. */
+  language: DriverLang;
   elapsed: number;
   race: Race;
   distance: number;
@@ -194,6 +197,7 @@ export function createState(): State {
     dock: 3,
     pin: randomPin(),
     booking: BOOKING,
+    language: "en",
     elapsed: 0,
     race: createRace(),
     distance: 0,
@@ -537,7 +541,11 @@ export function interact(s: State): boolean {
   } else if (s.phase === "gate") s.phase = "pin";
   return true;
 }
-export function register(s: State, booking: string): boolean {
+export function register(
+  s: State,
+  booking: string,
+  language: DriverLang = "en",
+): boolean {
   if (s.phase !== "kiosk") {
     note(s, t("note.checkInFirst"));
     return false;
@@ -547,6 +555,7 @@ export function register(s: State, booking: string): boolean {
     return false;
   }
   s.registered = true;
+  s.language = language;
   finishStage((s.race ??= createRace()), 1);
   s.phase = "walk-truck";
   // The yard operator's phone buzzes a moment after the driver leaves the kiosk.
@@ -872,6 +881,7 @@ export function snapshot(s: State) {
     parking: parking(s),
     docking: docking(s),
     pin: s.registered ? s.pin : null,
+    language: s.language ?? "en",
     elapsed: round(s.elapsed),
     race: s.race,
     distance: round(s.distance),
