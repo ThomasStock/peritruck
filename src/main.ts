@@ -638,16 +638,19 @@ document.addEventListener("visibilitychange", () => {
   clearInput();
   accumulator = 0;
 });
-function modal(title: string, body: string, cls = "") {
+function hiringBanner() {
+  return `<a class="hiring-banner" href="https://peripass.recruitee.com/" target="_blank" rel="noopener noreferrer"><span class="hiring-banner__badge">${t("hiring.badge")}</span><span class="hiring-banner__copy"><strong>${t("hiring.title")}</strong><span class="hiring-banner__cta">${t("hiring.cta")}</span></span><span class="hiring-banner__arrow" aria-hidden="true">↗</span></a>`;
+}
+function modal(title: string, body: string, cls = "", hiring = false) {
   modalReturnFocus = document.activeElement as HTMLElement;
   $("modal-root").innerHTML =
-    `<div class="modal-scrim"><section class="dialog ${cls}" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabindex="-1"><button class="dialog-close" id="close-dialog" aria-label="${t("dialog.close")}">×</button><div class="eyebrow">PERIPASS${state.race.started && state.phase !== "complete" ? `<span id="dialog-race-clock" class="dialog-race-clock" role="timer" aria-label="${t("race.elapsedAria")}">${formatTime(state.race.elapsed)}</span>` : ""}</div><h2 id="dialog-title">${title}</h2>${body}</section></div>`;
+    `<div class="modal-scrim"><section class="${hiring ? "hiring-modal" : `dialog ${cls}`}" role="dialog" aria-modal="true" aria-labelledby="dialog-title" tabindex="-1">${hiring ? `${hiringBanner()}<div class="dialog ${cls}">` : ""}<button class="dialog-close" id="close-dialog" aria-label="${t("dialog.close")}">×</button><div class="eyebrow">PERIPASS${state.race.started && state.phase !== "complete" ? `<span id="dialog-race-clock" class="dialog-race-clock" role="timer" aria-label="${t("race.elapsedAria")}">${formatTime(state.race.elapsed)}</span>` : ""}</div><h2 id="dialog-title">${title}</h2>${body}${hiring ? "</div>" : ""}</section></div>`;
   $("close-dialog").onclick = closeDialog;
   clearInput();
   // Move focus onto the dialog itself, not its first control, so nothing
   // lights up on open while Escape and the Tab trap keep working.
   $("modal-root")
-    .querySelector<HTMLElement>(".dialog")
+    .querySelector<HTMLElement>('[role="dialog"]')
     ?.focus({ preventScroll: true });
 }
 function syncDialog() {
@@ -716,6 +719,7 @@ function syncDialog() {
       t("lb.title"),
       `<p class="dialog-description">${board("lb.descGlobal", "lb.descLocal")}</p><div id="time-to-beat" class="time-to-beat"></div><div id="leaderboard-list"></div><p class="local-note">${board("lb.noteGlobal", "lb.noteLocal")}</p><button id="back-to-yard" class="primary">${t("lb.back")} <span>↗</span></button>`,
       "leaderboard-dialog",
+      true,
     );
     refreshBest();
     renderLeaderboard();
@@ -856,6 +860,7 @@ function syncDialog() {
           : t("res.titlePractice"),
       `<div class="finish-stripe" aria-hidden="true"></div><div class="result-badge">${!eligible ? t("res.badgePractice") : newBest ? board("res.badgeBestGlobal", "res.badgeBestLocal") : t("res.badgeComplete")}</div><div class="result-time">${formatTime(result.seconds)}</div><p class="result-comparison">${!eligible ? t("res.tryFull") : !best ? t("res.firstRun") : newBest ? t(shared ? "res.fasterGlobal" : "res.fasterLocal", { time: formatTime(best.seconds - result.seconds) }) : t(shared ? "res.offGlobal" : "res.offLocal", { time: formatTime(result.seconds - best.seconds) })}</p><div id="result-splits"></div><div class="result-stats"><span>${t("res.contacts", { n: result.contacts })}</span><span>${t("res.recoveries", { n: result.recoveries })}</span><span>${t(result.assisted ? "res.assistOn" : "res.classic")}</span></div>${registrationUsedScanning ? "" : `<aside class="result-pro-tip"><span class="result-pro-tip__icon">${icons.scan}</span><div><span class="result-pro-tip__label">${t("res.scanTipLabel")}</span><h3>${t("res.scanTipTitle")}</h3><p>${t("res.scanTipBody")}</p></div></aside>`}<form id="score-form" class="score-form ${saved || !eligible ? "hidden" : ""}"><label for="player-name">${t("res.nameLabel")}</label><div><input id="player-name" maxlength="24" placeholder="${t("res.namePlaceholder")}" autocomplete="nickname" required aria-describedby="save-status"/><button class="primary" type="submit">${t("res.save")} <span>↗</span></button></div></form><p id="save-status" class="local-note" role="status">${!eligible ? t("res.practiceNote") : saved ? t("res.onBoard") : board("res.saveGlobal", "res.saveLocal")}</p><div class="result-board-title"><b>${t("res.legends")}</b><span>${board("res.top20Global", "res.top20Local")}</span></div><div id="leaderboard-list" class="board-scroll"></div><button id="play-again" class="primary play-again">${t("res.again")} <span>↻</span></button><button id="results-feedback" class="secondary results-feedback">${t("res.feedback")}</button>`,
       "complete-dialog race-results",
+      true,
     );
     $("results-feedback").onclick = () => openFeedback("results");
     $("close-dialog").classList.add("hidden");

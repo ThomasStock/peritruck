@@ -22,6 +22,25 @@ export function setLanguage(lang: Lang) {
 }
 type Copy = Record<Lang, string>;
 export const STRINGS = {
+  // Recruitment banner
+  "hiring.badge": {
+    en: "We’re hiring!",
+    nl: "Wij zoeken talent!",
+    fr: "On recrute !",
+    de: "Wir stellen ein!",
+  },
+  "hiring.title": {
+    en: "Ready for your next move?",
+    nl: "Klaar voor je volgende stap?",
+    fr: "Prêt pour votre prochain défi ?",
+    de: "Bereit für deinen nächsten Schritt?",
+  },
+  "hiring.cta": {
+    en: "Explore open roles",
+    nl: "Bekijk onze vacatures",
+    fr: "Découvrez nos offres",
+    de: "Entdecke offene Stellen",
+  },
   // Top bar
   "topbar.leaderboard": {
     en: "Leaderboard",

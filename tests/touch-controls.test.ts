@@ -348,7 +348,7 @@ test("a completed delivery renders splits, saves a literal driver name once, and
     );
     assert.equal(
       document.activeElement,
-      document.querySelector(".race-results"),
+      document.querySelector('[role="dialog"]'),
     );
     const name = document.getElementById("player-name") as HTMLInputElement;
     name.value = "<b>Truck hero</b>";
@@ -378,7 +378,7 @@ test("a completed delivery renders splits, saves a literal driver name once, and
     assert.equal(run("state.phase"), "arrive");
     assert.equal(run("state.race.elapsed"), 0);
     assert.equal(run("state.race.started"), false);
-    assert.equal(document.querySelector(".race-results"), null);
+    assert.equal(document.querySelector('[role="dialog"]'), null);
     // "Time to beat" never appears on the start screen or the in-race HUD.
     assert.equal(document.getElementById("race-best"), null);
     assert.equal(document.getElementById("intro-best"), null);
